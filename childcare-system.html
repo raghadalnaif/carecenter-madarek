@@ -873,30 +873,55 @@ reports(){
     </table>
   </div>`:''}
   ${tab==='attendance'?`
+  <div class="card" style="padding:14px;margin-bottom:16px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="input-group" style="margin:0;flex:1;min-width:180px">
+        <label style="font-size:12px">🔍 بحث باسم الطفل</label>
+        <input class="input" id="att-search" placeholder="اكتب الاسم..." value="${esc(App.params.attQ||'')}" oninput="App.go('reports',{tab:'attendance',attQ:this.value,attFrom:document.getElementById('att-from')?.value||'',attTo:document.getElementById('att-to')?.value||''})">
+      </div>
+      <div class="input-group" style="margin:0;min-width:140px">
+        <label style="font-size:12px">📅 من تاريخ</label>
+        <input class="input" id="att-from" type="date" value="${App.params.attFrom||''}" onchange="App.go('reports',{tab:'attendance',attQ:document.getElementById('att-search')?.value||'',attFrom:this.value,attTo:document.getElementById('att-to')?.value||''})">
+      </div>
+      <div class="input-group" style="margin:0;min-width:140px">
+        <label style="font-size:12px">📅 إلى تاريخ</label>
+        <input class="input" id="att-to" type="date" value="${App.params.attTo||''}" onchange="App.go('reports',{tab:'attendance',attQ:document.getElementById('att-search')?.value||'',attFrom:document.getElementById('att-from')?.value||'',attTo:this.value})">
+      </div>
+      ${(App.params.attQ||App.params.attFrom||App.params.attTo)?`<button class="btn btn-secondary btn-sm" onclick="App.go('reports',{tab:'attendance'})">✕ مسح الفلتر</button>`:''}
+    </div>
+  </div>
   <div class="card">
-    <div class="card-title">تقرير حضور الأطفال</div>
+    <div class="card-title">تقرير حضور الأطفال${App.params.attFrom||App.params.attTo?` (${App.params.attFrom||'البداية'} — ${App.params.attTo||'اليوم'})`:''}</div>
     <table>
-      <thead><tr><th>الطفل</th><th>الحضور</th><th>الغياب</th><th>التأخر</th><th>إجمالي الأيام</th><th>نسبة الحضور</th></tr></thead>
+      <thead><tr><th>الطفل</th><th>الفرع / الفترة</th><th>حضور</th><th>غياب</th><th>تأخر</th><th>الأيام</th><th>النسبة</th><th>تفاصيل</th></tr></thead>
       <tbody>
-        ${children.map(c=>{
-          const cAtt=attList.filter(a=>a.childId===c.id);
+        ${children.filter(c=>!(App.params.attQ)||c.name.includes(App.params.attQ||'')).map(c=>{
+          let cAtt=attList.filter(a=>a.childId===c.id);
+          if(App.params.attFrom) cAtt=cAtt.filter(a=>a.date>=App.params.attFrom);
+          if(App.params.attTo) cAtt=cAtt.filter(a=>a.date<=App.params.attTo);
           const present=cAtt.filter(a=>a.status==='present').length;
           const absent=cAtt.filter(a=>a.status==='absent').length;
           const late=cAtt.filter(a=>a.status==='late').length;
           const total=cAtt.length||1;
           const pct=Math.round((present+late)/total*100);
+          const lastAbs=cAtt.filter(a=>a.status==='absent').sort((a,b)=>b.date.localeCompare(a.date))[0];
           return `<tr>
-            <td><strong>${esc(c.name)}</strong></td>
-            <td style="color:#10b981;font-weight:600">${present}</td>
-            <td style="color:#ef4444;font-weight:600">${absent}</td>
-            <td style="color:#f59e0b;font-weight:600">${late}</td>
-            <td>${total}</td>
+            <td><strong>${esc(c.name)}</strong><br><small style="color:#94a3b8">${esc(c.parentName)}</small></td>
             <td>
-              <div style="display:flex;align-items:center;gap:8px">
-                <div class="progress-bar" style="width:80px"><div class="progress-fill" style="width:${pct}%;background:${pct>80?'#10b981':pct>60?'#f59e0b':'#ef4444'}"></div></div>
-                <span style="font-size:13px;font-weight:600">${pct}%</span>
+              <span class="badge badge-blue" style="font-size:10px">🏢 ${DB.branchName(c.branchId)}</span><br>
+              <span class="badge ${c.period==='morning'?'badge-blue':'badge-orange'}" style="font-size:10px;margin-top:2px">${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'}</span>
+            </td>
+            <td style="color:#10b981;font-weight:700">${present}</td>
+            <td style="color:#ef4444;font-weight:700">${absent}</td>
+            <td style="color:#f59e0b;font-weight:700">${late}</td>
+            <td style="color:#64748b">${cAtt.length}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px">
+                <div class="progress-bar" style="width:60px"><div class="progress-fill" style="width:${pct}%;background:${pct>80?'#10b981':pct>60?'#f59e0b':'#ef4444'}"></div></div>
+                <span style="font-size:12px;font-weight:700">${pct}%</span>
               </div>
             </td>
+            <td style="font-size:11px;color:#94a3b8">${lastAbs?'آخر غياب: '+formatDate(lastAbs.date):'—'}</td>
           </tr>`;
         }).join('')}
       </tbody>
