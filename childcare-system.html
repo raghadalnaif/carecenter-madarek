@@ -107,6 +107,11 @@ tr:hover td{background:#f8fafc}
 .wa-btn{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;background:#25d366;color:#fff;border-radius:8px;text-decoration:none;font-family:'Tajawal',sans-serif;font-weight:600;font-size:14px;transition:.2s}
 .wa-btn:hover{background:#22c55e}
 .page-hidden{display:none}
+.pm-btn{background:#f1f5f9;color:#475569;border:2px solid #e2e8f0;padding:9px 18px;font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;font-family:'Tajawal',sans-serif;transition:.2s}
+.pm-btn:hover{background:#e2e8f0}
+.pm-btn.pm-active{background:#f0fdf4;color:#0f766e;border-color:#0f766e}
+.receipt-preview{margin-top:8px;display:none}
+.receipt-preview img{max-width:100%;max-height:130px;border-radius:8px;border:1px solid #e2e8f0;object-fit:contain}
 </style>
 </head>
 <body>
@@ -691,7 +696,7 @@ subscriptions(){
   </div>
   <div class="card">
     <table>
-      <thead><tr><th>الطفل</th><th>النوع</th><th>يبدأ</th><th>ينتهي</th><th>المبلغ</th><th>حالة الدفع</th><th>المتبقي</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+      <thead><tr><th>الطفل</th><th>النوع</th><th>يبدأ</th><th>ينتهي</th><th>المبلغ</th><th>طريقة الدفع</th><th>حالة الدفع</th><th>الحالة</th><th>إجراءات</th></tr></thead>
       <tbody>
         ${filtered.length?filtered.map(s=>{
           const child=DB.children().find(c=>c.id===s.childId);
@@ -700,14 +705,19 @@ subscriptions(){
           const stMap={active:'badge-green',today:'badge-yellow',soon3:'badge-orange',soon7:'badge-blue',expired:'badge-red',none:'badge-gray'};
           const stLbl={active:'نشط',today:'ينتهي اليوم',soon3:`${daysLeft} أيام`,soon7:`${daysLeft} أيام`,expired:'منتهي',none:'—'};
           const typeMap={daily:'يومي',weekly:'أسبوعي',monthly:'شهري'};
+          const pmLabel={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'}[s.paymentMethod]||'—';
           return `<tr>
-            <td><strong>${esc(child?.name||'—')}</strong>${Auth.isSuperAdmin()?`<br><small style="color:#94a3b8">${DB.schoolName(s.schoolId)}</small>`:''}</td>
+            <td>
+              <strong>${esc(child?.name||'—')}</strong>
+              ${s.discountPct>0?`<br><small style="color:#d97706">خصم ${s.discountPct}% · أصل ${s.basePrice} ر.س</small>`:''}
+              ${Auth.isSuperAdmin()?`<br><small style="color:#94a3b8">${DB.schoolName(s.schoolId)}</small>`:''}
+            </td>
             <td><span class="badge badge-blue">${typeMap[s.type]||s.type}</span></td>
             <td>${formatDate(s.startDate)}</td>
             <td>${formatDate(s.endDate)}</td>
-            <td>${s.price} ر.س</td>
+            <td><strong>${s.price} ر.س</strong>${s.price-s.paidAmount>0?`<br><small style="color:#ef4444">متبقي ${s.price-s.paidAmount}</small>`:''}</td>
+            <td><span style="font-size:13px">${pmLabel}</span>${s.receiptImage?`<br><button class="btn btn-secondary btn-xs" style="margin-top:4px" onclick="Modals.viewReceipt('${s.id}')">🖼 إيصال</button>`:''}</td>
             <td>${Views._payBadge(s)}</td>
-            <td>${s.price-s.paidAmount>0?`<span style="color:#ef4444;font-weight:700">${s.price-s.paidAmount} ر.س</span>`:'<span style="color:#10b981">✓</span>'}</td>
             <td><span class="badge ${stMap[st]}">${stLbl[st]}</span></td>
             <td style="white-space:nowrap">
               ${s.paymentStatus!=='paid'?`<button class="btn btn-success btn-xs" onclick="Modals.pay('${s.id}')">دفع</button>`:''}
@@ -1251,6 +1261,11 @@ const Modals = {
             </select>
           </div>
         </div>
+        <div class="input-group">
+          <label>💰 طريقة الدفع</label>
+          ${pmButtons('c-sub-pm')}
+        </div>
+        ${receiptField('c-receipt-file','c-receipt-data','c-receipt-preview')}
 
       </div>
       <div class="modal-footer">
@@ -1369,6 +1384,11 @@ const Modals = {
             <option value="deferred">⏳ مؤجل</option>
           </select>
         </div>
+        <div class="input-group">
+          <label>💰 طريقة الدفع</label>
+          ${pmButtons('sub-pm')}
+        </div>
+        ${receiptField('sub-receipt-file','sub-receipt-data','sub-receipt-preview')}
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" onclick="saveSub()">حفظ الاشتراك</button>
@@ -1442,6 +1462,26 @@ const Modals = {
       <div class="modal-footer">
         <button class="btn btn-primary" onclick="saveUser()">حفظ</button>
         <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+
+  viewReceipt(subId){
+    const s=DB.subscriptions().find(x=>x.id===subId);
+    if(!s||!s.receiptImage) return;
+    const child=DB.children().find(c=>c.id===s.childId);
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header"><h2>🖼 إيصال الدفع</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body" style="text-align:center">
+        <div style="font-size:13px;color:#64748b;margin-bottom:12px">
+          ${esc(child?.name||'—')} · ${formatDate(s.startDate)} — ${formatDate(s.endDate)} · ${s.price} ر.س
+        </div>
+        <img src="${s.receiptImage}" style="max-width:100%;border-radius:10px;border:1px solid #e2e8f0">
+        <div style="margin-top:12px">
+          <a href="${s.receiptImage}" download="ايصال-${s.invoiceNo||s.id}.png" class="btn btn-primary btn-sm">⬇️ تحميل الإيصال</a>
+        </div>
       </div>
     </div></div>`);
   },
@@ -1544,6 +1584,45 @@ function syncPaidAmount(srcId,tgtId){
   if(src&&tgt) tgt.value=src.value;
 }
 
+function setPM(btn,hiddenId){
+  btn.parentElement.querySelectorAll('.pm-btn').forEach(b=>b.classList.remove('pm-active'));
+  btn.classList.add('pm-active');
+  const h=document.getElementById(hiddenId);
+  if(h) h.value=btn.dataset.v;
+}
+
+function handleReceiptImg(input,hiddenId,previewId){
+  const file=input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const h=document.getElementById(hiddenId);
+    if(h) h.value=e.target.result;
+    const p=document.getElementById(previewId);
+    if(p){p.style.display='block';p.innerHTML=`<img src="${e.target.result}"><div style="font-size:11px;color:#10b981;margin-top:4px">✅ تم رفع الإيصال</div>`;}
+  };
+  reader.readAsDataURL(file);
+}
+
+const PM_LABEL={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
+
+function pmButtons(hiddenId,selected='cash'){
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button type="button" class="pm-btn ${selected==='cash'?'pm-active':''}" data-v="cash" onclick="setPM(this,'${hiddenId}')">💵 كاش</button>
+    <button type="button" class="pm-btn ${selected==='mada'?'pm-active':''}" data-v="mada" onclick="setPM(this,'${hiddenId}')">💳 مدى</button>
+    <button type="button" class="pm-btn ${selected==='transfer'?'pm-active':''}" data-v="transfer" onclick="setPM(this,'${hiddenId}')">🏦 حوالة</button>
+  </div><input type="hidden" id="${hiddenId}" value="${selected}">`;
+}
+
+function receiptField(fileId,hiddenId,previewId){
+  return `<div class="input-group" style="margin-top:10px">
+    <label style="font-size:13px;font-weight:600;color:#374151">📎 إيصال الدفع <span style="font-weight:400;color:#94a3b8">(اختياري)</span></label>
+    <input type="file" accept="image/*" class="input" style="padding:6px;font-size:13px" onchange="handleReceiptImg(this,'${hiddenId}','${previewId}')">
+    <input type="hidden" id="${hiddenId}" value="">
+    <div class="receipt-preview" id="${previewId}"></div>
+  </div>`;
+}
+
 function refreshTeachers(){
   const branchId=document.getElementById('c-branch')?.value||'';
   const period=document.getElementById('c-period')?.value||'';
@@ -1643,7 +1722,9 @@ function saveChild(edit=false){
       const maxNum=allSubs.reduce((m,s)=>{const n=parseInt(s.invoiceNo?.replace('INV-','')||0);return n>m?n:m;},0);
       const invoiceNo='INV-'+(maxNum+1).toString().padStart(4,'0');
       const basePrice=(SUB_PRICES[period]||SUB_PRICES.evening)[subType]||subPrice;
-      DB.addSub({id:uid(),childId,schoolId,branchId:c.branchId,period,type:subType,startDate:subStart,endDate:subEnd,basePrice,discountPct:0,price:subPrice,paidAmount:subPaid,paymentStatus:subPay,isActive:true,createdAt:T0,invoiceNo});
+      const subPM=document.getElementById('c-sub-pm')?.value||'cash';
+      const subReceipt=document.getElementById('c-receipt-data')?.value||'';
+      DB.addSub({id:uid(),childId,schoolId,branchId:c.branchId,period,type:subType,startDate:subStart,endDate:subEnd,basePrice,discountPct:0,price:subPrice,paidAmount:subPaid,paymentStatus:subPay,paymentMethod:subPM,receiptImage:subReceipt,isActive:true,createdAt:T0,invoiceNo});
     }
   }
   App.closeModal();
@@ -1667,7 +1748,9 @@ function saveSub(){
   const invoiceNo='INV-'+(maxNum+1).toString().padStart(4,'0');
   const discPct=parseFloat(document.getElementById('sub-disc')?.value||0);
   const basePrice=(SUB_PRICES[period]||SUB_PRICES.evening)[type]||price;
-  const s={id:uid(),childId,schoolId,branchId:child?.branchId||'',period,type,startDate,endDate,basePrice,discountPct:discPct,price,paidAmount,paymentStatus,isActive:true,createdAt:T0,invoiceNo};
+  const paymentMethod=document.getElementById('sub-pm')?.value||'cash';
+  const receiptImage=document.getElementById('sub-receipt-data')?.value||'';
+  const s={id:uid(),childId,schoolId,branchId:child?.branchId||'',period,type,startDate,endDate,basePrice,discountPct:discPct,price,paidAmount,paymentStatus,paymentMethod,receiptImage,isActive:true,createdAt:T0,invoiceNo};
   DB.addSub(s);
   App.closeModal();
   App.go('subscriptions');
