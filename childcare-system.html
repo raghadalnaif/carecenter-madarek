@@ -6,6 +6,8 @@
 <title>مدارك الطفل — نظام الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Tajawal',sans-serif;background:#f1f5f9;color:#1e293b;direction:rtl}
@@ -209,11 +211,71 @@ const SEED = {
 };
 
 // =========================================================
+//  FIREBASE
+// =========================================================
+const firebaseConfig={
+  apiKey:'AIzaSyAAr6lyp0BPImfA-5PNlO1iOKaOoVtnL5w',
+  authDomain:'madarekdaycare.firebaseapp.com',
+  projectId:'madarekdaycare',
+  storageBucket:'madarekdaycare.firebasestorage.app',
+  messagingSenderId:'531902685451',
+  appId:'1:531902685451:web:6241e4c5479eba9267420e'
+};
+let _fdb=null;
+const _mem={};
+
+// =========================================================
 //  DB
 // =========================================================
 const DB = {
-  get(k){try{return JSON.parse(localStorage.getItem('ccs_'+k))}catch{return null}},
-  set(k,v){localStorage.setItem('ccs_'+k,JSON.stringify(v))},
+  get(k){
+    if(_mem.hasOwnProperty(k)) return _mem[k];
+    try{return JSON.parse(localStorage.getItem('ccs_'+k))}catch{return null}
+  },
+  set(k,v){
+    _mem[k]=v;
+    try{localStorage.setItem('ccs_'+k,JSON.stringify(v))}catch{}
+    if(_fdb) _fdb.collection('ccs').doc(k).set({data:v}).catch(()=>{});
+  },
+  async initFirebase(){
+    try{
+      if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+      _fdb=firebase.firestore();
+      const keys=[...Object.keys(SEED),'data_version'];
+      const snaps=await Promise.all(keys.map(k=>_fdb.collection('ccs').doc(k).get()));
+      const fbHasData=snaps.some(s=>s.exists);
+      if(fbHasData){
+        // تحميل البيانات من Firebase
+        snaps.forEach((s,i)=>{if(s.exists) _mem[keys[i]]=s.data().data;});
+      } else {
+        // نقل بيانات localStorage الحالية إلى Firebase (مرة واحدة فقط)
+        const toMigrate={};
+        keys.forEach(k=>{
+          const raw=localStorage.getItem('ccs_'+k);
+          if(raw){try{toMigrate[k]=JSON.parse(raw);_mem[k]=toMigrate[k];}catch{}}
+        });
+        if(Object.keys(toMigrate).length){
+          await Promise.all(Object.entries(toMigrate).map(([k,v])=>
+            _fdb.collection('ccs').doc(k).set({data:v})
+          ));
+        }
+      }
+      // مستمع التحديثات الفورية من الأجهزة الأخرى
+      _fdb.collection('ccs').onSnapshot(qs=>{
+        let changed=false;
+        qs.docChanges().forEach(ch=>{
+          if(ch.type==='modified'||ch.type==='added'){
+            const k=ch.doc.id;const nv=ch.doc.data().data;
+            if(JSON.stringify(_mem[k])!==JSON.stringify(nv)){_mem[k]=nv;changed=true;}
+          }
+        });
+        if(changed&&Auth.user&&!App.modal){
+          const el=document.getElementById('content');
+          if(el) el.innerHTML=App.currentView();
+        }
+      });
+    }catch(e){console.warn('Firebase:',e);}
+  },
   init(){
     const DATA_VER='v7';
     if(this.get('data_version')===DATA_VER) return;
@@ -2433,16 +2495,13 @@ function closeSidebar(){
 // =========================================================
 //  INIT
 // =========================================================
-DB.init();
-Auth.init();
-App.render();
-
-// مزامنة تلقائية بين تابات المتصفح (نفس الجهاز)
-window.addEventListener('storage',(e)=>{
-  if(e.key&&e.key.startsWith('ccs_')&&Auth.user){
-    App.go(App.view,App.params);
-  }
-});
+document.getElementById('app').innerHTML=`<div style="height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Tajawal',sans-serif;background:linear-gradient(150deg,#0f766e,#064e3b)"><img src="logo.png" style="width:90px;height:90px;object-fit:contain;margin-bottom:16px" onerror="this.style.display='none'"><p style="color:#fff;font-size:22px;font-weight:700">مدارك الطفل</p><p style="color:rgba(255,255,255,.7);font-size:14px;margin-top:10px">⏳ جاري الاتصال بقاعدة البيانات...</p></div>`;
+(async()=>{
+  await DB.initFirebase();
+  DB.init();
+  Auth.init();
+  App.render();
+})();
 </script>
 </body>
 </html>
