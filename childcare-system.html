@@ -168,8 +168,8 @@ const T0 = today();
 // =========================================================
 const SEED = {
   branches: [
-    {id:'b1',name:'الفرع الرئيسي',location:'حي النزهة'},
-    {id:'b2',name:'الفرع الثاني',location:'حي الملقا'},
+    {id:'b1',name:'الفرع الرئيسي',location:'حي الروابي'},
+    {id:'b2',name:'الفرع الثاني',location:'حي الروابي'},
   ],
   users: [
     {id:'sa1',username:'admin',password:'admin123',role:'superadmin',name:'المدير العام',phone:''},
@@ -217,7 +217,7 @@ const DB = {
   get(k){try{return JSON.parse(localStorage.getItem('ccs_'+k))}catch{return null}},
   set(k,v){localStorage.setItem('ccs_'+k,JSON.stringify(v))},
   init(){
-    const DATA_VER='v4';
+    const DATA_VER='v5';
     if(this.get('data_version')===DATA_VER) return;
     Object.keys(SEED).forEach(k=>this.set(k,SEED[k]));
     this.set('data_version',DATA_VER);
@@ -329,6 +329,7 @@ const App = {
       {v:'subscriptions',icon:'📋',label:'الاشتراكات'},
       {v:'attendance',icon:'✅',label:'الحضور'},
       {v:'reports',icon:'📊',label:'التقارير'},
+      {v:'teachers',icon:'👩‍🏫',label:'المعلمات'},
       {v:'whatsapp',icon:'💬',label:'رسائل واتساب'},
     ] : [
       {v:'attendance',icon:'✅',label:'تسجيل الحضور'},
@@ -366,7 +367,21 @@ const App = {
     </div>`;
   },
   currentView(){
-    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports};
+    const role=Auth.user?.role;
+    const guards={
+      schools:()=>Auth.isSuperAdmin(),
+      branches:()=>Auth.isSuperAdmin(),
+      users:()=>Auth.isSuperAdmin(),
+      children:()=>role!=='teacher',
+      subscriptions:()=>role!=='teacher',
+      reports:()=>role!=='teacher',
+      whatsapp:()=>role!=='teacher',
+      teachers:()=>Auth.isSchoolAdmin(),
+      my_reports:()=>role==='teacher',
+    };
+    const guard=guards[App.view];
+    if(guard&&!guard()) return Views._forbidden();
+    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers};
     return (map[App.view]||Views.dashboard)();
   },
   showModal(html){App.modal=html;App.render()},
@@ -1020,6 +1035,43 @@ users(){
   </div>`;
 },
 
+// ---------- FORBIDDEN ----------
+_forbidden(){
+  return `<div class="empty-state"><div class="es-icon">🔒</div><p>غير مصرح بالوصول لهذه الصفحة</p></div>`;
+},
+
+// ---------- TEACHERS (school_admin only) ----------
+teachers(){
+  const sid=Auth.schoolId();
+  const bid=Auth.user?.branchId||'';
+  const branches=DB.branches();
+  const teachers=DB.users().filter(u=>u.role==='teacher'&&u.schoolId===sid&&(!bid||u.branchId===bid));
+  const periodMap={morning:'🌅 صباحية',evening:'🌙 مسائية'};
+  const branchName=branches.find(b=>b.id===bid)?.name||'';
+  return `
+  <div class="section-header">
+    <h2>👩‍🏫 معلمات ${esc(branchName)}</h2>
+    <button class="btn btn-primary btn-sm" onclick="Modals.addTeacher()">+ إضافة معلمة</button>
+  </div>
+  <div class="card">
+    ${teachers.length?`<table>
+      <thead><tr><th>الاسم</th><th>اسم المستخدم</th><th>الفترة</th><th>الهاتف</th><th>إجراءات</th></tr></thead>
+      <tbody>
+        ${teachers.map(t=>`<tr>
+          <td><strong>${esc(t.name)}</strong></td>
+          <td><code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:13px">${esc(t.username)}</code></td>
+          <td><span class="badge badge-green">${periodMap[t.period]||t.period||'—'}</span></td>
+          <td>${t.phone||'—'}</td>
+          <td>
+            <button class="btn btn-secondary btn-xs" onclick="Modals.editTeacher('${t.id}')">تعديل</button>
+            <button class="btn btn-danger btn-xs" onclick="deleteTeacher('${t.id}')">حذف</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`:`<div class="empty-state"><div class="es-icon">👩‍🏫</div><p>لا توجد معلمات مضافة بعد</p></div>`}
+  </div>`;
+},
+
 // ---------- WHATSAPP ----------
 whatsapp(){
   const sid=Auth.schoolId();
@@ -1458,6 +1510,78 @@ const Modals = {
     </div></div>`);
   },
 
+  addTeacher(){
+    const sid=Auth.schoolId();
+    const bid=Auth.user?.branchId||'';
+    const branches=DB.branches().filter(b=>!bid||b.id===bid);
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal">
+      <div class="modal-header"><h2>👩‍🏫 إضافة معلمة</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <div class="input-group"><label>الاسم الكامل *</label><input class="input" id="t-name" placeholder="اسم المعلمة"></div>
+        <div class="grid-2">
+          <div class="input-group"><label>اسم المستخدم *</label><input class="input" id="t-username" placeholder="username"></div>
+          <div class="input-group"><label>كلمة المرور *</label><input class="input" id="t-pass" placeholder="password"></div>
+        </div>
+        <div class="grid-2">
+          <div class="input-group"><label>الفرع *</label>
+            <select class="input" id="t-branch">${branches.map(b=>`<option value="${b.id}" ${b.id===bid?'selected':''}>${esc(b.name)}</option>`).join('')}</select>
+          </div>
+          <div class="input-group"><label>الفترة *</label>
+            <select class="input" id="t-period">
+              <option value="morning">🌅 صباحية</option>
+              <option value="evening">🌙 مسائية</option>
+            </select>
+          </div>
+        </div>
+        <div class="input-group"><label>الهاتف</label><input class="input" id="t-phone" placeholder="05xxxxxxxx"></div>
+        <input type="hidden" id="t-school" value="${sid}">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveTeacher()">حفظ</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+
+  editTeacher(id){
+    const t=DB.users().find(x=>x.id===id);
+    if(!t) return;
+    const sid=Auth.schoolId();
+    const bid=Auth.user?.branchId||'';
+    const branches=DB.branches().filter(b=>!bid||b.id===bid);
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal">
+      <div class="modal-header"><h2>✏️ تعديل معلمة</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <input type="hidden" id="t-id" value="${t.id}">
+        <div class="input-group"><label>الاسم الكامل</label><input class="input" id="t-name" value="${esc(t.name)}"></div>
+        <div class="grid-2">
+          <div class="input-group"><label>اسم المستخدم</label><input class="input" id="t-username" value="${esc(t.username)}"></div>
+          <div class="input-group"><label>كلمة المرور الجديدة</label><input class="input" id="t-pass" placeholder="اتركه فارغاً للإبقاء"></div>
+        </div>
+        <div class="grid-2">
+          <div class="input-group"><label>الفرع</label>
+            <select class="input" id="t-branch">${branches.map(b=>`<option value="${b.id}" ${t.branchId===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}</select>
+          </div>
+          <div class="input-group"><label>الفترة</label>
+            <select class="input" id="t-period">
+              <option value="morning" ${t.period==='morning'?'selected':''}>🌅 صباحية</option>
+              <option value="evening" ${t.period==='evening'?'selected':''}>🌙 مسائية</option>
+            </select>
+          </div>
+        </div>
+        <div class="input-group"><label>الهاتف</label><input class="input" id="t-phone" value="${esc(t.phone||'')}"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveTeacher(true)">حفظ التعديلات</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+
   addUser(){
     const schools=DB.schools();
     App.showModal(`
@@ -1793,6 +1917,37 @@ function savePay(){
   DB.updateSub(sub);
   App.closeModal();
   App.go('subscriptions');
+}
+
+function saveTeacher(edit=false){
+  const name=document.getElementById('t-name')?.value?.trim();
+  const username=document.getElementById('t-username')?.value?.trim();
+  const pass=document.getElementById('t-pass')?.value?.trim();
+  const branchId=document.getElementById('t-branch')?.value||'';
+  const period=document.getElementById('t-period')?.value||'morning';
+  const phone=document.getElementById('t-phone')?.value?.trim()||'';
+  const schoolId=document.getElementById('t-school')?.value||Auth.schoolId()||'';
+  if(!name||!username){alert('الاسم واسم المستخدم مطلوبان');return}
+  if(!edit&&!pass){alert('كلمة المرور مطلوبة');return}
+  if(edit){
+    const id=document.getElementById('t-id')?.value;
+    const u=DB.users().find(x=>x.id===id);
+    if(!u) return;
+    u.name=name;u.username=username;u.branchId=branchId;u.period=period;u.phone=phone;
+    if(pass) u.password=pass;
+    DB.updateUser(u);
+  } else {
+    if(DB.users().find(x=>x.username===username)){alert('اسم المستخدم مستخدم مسبقاً');return}
+    DB.addUser({id:uid(),name,username,password:pass,role:'teacher',schoolId,branchId,period,phone});
+  }
+  App.closeModal();
+  App.go('teachers');
+}
+
+function deleteTeacher(id){
+  if(!confirm('هل أنت متأكد من حذف هذه المعلمة؟')) return;
+  DB.deleteUser(id);
+  App.go('teachers');
 }
 
 function saveUser(edit=false){
