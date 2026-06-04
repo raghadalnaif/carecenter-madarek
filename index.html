@@ -1,0 +1,1838 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مدارك الطفل — نظام الإدارة</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Tajawal',sans-serif;background:#f1f5f9;color:#1e293b;direction:rtl}
+:root{--primary:#0f766e;--primary-dark:#0d6560;--primary-light:#ccfbf1;--danger:#ef4444;--warning:#f59e0b;--success:#10b981;--info:#3b82f6}
+.sidebar{width:240px;background:linear-gradient(160deg,#0f766e 0%,#065f46 100%);min-height:100vh;position:fixed;right:0;top:0;z-index:100;display:flex;flex-direction:column;transition:.3s}
+.sidebar-logo{padding:24px 20px;border-bottom:1px solid rgba(255,255,255,.15)}
+.sidebar-logo h1{color:#fff;font-size:18px;font-weight:700;line-height:1.4}
+.sidebar-logo p{color:rgba(255,255,255,.6);font-size:12px;margin-top:4px}
+.nav-section{padding:16px 8px}
+.nav-label{color:rgba(255,255,255,.4);font-size:11px;font-weight:600;padding:0 12px;margin-bottom:6px;letter-spacing:.5px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 14px;color:rgba(255,255,255,.75);cursor:pointer;border-radius:8px;margin:2px 0;transition:.2s;font-size:14px;font-weight:500}
+.nav-item:hover,.nav-item.active{background:rgba(255,255,255,.15);color:#fff}
+.nav-item .ni{width:18px;height:18px;flex-shrink:0}
+.main{margin-right:240px;min-height:100vh;display:flex;flex-direction:column}
+.topbar{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar-title{font-size:18px;font-weight:700;color:#0f766e}
+.topbar-user{display:flex;align-items:center;gap:10px;cursor:pointer}
+.avatar{width:36px;height:36px;background:#0f766e;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px}
+.content{padding:24px;flex:1}
+.card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.08);padding:24px;margin-bottom:20px}
+.card-title{font-size:16px;font-weight:700;color:#1e293b;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px}
+.stat-card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);border-right:4px solid transparent}
+.stat-card.green{border-color:#10b981}.stat-card.blue{border-color:#3b82f6}.stat-card.yellow{border-color:#f59e0b}.stat-card.red{border-color:#ef4444}
+.stat-val{font-size:28px;font-weight:900;color:#1e293b}
+.stat-lbl{font-size:13px;color:#64748b;margin-top:4px}
+.alert-box{border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:flex-start;gap:12px;font-size:14px}
+.alert-red{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.alert-yellow{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.alert-orange{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}
+.alert-green{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
+.alert-blue{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
+.badge-green{background:#dcfce7;color:#166534}
+.badge-yellow{background:#fef9c3;color:#854d0e}
+.badge-red{background:#fee2e2;color:#991b1b}
+.badge-blue{background:#dbeafe;color:#1e40af}
+.badge-gray{background:#f1f5f9;color:#475569}
+.badge-orange{background:#ffedd5;color:#9a3412}
+.btn{padding:9px 18px;border-radius:8px;border:none;font-family:'Tajawal',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:#0f766e;color:#fff}.btn-primary:hover{background:#0d6560}
+.btn-secondary{background:#f1f5f9;color:#475569}.btn-secondary:hover{background:#e2e8f0}
+.btn-danger{background:#fee2e2;color:#991b1b}.btn-danger:hover{background:#fecaca}
+.btn-success{background:#dcfce7;color:#166534}.btn-success:hover{background:#bbf7d0}
+.btn-warning{background:#fef9c3;color:#854d0e}
+.btn-wa{background:#25d366;color:#fff;font-size:13px;padding:7px 14px}.btn-wa:hover{background:#22c55e}
+.btn-sm{padding:6px 12px;font-size:13px}
+.btn-xs{padding:4px 10px;font-size:12px}
+table{width:100%;border-collapse:collapse}
+th{background:#f8fafc;padding:11px 14px;text-align:right;font-weight:700;color:#475569;font-size:13px;border-bottom:2px solid #e2e8f0}
+td{padding:11px 14px;border-bottom:1px solid #f1f5f9;font-size:14px;vertical-align:middle}
+tr:hover td{background:#f8fafc}
+.input{border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;width:100%;font-family:'Tajawal',sans-serif;font-size:14px;outline:none;transition:.2s;background:#fff;color:#1e293b}
+.input:focus{border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,.1)}
+.input-group{margin-bottom:14px}
+.input-group label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:5px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:#fff;border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal-header{padding:20px 24px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1}
+.modal-header h2{font-size:17px;font-weight:700}
+.modal-body{padding:24px}
+.modal-footer{padding:16px 24px;border-top:1px solid #e2e8f0;display:flex;gap:10px;justify-content:flex-start}
+.close-btn{background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;line-height:1;padding:4px}
+.close-btn:hover{color:#1e293b}
+.tabs{display:flex;gap:2px;background:#f1f5f9;border-radius:10px;padding:4px;margin-bottom:20px}
+.tab{flex:1;padding:9px 12px;text-align:center;cursor:pointer;border-radius:8px;font-size:13px;font-weight:600;color:#64748b;transition:.2s}
+.tab.active{background:#fff;color:#0f766e;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.search-bar{position:relative;margin-bottom:16px}
+.search-bar input{padding-right:36px}
+.search-bar .search-icon{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:16px}
+.actions-bar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:#f1f5f9;border-radius:20px;font-size:13px;font-weight:500;cursor:pointer;transition:.2s}
+.chip.active{background:#0f766e;color:#fff}
+.chip:hover:not(.active){background:#e2e8f0}
+.empty-state{text-align:center;padding:48px 20px;color:#94a3b8}
+.empty-state .es-icon{font-size:48px;margin-bottom:12px}
+.empty-state p{font-size:15px}
+.progress-bar{height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;border-radius:4px;transition:.3s}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:768px){
+  .sidebar{transform:translateX(100%)}
+  .sidebar.open{transform:translateX(0)}
+  .main{margin-right:0}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .grid-2{grid-template-columns:1fr}
+}
+.login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f766e 0%,#065f46 100%)}
+.login-card{background:#fff;border-radius:20px;padding:40px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.login-logo{text-align:center;margin-bottom:28px}
+.login-logo h1{font-size:24px;font-weight:900;color:#0f766e;margin-top:12px}
+.login-logo p{font-size:14px;color:#64748b;margin-top:4px}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.section-header h2{font-size:16px;font-weight:700}
+.attendance-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.attendance-card{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);border:2px solid #e2e8f0;cursor:pointer;transition:.2s}
+.attendance-card.present{border-color:#10b981;background:#f0fdf4}
+.attendance-card.absent{border-color:#ef4444;background:#fef2f2}
+.attendance-card.late{border-color:#f59e0b;background:#fffbeb}
+.wa-btn{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;background:#25d366;color:#fff;border-radius:8px;text-decoration:none;font-family:'Tajawal',sans-serif;font-weight:600;font-size:14px;transition:.2s}
+.wa-btn:hover{background:#22c55e}
+.page-hidden{display:none}
+.pm-btn{background:#f1f5f9;color:#475569;border:2px solid #e2e8f0;padding:9px 18px;font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;font-family:'Tajawal',sans-serif;transition:.2s}
+.pm-btn:hover{background:#e2e8f0}
+.pm-btn.pm-active{background:#f0fdf4;color:#0f766e;border-color:#0f766e}
+.receipt-preview{margin-top:8px;display:none}
+.receipt-preview img{max-width:100%;max-height:130px;border-radius:8px;border:1px solid #e2e8f0;object-fit:contain}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// =========================================================
+//  HELPERS
+// =========================================================
+const today = () => new Date().toISOString().split('T')[0];
+const addDays = (date, n) => {
+  const d = new Date(date + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
+};
+const diffDays = (d1, d2) => Math.round((new Date(d1) - new Date(d2)) / 86400000);
+const formatDate = d => {
+  if (!d) return '—';
+  return new Date(d + 'T00:00:00').toLocaleDateString('ar-SA', {year:'numeric',month:'short',day:'numeric'});
+};
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+const T0 = today();
+
+// =========================================================
+//  SEED DATA
+// =========================================================
+const SEED = {
+  branches: [
+    {id:'b1',name:'الفرع الرئيسي',location:'حي النزهة'},
+    {id:'b2',name:'الفرع الثاني',location:'حي الملقا'},
+  ],
+  users: [
+    {id:'sa1',username:'admin',password:'admin123',role:'superadmin',name:'المدير العام',phone:''},
+    {id:'u1',username:'main',password:'123456',role:'school_admin',schoolId:'s1',branchId:'b1',name:'ادارة الفرع الرئيسي',phone:'0501234567'},
+    {id:'u2',username:'second',password:'123456',role:'school_admin',schoolId:'s1',branchId:'b2',name:'ادارة الفرع الثاني',phone:'0509876543'},
+    {id:'u3',username:'sarah',password:'123456',role:'teacher',schoolId:'s1',branchId:'b1',period:'morning',name:'الأستاذة سارة',phone:'0507654321'},
+    {id:'u4',username:'hessa',password:'123456',role:'teacher',schoolId:'s1',branchId:'b1',period:'evening',name:'الأستاذة هيفاء',phone:'0508765432'},
+    {id:'u5',username:'noura',password:'123456',role:'teacher',schoolId:'s1',branchId:'b2',period:'morning',name:'الأستاذة نورا',phone:'0506543210'},
+    {id:'u6',username:'lama',password:'123456',role:'teacher',schoolId:'s1',branchId:'b2',period:'evening',name:'الأستاذة لمى',phone:'0505432109'},
+  ],
+  schools: [
+    {id:'s1',name:'مدارك الطفل',contactPerson:'ادارة الفرع الرئيسي',phone:'0501234567',email:'madarik@center.com',isActive:true,joinDate:'2024-09-01',vatNumber:'310123456700003',address:'الرياض، المملكة العربية السعودية'},
+  ],
+  children: [
+    {id:'c1',schoolId:'s1',branchId:'b1',teacherId:'u3',period:'morning',name:'عبدالله محمد العمري',parentName:'محمد العمري',parentPhone:'0551234567',grade:'KG1',notes:'',isActive:true,joinDate:'2024-09-01',isVip:false,discountPct:0},
+    {id:'c2',schoolId:'s1',branchId:'b1',teacherId:'u4',period:'evening',name:'نورة عبدالله السالم',parentName:'عبدالله السالم',parentPhone:'0557654321',grade:'KG2',notes:'حساسية من اللاكتوز',isActive:true,joinDate:'2024-09-01',isVip:true,discountPct:10},
+    {id:'c3',schoolId:'s1',branchId:'b2',teacherId:'u5',period:'morning',name:'فيصل خالد الحربي',parentName:'خالد الحربي',parentPhone:'0559876543',grade:'KG1',notes:'',isActive:true,joinDate:'2024-10-01',isVip:false,discountPct:0},
+    {id:'c4',schoolId:'s1',branchId:'b2',teacherId:'u6',period:'evening',name:'ريم سعد القحطاني',parentName:'سعد القحطاني',parentPhone:'0551122334',grade:'KG2',notes:'',isActive:true,joinDate:'2024-09-15',isVip:false,discountPct:0},
+    {id:'c5',schoolId:'s1',branchId:'b1',teacherId:'u3',period:'morning',name:'يوسف أحمد الزهراني',parentName:'أحمد الزهراني',parentPhone:'0554455667',grade:'KG1',notes:'',isActive:true,joinDate:'2024-11-01',isVip:true,discountPct:20},
+  ],
+  subscriptions: [
+    {id:'sub1',childId:'c1',schoolId:'s1',branchId:'b1',period:'morning',type:'monthly',startDate:addDays(T0,-20),endDate:addDays(T0,10),basePrice:1800,discountPct:0,price:1800,paidAmount:1800,paymentStatus:'paid',isActive:true,createdAt:addDays(T0,-20),invoiceNo:'INV-0001'},
+    {id:'sub2',childId:'c2',schoolId:'s1',branchId:'b1',period:'evening',type:'monthly',startDate:addDays(T0,-28),endDate:addDays(T0,2),basePrice:900,discountPct:10,price:810,paidAmount:400,paymentStatus:'partial',isActive:true,createdAt:addDays(T0,-28),invoiceNo:'INV-0002'},
+    {id:'sub3',childId:'c3',schoolId:'s1',branchId:'b2',period:'morning',type:'weekly',startDate:addDays(T0,-4),endDate:addDays(T0,3),basePrice:600,discountPct:0,price:600,paidAmount:600,paymentStatus:'paid',isActive:true,createdAt:addDays(T0,-4),invoiceNo:'INV-0003'},
+    {id:'sub4',childId:'c4',schoolId:'s1',branchId:'b2',period:'evening',type:'weekly',startDate:addDays(T0,-8),endDate:addDays(T0,-1),basePrice:300,discountPct:0,price:300,paidAmount:0,paymentStatus:'deferred',isActive:true,createdAt:addDays(T0,-8),invoiceNo:'INV-0004'},
+    {id:'sub5',childId:'c5',schoolId:'s1',branchId:'b1',period:'morning',type:'daily',startDate:T0,endDate:T0,basePrice:150,discountPct:20,price:120,paidAmount:120,paymentStatus:'paid',isActive:true,createdAt:T0,invoiceNo:'INV-0005'},
+  ],
+  attendance: (() => {
+    const arr = [];
+    const kids = ['c1','c2','c3','c4','c5'];
+    const statuses = ['present','present','present','absent','present','late','present'];
+    for(let i=1;i<=7;i++){
+      for(const cid of kids){
+        arr.push({id:uid(),childId:cid,schoolId:'s1',date:addDays(T0,-i),status:statuses[Math.floor(Math.random()*statuses.length)],checkIn:'07:30',checkOut:'14:00',takenBy:'u2',notes:''});
+      }
+    }
+    return arr;
+  })(),
+};
+
+// =========================================================
+//  DB
+// =========================================================
+const DB = {
+  get(k){try{return JSON.parse(localStorage.getItem('ccs_'+k))}catch{return null}},
+  set(k,v){localStorage.setItem('ccs_'+k,JSON.stringify(v))},
+  init(){
+    const DATA_VER='v4';
+    if(this.get('data_version')===DATA_VER) return;
+    Object.keys(SEED).forEach(k=>this.set(k,SEED[k]));
+    this.set('data_version',DATA_VER);
+  },
+  users(){return this.get('users')||[]},
+  schools(){return this.get('schools')||[]},
+  branches(){return this.get('branches')||SEED.branches},
+  children(){return this.get('children')||[]},
+  subscriptions(){return this.get('subscriptions')||[]},
+  attendance(){return this.get('attendance')||[]},
+  save(k,arr){this.set(k,arr)},
+  addUser(u){const a=this.users();a.push(u);this.save('users',a)},
+  updateUser(u){const a=this.users();const i=a.findIndex(x=>x.id===u.id);a[i]=u;this.save('users',a)},
+  deleteUser(id){this.save('users',this.users().filter(x=>x.id!==id))},
+  addSchool(s){const a=this.schools();a.push(s);this.save('schools',a)},
+  updateSchool(s){const a=this.schools();const i=a.findIndex(x=>x.id===s.id);a[i]=s;this.save('schools',a)},
+  addChild(c){const a=this.children();a.push(c);this.save('children',a)},
+  updateChild(c){const a=this.children();const i=a.findIndex(x=>x.id===c.id);a[i]=c;this.save('children',a)},
+  addSub(s){const a=this.subscriptions();a.push(s);this.save('subscriptions',a)},
+  updateSub(s){const a=this.subscriptions();const i=a.findIndex(x=>x.id===s.id);a[i]=s;this.save('subscriptions',a)},
+  saveAttendance(list){this.save('attendance',list)},
+  // get active subscription for child (latest by endDate)
+  activeSub(childId){
+    return this.subscriptions().filter(s=>s.childId===childId&&s.isActive).sort((a,b)=>b.endDate>a.endDate?1:-1)[0]||null;
+  },
+  subStatus(sub){
+    if(!sub) return 'none';
+    const d=diffDays(sub.endDate,T0);
+    if(d<0) return 'expired';
+    if(d===0) return 'today';
+    if(d<=3) return 'soon3';
+    if(d<=7) return 'soon7';
+    return 'active';
+  },
+  alerts(schoolId=null){
+    let subs=this.subscriptions();
+    if(schoolId) subs=subs.filter(s=>s.schoolId===schoolId);
+    subs=subs.filter(s=>s.isActive);
+    return {
+      expired:subs.filter(s=>diffDays(s.endDate,T0)<0),
+      today:subs.filter(s=>s.endDate===T0),
+      in3:subs.filter(s=>diffDays(s.endDate,T0)>0&&diffDays(s.endDate,T0)<=3),
+      in7:subs.filter(s=>diffDays(s.endDate,T0)>3&&diffDays(s.endDate,T0)<=7),
+    };
+  },
+  childName(id){return this.children().find(c=>c.id===id)?.name||id},
+  schoolName(id){return this.schools().find(s=>s.id===id)?.name||id},
+  branchName(id){return this.branches().find(b=>b.id===id)?.name||'—'},
+  addBranch(b){const a=this.branches();a.push(b);this.set('branches',a)},
+  updateBranch(b){const a=this.branches();const i=a.findIndex(x=>x.id===b.id);a[i]=b;this.set('branches',a)},
+};
+
+// =========================================================
+//  AUTH
+// =========================================================
+const Auth = {
+  user:null,
+  init(){
+    const s=sessionStorage.getItem('ccs_user');
+    if(s){try{this.user=JSON.parse(s)}catch{}}
+  },
+  login(username,password){
+    const u=DB.users().find(u=>u.username===username&&u.password===password);
+    if(u){this.user=u;sessionStorage.setItem('ccs_user',JSON.stringify(u));return true}
+    return false;
+  },
+  logout(){this.user=null;sessionStorage.removeItem('ccs_user');App.go('login')},
+  isSuperAdmin(){return this.user?.role==='superadmin'},
+  isSchoolAdmin(){return this.user?.role==='school_admin'},
+  isTeacher(){return this.user?.role==='teacher'},
+  schoolId(){return this.user?.schoolId||null},
+};
+
+// =========================================================
+//  APP STATE & ROUTER
+// =========================================================
+const App = {
+  view:'dashboard',
+  modal:null,
+  params:{},
+  go(view,params={}){this.view=view;this.params=params;this.render()},
+  render(){document.getElementById('app').innerHTML=Auth.user?this.shell():Views.login()},
+  shell(){
+    return `
+    <div style="display:flex">
+      ${this.sidebar()}
+      <div class="main">
+        ${this.topbar()}
+        <div class="content" id="content">${this.currentView()}</div>
+      </div>
+    </div>
+    ${App.modal?App.modal:''}
+    `;
+  },
+  sidebar(){
+    const u=Auth.user;
+    const links = u.role==='superadmin' ? [
+      {v:'dashboard',icon:'🏠',label:'الرئيسية'},
+      {v:'schools',icon:'🏫',label:'المدارس'},
+      {v:'branches',icon:'🏢',label:'الفروع'},
+      {v:'children',icon:'👶',label:'الأطفال'},
+      {v:'subscriptions',icon:'📋',label:'الاشتراكات'},
+      {v:'reports',icon:'📊',label:'التقارير'},
+      {v:'users',icon:'👥',label:'المستخدمون'},
+    ] : u.role==='school_admin' ? [
+      {v:'dashboard',icon:'🏠',label:'الرئيسية'},
+      {v:'children',icon:'👶',label:'الأطفال'},
+      {v:'subscriptions',icon:'📋',label:'الاشتراكات'},
+      {v:'attendance',icon:'✅',label:'الحضور'},
+      {v:'reports',icon:'📊',label:'التقارير'},
+      {v:'whatsapp',icon:'💬',label:'رسائل واتساب'},
+    ] : [
+      {v:'attendance',icon:'✅',label:'تسجيل الحضور'},
+      {v:'my_reports',icon:'📊',label:'تقارير الحضور'},
+    ];
+    return `
+    <div class="sidebar">
+      <div class="sidebar-logo">
+        <h1>🌟 مدارك الطفل</h1>
+        <p>نظام إدارة متكامل</p>
+      </div>
+      <div class="nav-section">
+        ${links.map(l=>`<div class="nav-item ${App.view===l.v?'active':''}" onclick="App.go('${l.v}')">${l.icon} ${l.label}</div>`).join('')}
+      </div>
+      <div style="margin-top:auto;padding:16px 8px;border-top:1px solid rgba(255,255,255,.15)">
+        <div class="nav-item" onclick="Auth.logout()">🚪 تسجيل الخروج</div>
+      </div>
+    </div>`;
+  },
+  topbar(){
+    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور'};
+    return `
+    <div class="topbar">
+      <div class="topbar-title">${titles[App.view]||''}</div>
+      <div class="topbar-user">
+        <div style="text-align:left">
+          <div style="font-size:13px;font-weight:600">${esc(Auth.user.name)}</div>
+          <div style="font-size:11px;color:#64748b">${Auth.user.role==='superadmin'?'مدير عام':Auth.user.role==='school_admin'?'مديرة فرع':'معلمة'}</div>
+        </div>
+        <div class="avatar">${Auth.user.name.charAt(0)}</div>
+      </div>
+    </div>`;
+  },
+  currentView(){
+    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports};
+    return (map[App.view]||Views.dashboard)();
+  },
+  showModal(html){App.modal=html;App.render()},
+  closeModal(){App.modal=null;App.render()},
+};
+
+// =========================================================
+//  VIEWS
+// =========================================================
+const Views = {
+
+// ---------- LOGIN ----------
+login(){
+  return `
+  <div class="login-page">
+    <div class="login-card">
+      <div class="login-logo">
+        <div style="font-size:52px">🌟</div>
+        <h1>مدارك الطفل</h1>
+        <p>نظام الإدارة المتكاملة</p>
+      </div>
+      <div id="login-err" style="display:none" class="alert-box alert-red" style="margin-bottom:14px">اسم المستخدم أو كلمة المرور غير صحيحة</div>
+      <div class="input-group">
+        <label>اسم المستخدم</label>
+        <input class="input" id="l-user" placeholder="أدخل اسم المستخدم" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div class="input-group">
+        <label>كلمة المرور</label>
+        <input class="input" id="l-pass" type="password" placeholder="أدخل كلمة المرور" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="doLogin()">دخول</button>
+      <div style="margin-top:20px;padding:14px;background:#f8fafc;border-radius:8px;font-size:12px;color:#64748b;line-height:2.2">
+        <strong style="color:#374151">بيانات الدخول:</strong><br>
+        🏢 ادارة الفرع الرئيسي: <code style="background:#e2e8f0;padding:1px 5px;border-radius:4px">main</code> / 123456<br>
+        🏢 ادارة الفرع الثاني: <code style="background:#e2e8f0;padding:1px 5px;border-radius:4px">second</code> / 123456<br>
+        👩‍🏫 معلمة: <code style="background:#e2e8f0;padding:1px 5px;border-radius:4px">sarah</code> / 123456
+      </div>
+    </div>
+  </div>`;
+},
+
+// ---------- DASHBOARD ----------
+dashboard(){
+  const u=Auth.user;
+  if(u.role==='superadmin') return Views._superDash();
+  if(u.role==='school_admin') return Views._schoolDash();
+  return Views.attendance();
+},
+
+_superDash(){
+  const schools=DB.schools();
+  const children=DB.children();
+  const subs=DB.subscriptions();
+  const al=DB.alerts();
+  const totalRevenue=subs.reduce((a,s)=>a+s.paidAmount,0);
+  const pendingRevenue=subs.reduce((a,s)=>a+(s.price-s.paidAmount),0);
+  return `
+  <div class="stats-grid">
+    <div class="stat-card green"><div class="stat-val">${schools.length}</div><div class="stat-lbl">🏫 المدارس المشتركة</div></div>
+    <div class="stat-card blue"><div class="stat-val">${children.length}</div><div class="stat-lbl">👶 إجمالي الأطفال</div></div>
+    <div class="stat-card green"><div class="stat-val">${subs.filter(s=>s.isActive).length}</div><div class="stat-lbl">📋 اشتراكات فعالة</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${totalRevenue.toLocaleString()} ر.س</div><div class="stat-lbl">💰 إجمالي الإيرادات</div></div>
+    <div class="stat-card red"><div class="stat-val">${pendingRevenue.toLocaleString()} ر.س</div><div class="stat-lbl">⏳ مبالغ معلقة</div></div>
+  </div>
+  ${Views._alertBanners(al)}
+  <div class="card">
+    <div class="card-title">🏢 توزيع الأطفال على الفروع</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      ${DB.branches().map(b=>{
+        const cnt=children.filter(c=>c.branchId===b.id).length;
+        const actSubs=subs.filter(s=>s.isActive&&children.filter(c=>c.branchId===b.id).some(c=>c.id===s.childId)).length;
+        return `<div style="flex:1;min-width:160px;border:2px solid #e2e8f0;border-radius:10px;padding:16px">
+          <div style="font-weight:700;font-size:16px;color:#0f766e">🏢 ${esc(b.name)}</div>
+          ${b.location?`<div style="font-size:12px;color:#94a3b8;margin-top:2px">📍 ${esc(b.location)}</div>`:''}
+          <div style="margin-top:12px;display:flex;gap:16px">
+            <div><div style="font-size:22px;font-weight:900">${cnt}</div><div style="font-size:12px;color:#64748b">طفل</div></div>
+            <div><div style="font-size:22px;font-weight:900;color:#10b981">${actSubs}</div><div style="font-size:12px;color:#64748b">اشتراك فعال</div></div>
+          </div>
+          <button class="btn btn-secondary btn-xs" style="margin-top:10px;width:100%;justify-content:center" onclick="App.go('children',{branch:'${b.id}'})">عرض الأطفال</button>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">📊 المدارس المشتركة</div>
+    <table>
+      <thead><tr><th>المدرسة</th><th>التواصل</th><th>الأطفال</th><th>الاشتراكات الفعالة</th><th>الحالة</th></tr></thead>
+      <tbody>
+        ${schools.map(s=>{
+          const count=children.filter(c=>c.schoolId===s.id).length;
+          const activeSubs=subs.filter(sub=>sub.schoolId===s.id&&sub.isActive).length;
+          return `<tr>
+            <td><strong>${esc(s.name)}</strong><br><small style="color:#94a3b8">${esc(s.contactPerson)}</small></td>
+            <td><a href="tel:${s.phone}" style="color:#0f766e">${s.phone}</a></td>
+            <td>${count}</td>
+            <td>${activeSubs}</td>
+            <td><span class="badge ${s.isActive?'badge-green':'badge-red'}">${s.isActive?'نشطة':'موقوفة'}</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+},
+
+_schoolDash(){
+  const sid=Auth.schoolId();
+  const children=DB.children().filter(c=>c.schoolId===sid);
+  const subs=DB.subscriptions().filter(s=>s.schoolId===sid);
+  const al=DB.alerts(sid);
+  const todayAtt=DB.attendance().filter(a=>a.schoolId===sid&&a.date===T0);
+  return `
+  <div class="stats-grid">
+    <div class="stat-card blue"><div class="stat-val">${children.length}</div><div class="stat-lbl">👶 الأطفال المسجلون</div></div>
+    <div class="stat-card green"><div class="stat-val">${subs.filter(s=>s.isActive).length}</div><div class="stat-lbl">📋 اشتراكات فعالة</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${todayAtt.filter(a=>a.status==='present').length}</div><div class="stat-lbl">✅ حضور اليوم</div></div>
+    <div class="stat-card red"><div class="stat-val">${al.expired.length+al.today.length+al.in3.length}</div><div class="stat-lbl">⚠️ تحتاج متابعة</div></div>
+  </div>
+  ${Views._alertBanners(al,sid)}
+  <div class="card">
+    <div class="section-header">
+      <div class="card-title" style="margin:0">👶 قائمة الأطفال مع حالة الاشتراك</div>
+      <button class="btn btn-primary btn-sm" onclick="App.go('children')">إدارة الأطفال</button>
+    </div>
+    <table>
+      <thead><tr><th>الفرع</th><th>الطفل</th><th>ولي الأمر</th><th>نوع الاشتراك</th><th>ينتهي في</th><th>الدفع</th><th>الحالة</th></tr></thead>
+      <tbody>
+        ${children.map(c=>{
+          const sub=DB.activeSub(c.id);
+          const st=DB.subStatus(sub);
+          const stMap={active:['badge-green','نشط'],today:['badge-yellow','ينتهي اليوم'],soon3:['badge-orange','ينتهي قريباً'],soon7:['badge-blue','7 أيام'],expired:['badge-red','منتهي'],none:['badge-gray','بلا اشتراك']};
+          const [bc,bl]=stMap[st];
+          return `<tr>
+            <td><span class="badge badge-blue" style="font-size:11px">🏢 ${DB.branchName(c.branchId)}</span></td>
+            <td><strong>${esc(c.name)}</strong><br><small style="color:#94a3b8">${c.grade||''}</small></td>
+            <td>${esc(c.parentName)}<br><a href="tel:${c.parentPhone}" style="color:#0f766e;font-size:13px">${c.parentPhone}</a></td>
+            <td>${sub?({'daily':'يومي','weekly':'أسبوعي','monthly':'شهري'}[sub.type]||sub.type):'—'}</td>
+            <td>${sub?formatDate(sub.endDate):'—'}</td>
+            <td>${sub?Views._payBadge(sub):'—'}</td>
+            <td><span class="badge ${bc}">${bl}</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+},
+
+_alertBanners(al,schoolId=null){
+  const children=DB.children();
+  const getName=(sub)=>{
+    const c=children.find(x=>x.id===sub.childId);
+    return c?c.name:sub.childId;
+  };
+  let html='';
+  if(al.expired.length){
+    html+=`<div class="alert-box alert-red">🔴 <div><strong>اشتراكات منتهية (${al.expired.length})</strong><br>${al.expired.map(s=>`${getName(s)} — انتهى ${formatDate(s.endDate)}`).join(' | ')}</div></div>`;
+  }
+  if(al.today.length){
+    html+=`<div class="alert-box alert-yellow">🟡 <div><strong>تنتهي اليوم (${al.today.length})</strong><br>${al.today.map(s=>getName(s)).join(' | ')}</div></div>`;
+  }
+  if(al.in3.length){
+    html+=`<div class="alert-box alert-orange">🟠 <div><strong>تنتهي خلال 3 أيام (${al.in3.length})</strong><br>${al.in3.map(s=>`${getName(s)} — ${formatDate(s.endDate)}`).join(' | ')}</div></div>`;
+  }
+  if(al.in7.length){
+    html+=`<div class="alert-box alert-blue">🔵 <div><strong>تنتهي خلال أسبوع (${al.in7.length})</strong><br>${al.in7.map(s=>`${getName(s)} — ${formatDate(s.endDate)}`).join(' | ')}</div></div>`;
+  }
+  return html;
+},
+
+_payBadge(sub){
+  const map={paid:['badge-green','مدفوع'],partial:['badge-yellow','جزئي'],deferred:['badge-orange','مؤجل']};
+  const [bc,bl]=map[sub.paymentStatus]||['badge-gray','—'];
+  return `<span class="badge ${bc}">${bl} ${sub.paidAmount}/${sub.price}</span>`;
+},
+
+// ---------- BRANCHES ----------
+branches(){
+  const branches=DB.branches();
+  const children=DB.children();
+  const subs=DB.subscriptions();
+  return `
+  <div class="section-header">
+    <h2>إدارة الفروع</h2>
+    <button class="btn btn-primary btn-sm" onclick="Modals.addBranch()">+ إضافة فرع</button>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:20px">
+    ${branches.map(b=>{
+      const kids=children.filter(c=>c.branchId===b.id);
+      const activeSubs=subs.filter(s=>s.isActive&&kids.some(c=>c.id===s.childId));
+      const rev=activeSubs.reduce((a,s)=>a+s.paidAmount,0);
+      return `<div class="card" style="margin:0">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="font-size:18px;font-weight:900;color:#0f766e">🏢 ${esc(b.name)}</div>
+            ${b.location?`<div style="font-size:13px;color:#64748b;margin-top:4px">📍 ${esc(b.location)}</div>`:''}
+          </div>
+          <button class="btn btn-secondary btn-xs" onclick="Modals.editBranch('${b.id}')">تعديل</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px;text-align:center">
+          <div style="background:#f0fdf4;border-radius:8px;padding:10px">
+            <div style="font-size:20px;font-weight:900">${kids.length}</div>
+            <div style="font-size:11px;color:#64748b">طفل</div>
+          </div>
+          <div style="background:#eff6ff;border-radius:8px;padding:10px">
+            <div style="font-size:20px;font-weight:900">${activeSubs.length}</div>
+            <div style="font-size:11px;color:#64748b">اشتراك</div>
+          </div>
+          <div style="background:#fefce8;border-radius:8px;padding:10px">
+            <div style="font-size:16px;font-weight:900">${rev.toLocaleString()}</div>
+            <div style="font-size:11px;color:#64748b">ر.س</div>
+          </div>
+        </div>
+        <div style="margin-top:12px">
+          <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center" onclick="App.go('children',{branch:'${b.id}'})">👶 عرض أطفال هذا الفرع</button>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+  <div class="card">
+    <div class="card-title">📋 جميع الأطفال مع الفرع</div>
+    <table>
+      <thead><tr><th>الفرع</th><th>اسم الطفل</th><th>ولي الأمر</th><th>المدرسة</th><th>الاشتراك</th><th>الحالة</th></tr></thead>
+      <tbody>
+        ${children.map(c=>{
+          const sub=DB.activeSub(c.id);
+          const st=DB.subStatus(sub);
+          const stMap={active:'badge-green',today:'badge-yellow',soon3:'badge-orange',soon7:'badge-blue',expired:'badge-red',none:'badge-gray'};
+          const stLbl={active:'نشط',today:'اليوم',soon3:'قريباً',soon7:'أسبوع',expired:'منتهي',none:'—'};
+          return `<tr>
+            <td><span class="badge badge-blue" style="font-size:11px">🏢 ${DB.branchName(c.branchId)}</span></td>
+            <td><strong>${esc(c.name)}</strong></td>
+            <td>${esc(c.parentName)}</td>
+            <td style="font-size:13px">${DB.schoolName(c.schoolId)}</td>
+            <td>${sub?`${{'daily':'يومي','weekly':'أسبوعي','monthly':'شهري'}[sub.type]} — ${formatDate(sub.endDate)}`:'—'}</td>
+            <td><span class="badge ${stMap[st]}">${stLbl[st]}</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+},
+
+// ---------- SCHOOLS ----------
+schools(){
+  const schools=DB.schools();
+  return `
+  <div class="section-header">
+    <h2 style="font-size:16px;font-weight:700">المدارس المشتركة</h2>
+    <button class="btn btn-primary btn-sm" onclick="Modals.addSchool()">+ إضافة مدرسة</button>
+  </div>
+  <div class="card">
+    <table>
+      <thead><tr><th>اسم المدرسة</th><th>المسؤول</th><th>الهاتف</th><th>البريد</th><th>تاريخ الانضمام</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+      <tbody>
+        ${schools.length?schools.map(s=>`<tr>
+          <td><strong>${esc(s.name)}</strong></td>
+          <td>${esc(s.contactPerson)}</td>
+          <td><a href="tel:${s.phone}" style="color:#0f766e">${s.phone}</a></td>
+          <td style="font-size:13px">${esc(s.email)}</td>
+          <td>${formatDate(s.joinDate)}</td>
+          <td><span class="badge ${s.isActive?'badge-green':'badge-red'}">${s.isActive?'نشطة':'موقوفة'}</span></td>
+          <td>
+            <button class="btn btn-secondary btn-xs" onclick="Modals.editSchool('${s.id}')">تعديل</button>
+            <button class="btn btn-xs" style="${s.isActive?'background:#fef9c3;color:#854d0e':'background:#dcfce7;color:#166534'}" onclick="toggleSchool('${s.id}')">${s.isActive?'إيقاف':'تفعيل'}</button>
+          </td>
+        </tr>`).join(''):`<tr><td colspan="7"><div class="empty-state"><div class="es-icon">🏫</div><p>لا توجد مدارس مسجلة</p></div></td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+},
+
+// ---------- CHILDREN ----------
+children(){
+  const sid=Auth.schoolId();
+  const branches=DB.branches();
+  let kids=DB.children();
+  if(sid) kids=kids.filter(c=>c.schoolId===sid);
+  const schools=DB.schools();
+  const q=(App.params.q||'').toLowerCase();
+  const bFilter=App.params.branch||'all';
+  if(q) kids=kids.filter(c=>c.name.includes(q)||c.parentName.includes(q)||c.parentPhone.includes(q));
+  if(bFilter!=='all') kids=kids.filter(c=>c.branchId===bFilter);
+  const branchColors=['badge-blue','badge-green','badge-orange','badge-red'];
+  return `
+  <div class="actions-bar" style="flex-wrap:wrap">
+    <button class="btn btn-primary btn-sm" onclick="Modals.addChild()">+ إضافة طفل</button>
+    <div class="search-bar" style="flex:1;max-width:300px;margin:0">
+      <span class="search-icon">🔍</span>
+      <input class="input" placeholder="بحث بالاسم أو الوالد..." value="${esc(App.params.q||'')}" oninput="App.go('children',{q:this.value,branch:'${bFilter}'})">
+    </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <span style="font-size:13px;font-weight:600;color:#64748b">الفرع:</span>
+      <span class="chip ${bFilter==='all'?'active':''}" onclick="App.go('children',{q:'${esc(App.params.q||'')}',branch:'all'})">الكل (${DB.children().filter(c=>sid?c.schoolId===sid:true).length})</span>
+      ${branches.map((b,i)=>{
+        const cnt=DB.children().filter(c=>(sid?c.schoolId===sid:true)&&c.branchId===b.id).length;
+        return `<span class="chip ${bFilter===b.id?'active':''}" onclick="App.go('children',{q:'${esc(App.params.q||'')}',branch:'${b.id}'})">${b.name} (${cnt})</span>`;
+      }).join('')}
+    </div>
+  </div>
+  <div class="card">
+    <table>
+      <thead><tr>${Auth.isSuperAdmin()?'<th>المدرسة</th>':''}<th>الفرع / الفترة</th><th>اسم الطفل</th><th>المعلمة</th><th>ولي الأمر</th><th>الهاتف</th><th>الاشتراك الحالي</th><th>حالة الدفع</th><th>إجراءات</th></tr></thead>
+      <tbody>
+        ${kids.length?kids.map(c=>{
+          const sub=DB.activeSub(c.id);
+          const st=DB.subStatus(sub);
+          const stMap={active:'badge-green',today:'badge-yellow',soon3:'badge-orange',soon7:'badge-blue',expired:'badge-red',none:'badge-gray'};
+          const stLbl={active:'نشط',today:'ينتهي اليوم',soon3:'ينتهي قريباً',soon7:'7 أيام',expired:'منتهي',none:'—'};
+          const school=schools.find(s=>s.id===c.schoolId);
+          const branchIdx=branches.findIndex(b=>b.id===c.branchId);
+          const bColor=branchColors[branchIdx]||'badge-gray';
+          const teacher=DB.users().find(u=>u.id===c.teacherId);
+          return `<tr>
+            ${Auth.isSuperAdmin()?`<td><span class="badge badge-blue" style="font-size:11px">${esc(school?.name||'')}</span></td>`:''}
+            <td>
+              <span class="badge ${bColor}" style="font-size:11px">🏢 ${DB.branchName(c.branchId)}</span>
+              <br><span class="badge ${c.period==='morning'?'badge-blue':'badge-orange'}" style="font-size:10px;margin-top:4px">${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'}</span>
+            </td>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px">
+                <strong>${esc(c.name)}</strong>
+                ${c.isVip?`<span class="badge badge-yellow" style="font-size:10px">⭐ VIP${c.discountPct?` ${c.discountPct}%`:''}</span>`:''}
+              </div>
+              ${c.notes?`<small style="color:#f59e0b">⚠️ ${esc(c.notes)}</small>`:''}
+            </td>
+            <td style="font-size:13px;color:#374151">${teacher?esc(teacher.name):'<span style="color:#94a3b8">—</span>'}</td>
+            <td>${esc(c.parentName)}</td>
+            <td><a href="tel:${c.parentPhone}" style="color:#0f766e">${c.parentPhone}</a></td>
+            <td><span class="badge ${stMap[st]}">${stLbl[st]}${sub?' — '+formatDate(sub.endDate):''}</span></td>
+            <td>${sub?Views._payBadge(sub):'—'}</td>
+            <td style="white-space:nowrap">
+              <button class="btn btn-secondary btn-xs" onclick="Modals.editChild('${c.id}')">تعديل</button>
+              <button class="btn btn-primary btn-xs" onclick="Modals.addSub('${c.id}')">اشتراك</button>
+            </td>
+          </tr>`;
+        }).join(''):`<tr><td colspan="9"><div class="empty-state"><div class="es-icon">👶</div><p>لا يوجد أطفال في هذا الفرع</p></div></td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+},
+
+// ---------- SUBSCRIPTIONS ----------
+subscriptions(){
+  const sid=Auth.schoolId();
+  let subs=DB.subscriptions();
+  if(sid) subs=subs.filter(s=>s.schoolId===sid);
+  const filter=App.params.filter||'all';
+  let filtered=subs;
+  if(filter==='active') filtered=subs.filter(s=>s.isActive&&diffDays(s.endDate,T0)>=0);
+  if(filter==='expired') filtered=subs.filter(s=>diffDays(s.endDate,T0)<0);
+  if(filter==='expiring') filtered=subs.filter(s=>s.isActive&&diffDays(s.endDate,T0)>=0&&diffDays(s.endDate,T0)<=7);
+  if(filter==='unpaid') filtered=subs.filter(s=>s.paymentStatus!=='paid');
+  filtered.sort((a,b)=>a.endDate>b.endDate?1:-1);
+  const chips=[['all','الكل'],['active','فعالة'],['expiring','تنتهي قريباً'],['expired','منتهية'],['unpaid','غير مدفوعة']];
+  return `
+  <div class="actions-bar">
+    ${chips.map(([v,l])=>`<span class="chip ${filter===v?'active':''}" onclick="App.go('subscriptions',{filter:'${v}'})">${l} (${v==='all'?subs.length:v==='active'?subs.filter(s=>s.isActive&&diffDays(s.endDate,T0)>=0).length:v==='expiring'?subs.filter(s=>s.isActive&&diffDays(s.endDate,T0)>=0&&diffDays(s.endDate,T0)<=7).length:v==='expired'?subs.filter(s=>diffDays(s.endDate,T0)<0).length:subs.filter(s=>s.paymentStatus!=='paid').length})</span>`).join('')}
+  </div>
+  <div class="card">
+    <table>
+      <thead><tr><th>الطفل</th><th>النوع</th><th>يبدأ</th><th>ينتهي</th><th>المبلغ</th><th>طريقة الدفع</th><th>حالة الدفع</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+      <tbody>
+        ${filtered.length?filtered.map(s=>{
+          const child=DB.children().find(c=>c.id===s.childId);
+          const st=DB.subStatus(s);
+          const daysLeft=diffDays(s.endDate,T0);
+          const stMap={active:'badge-green',today:'badge-yellow',soon3:'badge-orange',soon7:'badge-blue',expired:'badge-red',none:'badge-gray'};
+          const stLbl={active:'نشط',today:'ينتهي اليوم',soon3:`${daysLeft} أيام`,soon7:`${daysLeft} أيام`,expired:'منتهي',none:'—'};
+          const typeMap={daily:'يومي',weekly:'أسبوعي',monthly:'شهري'};
+          const pmLabel={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'}[s.paymentMethod]||'—';
+          return `<tr>
+            <td>
+              <strong>${esc(child?.name||'—')}</strong>
+              ${s.discountPct>0?`<br><small style="color:#d97706">خصم ${s.discountPct}% · أصل ${s.basePrice} ر.س</small>`:''}
+              ${Auth.isSuperAdmin()?`<br><small style="color:#94a3b8">${DB.schoolName(s.schoolId)}</small>`:''}
+            </td>
+            <td><span class="badge badge-blue">${typeMap[s.type]||s.type}</span></td>
+            <td>${formatDate(s.startDate)}</td>
+            <td>${formatDate(s.endDate)}</td>
+            <td><strong>${s.price} ر.س</strong>${s.price-s.paidAmount>0?`<br><small style="color:#ef4444">متبقي ${s.price-s.paidAmount}</small>`:''}</td>
+            <td><span style="font-size:13px">${pmLabel}</span>${s.receiptImage?`<br><button class="btn btn-secondary btn-xs" style="margin-top:4px" onclick="Modals.viewReceipt('${s.id}')">🖼 إيصال</button>`:''}</td>
+            <td>${Views._payBadge(s)}</td>
+            <td><span class="badge ${stMap[st]}">${stLbl[st]}</span></td>
+            <td style="white-space:nowrap">
+              ${s.paymentStatus!=='paid'?`<button class="btn btn-success btn-xs" onclick="Modals.pay('${s.id}')">دفع</button>`:''}
+              <button class="btn btn-secondary btn-xs" onclick="Modals.addSub('${s.childId}')">تجديد</button>
+              ${child?`<a href="https://wa.me/966${child.parentPhone.slice(1)}?text=${encodeURIComponent(`مرحباً، اشتراك ${child.name} ينتهي ${formatDate(s.endDate)}. يرجى التجديد.`)}" target="_blank" class="btn btn-wa btn-xs">واتساب</a>`:''}
+            </td>
+          </tr>`;
+        }).join(''):`<tr><td colspan="9"><div class="empty-state"><div class="es-icon">📋</div><p>لا توجد نتائج</p></div></td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+},
+
+// ---------- ATTENDANCE ----------
+attendance(){
+  const u=Auth.user;
+  const isTeacher=u.role==='teacher';
+  const isAdmin=u.role==='school_admin'||u.role==='superadmin';
+  const sid=Auth.schoolId()||App.params.schoolId;
+  const date=App.params.date||T0;
+  const allSubs=DB.subscriptions();
+
+  const hasActiveSub=(childId)=>allSubs.some(s=>
+    s.childId===childId&&s.isActive&&s.startDate<=date&&s.endDate>=date
+  );
+
+  let kids=DB.children();
+  if(sid) kids=kids.filter(c=>c.schoolId===sid);
+
+  // المعلمة: أطفالها فقط + الاشتراك فعّال — بدون أي قسم آخر
+  if(isTeacher){
+    kids=kids.filter(c=>c.teacherId===u.id&&hasActiveSub(c.id));
+  } else {
+    // الإدارة: فلترة بالمعلمة لو اختارت (غياب معلمة)
+    const teacherFilter=App.params.teacherFilter||'';
+    if(teacherFilter) kids=kids.filter(c=>c.teacherId===teacherFilter);
+    // فلترة الفرع
+    if(App.params.branchFilter) kids=kids.filter(c=>c.branchId===App.params.branchFilter);
+    // الإدارة تعرف من لديه اشتراك فعّال فقط
+    kids=kids.filter(c=>hasActiveSub(c.id));
+  }
+
+  const attList=DB.attendance();
+  const todayAtt=attList.filter(a=>a.date===date&&(sid?a.schoolId===sid:true));
+  const attMap={};
+  todayAtt.forEach(a=>{attMap[a.childId]=a});
+  const isToday=date===T0;
+
+  const renderCard=(c)=>{
+    const a=attMap[c.id];
+    const status=a?.status||'';
+    // للإدارة فقط: نعرض اسم المعلمة فوق الطفل
+    const teacher=isAdmin?DB.users().find(t=>t.id===c.teacherId):null;
+    return `<div class="attendance-card ${status}" id="att-${c.id}">
+      <div style="font-weight:700;font-size:14px">${esc(c.name)}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:2px">${c.grade||''} — ${esc(c.parentName)}</div>
+      ${teacher?`<div style="font-size:11px;color:#0f766e;margin-top:3px">👩‍🏫 ${esc(teacher.name)}</div>`:''}
+      <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">
+        <span class="badge badge-blue" style="font-size:10px">🏢 ${DB.branchName(c.branchId)}</span>
+        <span class="badge ${c.period==='morning'?'badge-blue':'badge-orange'}" style="font-size:10px">${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'}</span>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:10px">
+        <button class="btn btn-xs ${status==='present'?'btn-success':''}" style="flex:1;justify-content:center" onclick="setAtt('${c.id}','present','${date}','${c.schoolId}')">✅ حاضر</button>
+        <button class="btn btn-xs ${status==='absent'?'btn-danger':''}" style="flex:1;justify-content:center" onclick="setAtt('${c.id}','absent','${date}','${c.schoolId}')">❌ غائب</button>
+        <button class="btn btn-xs ${status==='late'?'btn-warning':''}" style="flex:1;justify-content:center" onclick="setAtt('${c.id}','late','${date}','${c.schoolId}')">⏰ متأخر</button>
+      </div>
+      ${a?`<div style="font-size:11px;margin-top:6px;color:#64748b">دخول: ${a.checkIn||'—'} · خروج: ${a.checkOut||'—'}</div>`:''}
+    </div>`;
+  };
+
+  // قائمة المعلمات للفلترة (للإدارة فقط)
+  const teachers=isAdmin?DB.users().filter(t=>t.role==='teacher'&&(!sid||t.schoolId===sid)):[];
+  const teacherFilter=App.params.teacherFilter||'';
+  const branchFilter=App.params.branchFilter||'';
+
+  return `
+  <div class="actions-bar" style="flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:8px">
+      <label style="font-weight:600;font-size:14px">التاريخ:</label>
+      <input type="date" class="input" style="width:160px" value="${date}" onchange="App.go('attendance',{date:this.value,schoolId:'${sid||''}',branchFilter:'${branchFilter}',teacherFilter:'${teacherFilter}'})" max="${T0}">
+    </div>
+    ${isToday?`<button class="btn btn-primary btn-sm" onclick="saveAttendance('${date}','${sid||''}')">💾 حفظ الحضور</button>`:''}
+    <div style="margin-right:auto;display:flex;gap:8px">
+      <span class="badge badge-green">✅ ${Object.values(attMap).filter(a=>a.status==='present').length} حاضر</span>
+      <span class="badge badge-red">❌ ${Object.values(attMap).filter(a=>a.status==='absent').length} غائب</span>
+      <span class="badge badge-yellow">⏰ ${Object.values(attMap).filter(a=>a.status==='late').length} متأخر</span>
+    </div>
+  </div>
+
+  ${isAdmin?`
+  <div class="card" style="padding:12px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <span style="font-size:13px;font-weight:600;color:#64748b">🏢 الفرع:</span>
+      <span class="chip ${!branchFilter?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'',teacherFilter:'${teacherFilter}'})">الكل</span>
+      ${DB.branches().map(b=>`<span class="chip ${branchFilter===b.id?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${b.id}',teacherFilter:'${teacherFilter}'})">${esc(b.name)}</span>`).join('')}
+    </div>
+    <div style="border-top:1px solid #f1f5f9;padding-top:10px">
+      <span style="font-size:13px;font-weight:600;color:#64748b">👩‍🏫 الفصل:</span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        <span class="chip ${!teacherFilter?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${branchFilter}',teacherFilter:''})">جميع الفصول</span>
+        ${teachers.map(t=>`<span class="chip ${teacherFilter===t.id?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${branchFilter}',teacherFilter:'${t.id}'})">${esc(t.name)}</span>`).join('')}
+      </div>
+    </div>
+  </div>`:''}
+
+  ${kids.length===0?`<div class="card"><div class="empty-state"><div class="es-icon">👶</div><p>${isTeacher?'لا يوجد أطفال نشطون في فصلك اليوم':'لا يوجد أطفال لديهم اشتراك فعّال في هذا التاريخ'}</p></div></div>`:`
+  <div class="attendance-grid" id="att-grid">
+    ${kids.map(c=>renderCard(c)).join('')}
+  </div>`}
+  `;
+},
+
+// ---------- REPORTS ----------
+reports(){
+  const sid=Auth.schoolId();
+  let children=DB.children();
+  let subs=DB.subscriptions();
+  let attList=DB.attendance();
+  if(sid){
+    children=children.filter(c=>c.schoolId===sid);
+    subs=subs.filter(s=>s.schoolId===sid);
+    attList=attList.filter(a=>a.schoolId===sid);
+  }
+  const totalRev=subs.reduce((a,s)=>a+s.paidAmount,0);
+  const pendingRev=subs.reduce((a,s)=>a+(s.price-s.paidAmount),0);
+  const monthlyCount=subs.filter(s=>s.type==='monthly').length;
+  const weeklyCount=subs.filter(s=>s.type==='weekly').length;
+  const dailyCount=subs.filter(s=>s.type==='daily').length;
+  const tab=App.params.tab||'financial';
+  return `
+  <div class="tabs">
+    <div class="tab ${tab==='financial'?'active':''}" onclick="App.go('reports',{tab:'financial'})">💰 التقرير المالي</div>
+    <div class="tab ${tab==='attendance'?'active':''}" onclick="App.go('reports',{tab:'attendance'})">✅ تقرير الحضور</div>
+    <div class="tab ${tab==='subscriptions'?'active':''}" onclick="App.go('reports',{tab:'subscriptions'})">📋 تقرير الاشتراكات</div>
+  </div>
+  ${tab==='financial'?`
+  <div class="stats-grid">
+    <div class="stat-card green"><div class="stat-val">${totalRev.toLocaleString()}</div><div class="stat-lbl">ر.س إجمالي محصّل</div></div>
+    <div class="stat-card red"><div class="stat-val">${pendingRev.toLocaleString()}</div><div class="stat-lbl">ر.س مبالغ معلقة</div></div>
+    <div class="stat-card blue"><div class="stat-val">${monthlyCount}</div><div class="stat-lbl">اشتراكات شهرية</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${weeklyCount}</div><div class="stat-lbl">اشتراكات أسبوعية</div></div>
+    <div class="stat-card green"><div class="stat-val">${dailyCount}</div><div class="stat-lbl">اشتراكات يومية</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${subs.filter(s=>s.paymentStatus==='deferred').length}</div><div class="stat-lbl">مبالغ مؤجلة</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">تفاصيل المدفوعات لكل طفل</div>
+    <table>
+      <thead><tr><th>الطفل</th>${Auth.isSuperAdmin()?'<th>المدرسة</th>':''}<th>نوع الاشتراك</th><th>المبلغ الكلي</th><th>المدفوع</th><th>المتبقي</th><th>حالة الدفع</th></tr></thead>
+      <tbody>
+        ${subs.map(s=>{
+          const c=children.find(x=>x.id===s.childId)||DB.children().find(x=>x.id===s.childId);
+          return `<tr>
+            <td>${esc(c?.name||'—')}</td>
+            ${Auth.isSuperAdmin()?`<td><small>${DB.schoolName(s.schoolId)}</small></td>`:''}
+            <td>${{daily:'يومي',weekly:'أسبوعي',monthly:'شهري'}[s.type]||s.type}</td>
+            <td>${s.price} ر.س</td>
+            <td style="color:#10b981;font-weight:600">${s.paidAmount} ر.س</td>
+            <td style="color:${s.price-s.paidAmount>0?'#ef4444':'#10b981'};font-weight:600">${s.price-s.paidAmount} ر.س</td>
+            <td>${Views._payBadge(s)}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`:''}
+  ${tab==='attendance'?`
+  <div class="card" style="padding:14px;margin-bottom:16px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="input-group" style="margin:0;flex:1;min-width:180px">
+        <label style="font-size:12px">🔍 بحث باسم الطفل</label>
+        <input class="input" id="att-search" placeholder="اكتب الاسم..." value="${esc(App.params.attQ||'')}" oninput="App.go('reports',{tab:'attendance',attQ:this.value,attFrom:document.getElementById('att-from')?.value||'',attTo:document.getElementById('att-to')?.value||''})">
+      </div>
+      <div class="input-group" style="margin:0;min-width:140px">
+        <label style="font-size:12px">📅 من تاريخ</label>
+        <input class="input" id="att-from" type="date" value="${App.params.attFrom||''}" onchange="App.go('reports',{tab:'attendance',attQ:document.getElementById('att-search')?.value||'',attFrom:this.value,attTo:document.getElementById('att-to')?.value||''})">
+      </div>
+      <div class="input-group" style="margin:0;min-width:140px">
+        <label style="font-size:12px">📅 إلى تاريخ</label>
+        <input class="input" id="att-to" type="date" value="${App.params.attTo||''}" onchange="App.go('reports',{tab:'attendance',attQ:document.getElementById('att-search')?.value||'',attFrom:document.getElementById('att-from')?.value||'',attTo:this.value})">
+      </div>
+      ${(App.params.attQ||App.params.attFrom||App.params.attTo)?`<button class="btn btn-secondary btn-sm" onclick="App.go('reports',{tab:'attendance'})">✕ مسح الفلتر</button>`:''}
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">تقرير حضور الأطفال${App.params.attFrom||App.params.attTo?` (${App.params.attFrom||'البداية'} — ${App.params.attTo||'اليوم'})`:''}</div>
+    <table>
+      <thead><tr><th>الطفل</th><th>الفرع / الفترة</th><th>حضور</th><th>غياب</th><th>تأخر</th><th>الأيام</th><th>النسبة</th><th>تفاصيل</th></tr></thead>
+      <tbody>
+        ${children.filter(c=>!(App.params.attQ)||c.name.includes(App.params.attQ||'')).map(c=>{
+          let cAtt=attList.filter(a=>a.childId===c.id);
+          if(App.params.attFrom) cAtt=cAtt.filter(a=>a.date>=App.params.attFrom);
+          if(App.params.attTo) cAtt=cAtt.filter(a=>a.date<=App.params.attTo);
+          const present=cAtt.filter(a=>a.status==='present').length;
+          const absent=cAtt.filter(a=>a.status==='absent').length;
+          const late=cAtt.filter(a=>a.status==='late').length;
+          const total=cAtt.length||1;
+          const pct=Math.round((present+late)/total*100);
+          const lastAbs=cAtt.filter(a=>a.status==='absent').sort((a,b)=>b.date.localeCompare(a.date))[0];
+          return `<tr>
+            <td><strong>${esc(c.name)}</strong><br><small style="color:#94a3b8">${esc(c.parentName)}</small></td>
+            <td>
+              <span class="badge badge-blue" style="font-size:10px">🏢 ${DB.branchName(c.branchId)}</span><br>
+              <span class="badge ${c.period==='morning'?'badge-blue':'badge-orange'}" style="font-size:10px;margin-top:2px">${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'}</span>
+            </td>
+            <td style="color:#10b981;font-weight:700">${present}</td>
+            <td style="color:#ef4444;font-weight:700">${absent}</td>
+            <td style="color:#f59e0b;font-weight:700">${late}</td>
+            <td style="color:#64748b">${cAtt.length}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px">
+                <div class="progress-bar" style="width:60px"><div class="progress-fill" style="width:${pct}%;background:${pct>80?'#10b981':pct>60?'#f59e0b':'#ef4444'}"></div></div>
+                <span style="font-size:12px;font-weight:700">${pct}%</span>
+              </div>
+            </td>
+            <td style="font-size:11px;color:#94a3b8">${lastAbs?'آخر غياب: '+formatDate(lastAbs.date):'—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`:''}
+  ${tab==='subscriptions'?`
+  <div class="card">
+    <div class="card-title">تقرير الاشتراكات التفصيلي</div>
+    <table>
+      <thead><tr><th>الطفل</th>${Auth.isSuperAdmin()?'<th>المدرسة</th>':''}<th>النوع</th><th>البداية</th><th>النهاية</th><th>الحالة</th><th>الدفع</th></tr></thead>
+      <tbody>
+        ${subs.map(s=>{
+          const c=children.find(x=>x.id===s.childId)||DB.children().find(x=>x.id===s.childId);
+          const st=DB.subStatus(s);
+          const stMap={active:'badge-green',today:'badge-yellow',soon3:'badge-orange',soon7:'badge-blue',expired:'badge-red',none:'badge-gray'};
+          const stLbl={active:'نشط',today:'ينتهي اليوم',soon3:'ينتهي قريباً',soon7:'قريباً',expired:'منتهي',none:'—'};
+          return `<tr>
+            <td>${esc(c?.name||'—')}</td>
+            ${Auth.isSuperAdmin()?`<td><small>${DB.schoolName(s.schoolId)}</small></td>`:''}
+            <td>${{daily:'يومي',weekly:'أسبوعي',monthly:'شهري'}[s.type]}</td>
+            <td>${formatDate(s.startDate)}</td>
+            <td>${formatDate(s.endDate)}</td>
+            <td><span class="badge ${stMap[st]}">${stLbl[st]}</span></td>
+            <td>${Views._payBadge(s)}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`:''}
+  `;
+},
+
+// ---------- USERS ----------
+users(){
+  const users=DB.users();
+  const schools=DB.schools();
+  const roleMap={superadmin:'مدير عام',school_admin:'مديرة فرع',teacher:'معلمة'};
+  return `
+  <div class="section-header">
+    <h2>إدارة المستخدمين</h2>
+    <button class="btn btn-primary btn-sm" onclick="Modals.addUser()">+ إضافة مستخدم</button>
+  </div>
+  <div class="card">
+    <table>
+      <thead><tr><th>الاسم</th><th>اسم المستخدم</th><th>الدور</th><th>المدرسة</th><th>الهاتف</th><th>إجراءات</th></tr></thead>
+      <tbody>
+        ${users.map(u=>`<tr>
+          <td><strong>${esc(u.name)}</strong></td>
+          <td><code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:13px">${esc(u.username)}</code></td>
+          <td><span class="badge ${u.role==='superadmin'?'badge-red':u.role==='school_admin'?'badge-blue':'badge-green'}">${roleMap[u.role]||u.role}</span></td>
+          <td>${u.schoolId?esc(schools.find(s=>s.id===u.schoolId)?.name||'—'):'—'}</td>
+          <td>${u.phone||'—'}</td>
+          <td>
+            <button class="btn btn-secondary btn-xs" onclick="Modals.editUser('${u.id}')">تعديل</button>
+            ${u.id!=='sa1'?`<button class="btn btn-danger btn-xs" onclick="deleteUser('${u.id}')">حذف</button>`:''}
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+},
+
+// ---------- WHATSAPP ----------
+whatsapp(){
+  const sid=Auth.schoolId();
+  const al=DB.alerts(sid);
+  const children=DB.children();
+  const subs=DB.subscriptions();
+  const buildMsg=(sub,days)=>{
+    const c=children.find(x=>x.id===sub.childId);
+    if(!c) return null;
+    const msgs={
+      expired:`السلام عليكم 🌟\nنود إشعاركم بأن اشتراك الطفل ${c.name} في مدارك الطفل قد انتهى بتاريخ ${formatDate(sub.endDate)}.\nيسعدنا التواصل معكم لتجديد الاشتراك.\nشكراً لثقتكم 🌺`,
+      today:`السلام عليكم 🌟\nتذكير ودي: اشتراك ${c.name} ينتهي اليوم.\nلتجديد الاشتراك تواصلوا معنا.\nشكراً 🌺`,
+      soon:`السلام عليكم 🌟\nتذكير: اشتراك ${c.name} سينتهي بتاريخ ${formatDate(sub.endDate)} (خلال ${days} أيام).\nيسعدنا خدمتكم لتجديد الاشتراك.\nشكراً 🌺`,
+    };
+    const msgKey=days===0?'today':days<0?'expired':'soon';
+    const phone='966'+c.parentPhone.slice(1);
+    return {child:c,sub,msg:msgs[msgKey],phone};
+  };
+  const renderGroup=(list,label,days)=>{
+    const items=list.map(s=>buildMsg(s,days)).filter(Boolean);
+    if(!items.length) return '';
+    return `
+    <div class="card">
+      <div class="card-title">${label} (${items.length})</div>
+      ${items.map(({child,sub,msg,phone})=>`
+      <div style="border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:12px;display:flex;align-items:flex-start;gap:16px">
+        <div style="flex:1">
+          <div style="font-weight:700;margin-bottom:4px">${esc(child.name)}</div>
+          <div style="font-size:13px;color:#64748b;margin-bottom:8px">📱 ${child.parentPhone} — ينتهي: ${formatDate(sub.endDate)}</div>
+          <div style="background:#f8fafc;border-radius:8px;padding:10px;font-size:13px;color:#374151;line-height:1.7;white-space:pre-wrap">${esc(msg)}</div>
+        </div>
+        <a href="https://wa.me/${phone}?text=${encodeURIComponent(msg)}" target="_blank" class="wa-btn" style="white-space:nowrap">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+          إرسال واتساب
+        </a>
+      </div>`).join('')}
+    </div>`;
+  };
+  return `
+  <div class="alert-box alert-blue" style="margin-bottom:16px">
+    💡 اضغط على "إرسال واتساب" لفتح محادثة مباشرة مع ولي الأمر بالرسالة جاهزة للإرسال
+  </div>
+  ${renderGroup(al.expired,'🔴 اشتراكات منتهية',-1)}
+  ${renderGroup(al.today,'🟡 تنتهي اليوم',0)}
+  ${renderGroup(al.in3,'🟠 تنتهي خلال 3 أيام',2)}
+  ${renderGroup(al.in7,'🔵 تنتهي خلال أسبوع',5)}
+  ${!al.expired.length&&!al.today.length&&!al.in3.length&&!al.in7.length?`<div class="empty-state card"><div class="es-icon">🎉</div><p>لا توجد اشتراكات تحتاج تذكير الآن</p></div>`:''}
+  `;
+},
+
+// ---------- MY REPORTS (Teacher) ----------
+myReports(){
+  const u=Auth.user;
+  const sid=Auth.schoolId();
+  // أطفال المعلمة فقط
+  const kids=DB.children().filter(c=>c.schoolId===sid&&c.teacherId===u.id);
+  const attList=DB.attendance().filter(a=>a.schoolId===sid);
+  const allSubs=DB.subscriptions();
+  return `
+  <div class="card">
+    <div class="card-title">📊 تقرير حضور أطفالي (${kids.length} طفل)</div>
+    ${kids.length===0?`<div class="empty-state"><div class="es-icon">👶</div><p>لا يوجد أطفال مسندون إليك حتى الآن</p></div>`:`
+    <table>
+      <thead><tr><th>الطفل</th><th>الفرع / الفترة</th><th>حالة الاشتراك</th><th>حضور</th><th>غياب</th><th>تأخر</th><th>نسبة</th></tr></thead>
+      <tbody>
+        ${kids.map(c=>{
+          const cAtt=attList.filter(a=>a.childId===c.id);
+          const present=cAtt.filter(a=>a.status==='present').length;
+          const absent=cAtt.filter(a=>a.status==='absent').length;
+          const late=cAtt.filter(a=>a.status==='late').length;
+          const total=cAtt.length||1;
+          const pct=Math.round((present+late)/total*100);
+          const activeSub=allSubs.find(s=>s.childId===c.id&&s.isActive&&s.startDate<=T0&&s.endDate>=T0);
+          const subStatus=activeSub?`<span class="badge badge-green" style="font-size:11px">✅ حتى ${formatDate(activeSub.endDate)}</span>`:`<span class="badge badge-red" style="font-size:11px">⛔ منتهي</span>`;
+          return `<tr>
+            <td><strong>${esc(c.name)}</strong><br><small style="color:#94a3b8">${esc(c.parentName)}</small></td>
+            <td>
+              <span class="badge badge-blue" style="font-size:10px">🏢 ${DB.branchName(c.branchId)}</span><br>
+              <span class="badge ${c.period==='morning'?'badge-blue':'badge-orange'}" style="font-size:10px;margin-top:3px">${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'}</span>
+            </td>
+            <td>${subStatus}</td>
+            <td style="color:#10b981;font-weight:700">${present}</td>
+            <td style="color:#ef4444;font-weight:700">${absent}</td>
+            <td style="color:#f59e0b;font-weight:700">${late}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px">
+                <div class="progress-bar" style="width:60px"><div class="progress-fill" style="width:${pct}%;background:${pct>80?'#10b981':pct>60?'#f59e0b':'#ef4444'}"></div></div>
+                <span style="font-size:12px;font-weight:700">${pct}%</span>
+              </div>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`}
+  </div>`;
+},
+
+};// end Views
+
+// =========================================================
+//  MODALS
+// =========================================================
+const Modals = {
+  addBranch(){
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal">
+      <div class="modal-header"><h2>🏢 إضافة فرع</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <div class="input-group"><label>اسم الفرع *</label><input class="input" id="br-name" placeholder="مثال: الفرع الرئيسي"></div>
+        <div class="input-group"><label>الموقع / الحي</label><input class="input" id="br-loc" placeholder="مثال: حي النزهة"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveBranch()">حفظ</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+  editBranch(id){
+    const b=DB.branches().find(x=>x.id===id);
+    if(!b) return;
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal">
+      <div class="modal-header"><h2>✏️ تعديل الفرع</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <input type="hidden" id="br-id" value="${b.id}">
+        <div class="input-group"><label>اسم الفرع *</label><input class="input" id="br-name" value="${esc(b.name)}"></div>
+        <div class="input-group"><label>الموقع / الحي</label><input class="input" id="br-loc" value="${esc(b.location||'')}"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveBranch(true)">حفظ التعديلات</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+  addSchool(){
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal">
+      <div class="modal-header"><h2>🏫 إضافة مدرسة</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <div class="input-group"><label>اسم المدرسة *</label><input class="input" id="sc-name" placeholder="مدرسة ..."></div>
+        <div class="input-group"><label>المسؤول/الجهة</label><input class="input" id="sc-contact" placeholder="اسم المسؤول"></div>
+        <div class="grid-2">
+          <div class="input-group"><label>الهاتف</label><input class="input" id="sc-phone" placeholder="05xxxxxxxx"></div>
+          <div class="input-group"><label>البريد الإلكتروني</label><input class="input" id="sc-email" type="email" placeholder="email@school.com"></div>
+        </div>
+        <div class="input-group"><label>تاريخ الانضمام</label><input class="input" id="sc-date" type="date" value="${T0}"></div>
+        <div style="background:#fffbeb;border-radius:8px;padding:12px;font-size:13px;color:#92400e;margin-top:8px">
+          💡 بعد إضافة المدرسة، أضف حساب مديرة المدرسة من قسم المستخدمين
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveSchool()">حفظ</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+
+  editSchool(id){
+    const s=DB.schools().find(x=>x.id===id);
+    if(!s) return;
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal">
+      <div class="modal-header"><h2>✏️ تعديل مدرسة</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <input type="hidden" id="sc-id" value="${s.id}">
+        <div class="input-group"><label>اسم المدرسة *</label><input class="input" id="sc-name" value="${esc(s.name)}"></div>
+        <div class="input-group"><label>المسؤول</label><input class="input" id="sc-contact" value="${esc(s.contactPerson)}"></div>
+        <div class="grid-2">
+          <div class="input-group"><label>الهاتف</label><input class="input" id="sc-phone" value="${esc(s.phone)}"></div>
+          <div class="input-group"><label>البريد</label><input class="input" id="sc-email" value="${esc(s.email)}"></div>
+        </div>
+        <div class="input-group"><label>تاريخ الانضمام</label><input class="input" id="sc-date" type="date" value="${s.joinDate}"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveSchool(true)">حفظ التعديلات</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+
+  addChild(){
+    const sid=Auth.schoolId();
+    const schools=DB.schools();
+    const branches=DB.branches();
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal" style="max-width:560px">
+      <div class="modal-header"><h2>👶 تسجيل طفل جديد</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+
+        <div style="font-size:13px;font-weight:700;color:#0f766e;padding:8px 12px;background:#f0fdf4;border-radius:8px;margin-bottom:14px">📋 بيانات الطفل</div>
+
+        ${!sid?`<div class="input-group"><label>المدرسة *</label><select class="input" id="c-school"><option value="">اختر مدرسة</option>${schools.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>`:`<input type="hidden" id="c-school" value="${sid}">`}
+        <div class="grid-2">
+          <div class="input-group"><label>🏢 الفرع *</label><select class="input" id="c-branch" onchange="refreshTeachers()">${branches.map(b=>`<option value="${b.id}">${esc(b.name)}${b.location?' — '+b.location:''}</option>`).join('')}</select></div>
+          <div class="input-group">
+            <label>⏰ الفترة *</label>
+            <select class="input" id="c-period" onchange="calcChildSubPrice();refreshTeachers()">
+              <option value="morning">🌅 صباحية (150 / 600 / 1800 ر.س)</option>
+              <option value="evening">🌙 مسائية (70 / 300 / 900 ر.س)</option>
+            </select>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>👩‍🏫 عند أي معلمة؟</label>
+          <select class="input" id="c-teacher"><option value="">— اختر المعلمة —</option></select>
+        </div>
+        <div class="input-group"><label>اسم الطفل *</label><input class="input" id="c-name" placeholder="الاسم الثلاثي"></div>
+        <div class="grid-2">
+          <div class="input-group"><label>اسم ولي الأمر *</label><input class="input" id="c-parent" placeholder="الاسم"></div>
+          <div class="input-group"><label>هاتف ولي الأمر *</label><input class="input" id="c-phone" placeholder="05xxxxxxxx"></div>
+        </div>
+        <div class="grid-2">
+          <div class="input-group"><label>الصف</label><input class="input" id="c-grade" placeholder="KG1 / KG2"></div>
+          <div class="input-group"><label>تاريخ الانتساب</label><input class="input" id="c-join" type="date" value="${T0}"></div>
+        </div>
+        <div class="input-group"><label>ملاحظات صحية</label><textarea class="input" id="c-notes" rows="2" placeholder="حساسية، حالة صحية..."></textarea></div>
+
+        <div style="display:flex;align-items:center;gap:16px;padding:10px 14px;background:#fefce8;border-radius:8px;margin-bottom:14px;border:1px solid #fde68a">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:13px">
+            <input type="checkbox" id="c-vip" style="width:16px;height:16px;cursor:pointer">
+            ⭐ عميل مميز (VIP)
+          </label>
+          <div style="display:flex;align-items:center;gap:8px;flex:1">
+            <label style="font-size:13px;font-weight:600;white-space:nowrap">نسبة الخصم الدائم %</label>
+            <input class="input" id="c-disc" type="number" min="0" max="100" value="0" placeholder="0" style="width:80px" oninput="calcChildSubPrice()">
+          </div>
+        </div>
+
+        <div style="font-size:13px;font-weight:700;color:#0f766e;padding:8px 12px;background:#f0fdf4;border-radius:8px;margin:0 0 14px">💳 الاشتراك والدفع</div>
+
+        <div class="grid-2">
+          <div class="input-group">
+            <label>مدة الاشتراك *</label>
+            <select class="input" id="c-sub-type" onchange="calcChildSubPrice()">
+              <option value="daily">📅 يومي</option>
+              <option value="weekly">📅 أسبوعي</option>
+              <option value="monthly" selected>📅 شهري</option>
+            </select>
+          </div>
+          <div class="input-group"><label>تاريخ البداية</label><input class="input" id="c-sub-start" type="date" value="${T0}" onchange="calcChildSubPrice()"></div>
+        </div>
+        <div class="grid-2">
+          <div class="input-group"><label>تاريخ الانتهاء</label><input class="input" id="c-sub-end" type="date" value="${addDays(T0,30)}" readonly style="background:#f8fafc;color:#64748b"></div>
+          <div class="input-group">
+            <label>المبلغ بعد الخصم (ر.س)</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input class="input" id="c-sub-price" type="number" value="1800" oninput="syncPaidAmount('c-sub-price','c-sub-paid')" style="flex:1">
+              <span id="c-base-hint" style="font-size:11px;color:#94a3b8;white-space:nowrap"></span>
+            </div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="input-group"><label>المبلغ المدفوع (ر.س)</label><input class="input" id="c-sub-paid" type="number" value="1800"></div>
+          <div class="input-group">
+            <label>حالة الدفع</label>
+            <select class="input" id="c-sub-pay">
+              <option value="paid">✅ مدفوع بالكامل</option>
+              <option value="partial">🟡 جزئي</option>
+              <option value="deferred">⏳ مؤجل</option>
+            </select>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>💰 طريقة الدفع</label>
+          ${pmButtons('c-sub-pm')}
+        </div>
+        ${receiptField('c-receipt-file','c-receipt-data','c-receipt-preview')}
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveChild()">✅ حفظ وتسجيل الاشتراك</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+    setTimeout(()=>{calcChildSubPrice();refreshTeachers();},30);
+  },
+
+  editChild(id){
+    const c=DB.children().find(x=>x.id===id);
+    if(!c) return;
+    const branches=DB.branches();
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal">
+      <div class="modal-header"><h2>✏️ تعديل بيانات الطفل</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <input type="hidden" id="c-id" value="${c.id}">
+        <input type="hidden" id="c-school" value="${c.schoolId}">
+        <div class="grid-2">
+          <div class="input-group"><label>🏢 الفرع *</label><select class="input" id="c-branch" onchange="refreshTeachers()">${branches.map(b=>`<option value="${b.id}" ${c.branchId===b.id?'selected':''}>${esc(b.name)}${b.location?' — '+b.location:''}</option>`).join('')}</select></div>
+          <div class="input-group">
+            <label>⏰ الفترة *</label>
+            <select class="input" id="c-period" onchange="refreshTeachers()">
+              <option value="morning" ${(c.period||'evening')==='morning'?'selected':''}>🌅 صباحية</option>
+              <option value="evening" ${(c.period||'evening')==='evening'?'selected':''}>🌙 مسائية</option>
+            </select>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>👩‍🏫 المعلمة</label>
+          <select class="input" id="c-teacher">
+            <option value="">— بدون تحديد —</option>
+            ${DB.users().filter(u=>u.role==='teacher'&&u.schoolId===c.schoolId&&u.branchId===c.branchId&&u.period===(c.period||'evening')).map(t=>`<option value="${t.id}" ${c.teacherId===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="input-group"><label>اسم الطفل *</label><input class="input" id="c-name" value="${esc(c.name)}"></div>
+        <div class="grid-2">
+          <div class="input-group"><label>اسم ولي الأمر</label><input class="input" id="c-parent" value="${esc(c.parentName)}"></div>
+          <div class="input-group"><label>الهاتف</label><input class="input" id="c-phone" value="${esc(c.parentPhone)}"></div>
+        </div>
+        <div class="grid-2">
+          <div class="input-group"><label>الصف</label><input class="input" id="c-grade" value="${esc(c.grade||'')}"></div>
+          <div class="input-group"><label>تاريخ الانتساب</label><input class="input" id="c-join" type="date" value="${c.joinDate}"></div>
+        </div>
+        <div class="input-group"><label>ملاحظات</label><textarea class="input" id="c-notes" rows="2">${esc(c.notes||'')}</textarea></div>
+        <div style="display:flex;align-items:center;gap:16px;padding:10px 14px;background:#fefce8;border-radius:8px;border:1px solid #fde68a">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:13px">
+            <input type="checkbox" id="c-vip" ${c.isVip?'checked':''} style="width:16px;height:16px;cursor:pointer">
+            ⭐ عميل مميز (VIP)
+          </label>
+          <div style="display:flex;align-items:center;gap:8px;flex:1">
+            <label style="font-size:13px;font-weight:600;white-space:nowrap">نسبة الخصم الدائم %</label>
+            <input class="input" id="c-disc" type="number" min="0" max="100" value="${c.discountPct||0}" placeholder="0" style="width:80px">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveChild(true)">حفظ التعديلات</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+
+  addSub(childId){
+    const c=DB.children().find(x=>x.id===childId);
+    if(!c) return;
+    const period=c.period||'evening';
+    const p=SUB_PRICES[period]||SUB_PRICES.evening;
+    const periodLabel=period==='morning'?'🌅 صباحية':'🌙 مسائية';
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal">
+      <div class="modal-header"><h2>📋 اشتراك جديد — ${esc(c.name)}</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <input type="hidden" id="sub-child" value="${childId}">
+        <input type="hidden" id="sub-school" value="${c.schoolId}">
+        <input type="hidden" id="sub-period" value="${period}">
+        <div style="background:#f0fdf4;border-radius:8px;padding:12px;margin-bottom:14px;display:flex;gap:20px;flex-wrap:wrap">
+          <div><div style="font-size:11px;color:#64748b">الطفل</div><div style="font-weight:700">${esc(c.name)}</div></div>
+          <div><div style="font-size:11px;color:#64748b">الفترة</div><div style="font-weight:700">${periodLabel}</div></div>
+          <div><div style="font-size:11px;color:#64748b">الفرع</div><div style="font-weight:700">${DB.branchName(c.branchId)}</div></div>
+          ${c.isVip?`<div><div style="font-size:11px;color:#64748b">التصنيف</div><div style="font-weight:700;color:#d97706">⭐ عميل مميز</div></div>`:''}
+        </div>
+        <div class="input-group">
+          <label>مدة الاشتراك *</label>
+          <select class="input" id="sub-type" onchange="calcEndDate()">
+            <option value="daily">📅 يومي — ${p.daily} ر.س</option>
+            <option value="weekly">📅 أسبوعي — ${p.weekly} ر.س</option>
+            <option value="monthly" selected>📅 شهري — ${p.monthly} ر.س</option>
+          </select>
+        </div>
+        <div class="grid-2">
+          <div class="input-group"><label>تاريخ البداية *</label><input class="input" id="sub-start" type="date" value="${T0}" onchange="calcEndDate()"></div>
+          <div class="input-group"><label>تاريخ الانتهاء</label><input class="input" id="sub-end" type="date" value="${addDays(T0,30)}" readonly style="background:#f8fafc;color:#64748b"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#fefce8;border-radius:8px;margin-bottom:14px;border:1px solid #fde68a">
+          <span style="font-size:13px;font-weight:600">نسبة الخصم %</span>
+          <input class="input" id="sub-disc" type="number" min="0" max="100" value="${c.discountPct||0}" style="width:80px" oninput="calcEndDate()">
+          <span style="font-size:12px;color:#64748b">السعر الأساسي: <strong id="sub-base-label">${p.monthly} ر.س</strong></span>
+        </div>
+        <div class="grid-2">
+          <div class="input-group">
+            <label>المبلغ بعد الخصم (ر.س)</label>
+            <input class="input" id="sub-price" type="number" value="${Math.round(p.monthly*(1-(c.discountPct||0)/100))}" oninput="syncPaidAmount('sub-price','sub-paid')">
+          </div>
+          <div class="input-group"><label>المبلغ المدفوع (ر.س)</label><input class="input" id="sub-paid" type="number" value="${Math.round(p.monthly*(1-(c.discountPct||0)/100))}"></div>
+        </div>
+        <div class="input-group">
+          <label>حالة الدفع *</label>
+          <select class="input" id="sub-pay">
+            <option value="paid">✅ مدفوع بالكامل</option>
+            <option value="partial">🟡 مدفوع جزئياً</option>
+            <option value="deferred">⏳ مؤجل</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>💰 طريقة الدفع</label>
+          ${pmButtons('sub-pm')}
+        </div>
+        ${receiptField('sub-receipt-file','sub-receipt-data','sub-receipt-preview')}
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveSub()">حفظ الاشتراك</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+
+  pay(subId){
+    const s=DB.subscriptions().find(x=>x.id===subId);
+    if(!s) return;
+    const remaining=s.price-s.paidAmount;
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal">
+      <div class="modal-header"><h2>💰 تسجيل دفعة</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <input type="hidden" id="pay-sub" value="${subId}">
+        <div style="background:#f0fdf4;border-radius:8px;padding:14px;margin-bottom:16px">
+          <div style="font-size:13px;color:#64748b">الطفل</div>
+          <div style="font-weight:700">${esc(DB.childName(s.childId))}</div>
+          <div style="margin-top:8px;display:flex;gap:16px">
+            <div><div style="font-size:12px;color:#64748b">السعر الكلي</div><div style="font-weight:700">${s.price} ر.س</div></div>
+            <div><div style="font-size:12px;color:#64748b">المدفوع</div><div style="font-weight:700;color:#10b981">${s.paidAmount} ر.س</div></div>
+            <div><div style="font-size:12px;color:#64748b">المتبقي</div><div style="font-weight:700;color:#ef4444">${remaining} ر.س</div></div>
+          </div>
+        </div>
+        <div class="input-group"><label>مبلغ الدفعة (ر.س) *</label><input class="input" id="pay-amount" type="number" value="${remaining}" max="${remaining}" placeholder="0"></div>
+        <div class="input-group">
+          <label>حالة الدفع بعد الدفعة</label>
+          <select class="input" id="pay-status">
+            <option value="paid">مدفوع بالكامل</option>
+            <option value="partial">جزئي</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="savePay()">تأكيد الدفع</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+
+  addUser(){
+    const schools=DB.schools();
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal">
+      <div class="modal-header"><h2>👤 إضافة مستخدم</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <div class="input-group"><label>الاسم الكامل *</label><input class="input" id="u-name" placeholder="الاسم"></div>
+        <div class="grid-2">
+          <div class="input-group"><label>اسم المستخدم *</label><input class="input" id="u-username" placeholder="username"></div>
+          <div class="input-group"><label>كلمة المرور *</label><input class="input" id="u-pass" placeholder="password"></div>
+        </div>
+        <div class="grid-2">
+          <div class="input-group"><label>الدور *</label>
+            <select class="input" id="u-role" onchange="toggleSchoolField()">
+              <option value="school_admin">مديرة فرع</option>
+              <option value="teacher">معلمة</option>
+              <option value="superadmin">مدير عام</option>
+            </select>
+          </div>
+          <div class="input-group" id="school-field">
+            <label>المدرسة *</label>
+            <select class="input" id="u-school"><option value="">اختر مدرسة</option>${schools.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select>
+          </div>
+        </div>
+        <div class="input-group"><label>الهاتف</label><input class="input" id="u-phone" placeholder="05xxxxxxxx"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveUser()">حفظ</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+
+  viewReceipt(subId){
+    const s=DB.subscriptions().find(x=>x.id===subId);
+    if(!s||!s.receiptImage) return;
+    const child=DB.children().find(c=>c.id===s.childId);
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header"><h2>🖼 إيصال الدفع</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body" style="text-align:center">
+        <div style="font-size:13px;color:#64748b;margin-bottom:12px">
+          ${esc(child?.name||'—')} · ${formatDate(s.startDate)} — ${formatDate(s.endDate)} · ${s.price} ر.س
+        </div>
+        <img src="${s.receiptImage}" style="max-width:100%;border-radius:10px;border:1px solid #e2e8f0">
+        <div style="margin-top:12px">
+          <a href="${s.receiptImage}" download="ايصال-${s.invoiceNo||s.id}.png" class="btn btn-primary btn-sm">⬇️ تحميل الإيصال</a>
+        </div>
+      </div>
+    </div></div>`);
+  },
+
+  editUser(id){
+    const u=DB.users().find(x=>x.id===id);
+    const schools=DB.schools();
+    if(!u) return;
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal">
+      <div class="modal-header"><h2>✏️ تعديل مستخدم</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <input type="hidden" id="u-id" value="${u.id}">
+        <div class="input-group"><label>الاسم الكامل</label><input class="input" id="u-name" value="${esc(u.name)}"></div>
+        <div class="grid-2">
+          <div class="input-group"><label>اسم المستخدم</label><input class="input" id="u-username" value="${esc(u.username)}"></div>
+          <div class="input-group"><label>كلمة المرور الجديدة</label><input class="input" id="u-pass" placeholder="اتركه فارغاً للإبقاء"></div>
+        </div>
+        <div class="grid-2">
+          <div class="input-group"><label>الدور</label>
+            <select class="input" id="u-role" onchange="toggleSchoolField()">
+              <option value="school_admin" ${u.role==='school_admin'?'selected':''}>مديرة فرع</option>
+              <option value="teacher" ${u.role==='teacher'?'selected':''}>معلمة</option>
+              <option value="superadmin" ${u.role==='superadmin'?'selected':''}>مدير عام</option>
+            </select>
+          </div>
+          <div class="input-group" id="school-field" style="${u.role==='superadmin'?'display:none':''}">
+            <label>المدرسة</label>
+            <select class="input" id="u-school">${schools.map(s=>`<option value="${s.id}" ${u.schoolId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select>
+          </div>
+        </div>
+        <div class="input-group"><label>الهاتف</label><input class="input" id="u-phone" value="${esc(u.phone||'')}"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveUser(true)">حفظ التعديلات</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+};
+
+// =========================================================
+//  EVENT HANDLERS
+// =========================================================
+function doLogin(){
+  const user=document.getElementById('l-user')?.value?.trim();
+  const pass=document.getElementById('l-pass')?.value?.trim();
+  if(Auth.login(user,pass)){App.go('dashboard')}
+  else{const e=document.getElementById('login-err');if(e)e.style.display='flex'}
+}
+
+const SUB_PRICES={morning:{daily:150,weekly:600,monthly:1800},evening:{daily:70,weekly:300,monthly:900}};
+
+function calcEndDate(){
+  const type=document.getElementById('sub-type')?.value;
+  const start=document.getElementById('sub-start')?.value;
+  const end=document.getElementById('sub-end');
+  const period=document.getElementById('sub-period')?.value||'evening';
+  if(!type||!start||!end) return;
+  if(type==='daily') end.value=start;
+  else if(type==='weekly') end.value=addDays(start,7);
+  else if(type==='monthly') end.value=addDays(start,30);
+  const priceEl=document.getElementById('sub-price');
+  const paidEl=document.getElementById('sub-paid');
+  const baseLabel=document.getElementById('sub-base-label');
+  const base=(SUB_PRICES[period]||SUB_PRICES.evening)[type]||0;
+  const disc=parseFloat(document.getElementById('sub-disc')?.value||0);
+  const final=disc>0?Math.round(base*(1-disc/100)):base;
+  if(baseLabel) baseLabel.textContent=base+' ر.س';
+  if(priceEl){priceEl.value=final;if(paidEl)paidEl.value=final;}
+}
+
+function calcChildSubPrice(){
+  const type=document.getElementById('c-sub-type')?.value;
+  const start=document.getElementById('c-sub-start')?.value;
+  const period=document.getElementById('c-period')?.value||'evening';
+  const endEl=document.getElementById('c-sub-end');
+  if(type&&start&&endEl){
+    if(type==='daily') endEl.value=start;
+    else if(type==='weekly') endEl.value=addDays(start,7);
+    else endEl.value=addDays(start,30);
+  }
+  const priceEl=document.getElementById('c-sub-price');
+  const paidEl=document.getElementById('c-sub-paid');
+  const hintEl=document.getElementById('c-base-hint');
+  if(priceEl&&type){
+    const base=(SUB_PRICES[period]||SUB_PRICES.evening)[type]||0;
+    const disc=parseFloat(document.getElementById('c-disc')?.value||0);
+    const final=disc>0?Math.round(base*(1-disc/100)):base;
+    if(hintEl) hintEl.textContent=disc>0?`أصل: ${base} ر.س`:'';
+    priceEl.value=final;
+    if(paidEl) paidEl.value=final;
+  }
+}
+
+function syncPaidAmount(srcId,tgtId){
+  const src=document.getElementById(srcId);
+  const tgt=document.getElementById(tgtId);
+  if(src&&tgt) tgt.value=src.value;
+}
+
+function setPM(btn,hiddenId){
+  btn.parentElement.querySelectorAll('.pm-btn').forEach(b=>b.classList.remove('pm-active'));
+  btn.classList.add('pm-active');
+  const h=document.getElementById(hiddenId);
+  if(h) h.value=btn.dataset.v;
+}
+
+function handleReceiptImg(input,hiddenId,previewId){
+  const file=input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const h=document.getElementById(hiddenId);
+    if(h) h.value=e.target.result;
+    const p=document.getElementById(previewId);
+    if(p){p.style.display='block';p.innerHTML=`<img src="${e.target.result}"><div style="font-size:11px;color:#10b981;margin-top:4px">✅ تم رفع الإيصال</div>`;}
+  };
+  reader.readAsDataURL(file);
+}
+
+const PM_LABEL={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
+
+function pmButtons(hiddenId,selected='cash'){
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button type="button" class="pm-btn ${selected==='cash'?'pm-active':''}" data-v="cash" onclick="setPM(this,'${hiddenId}')">💵 كاش</button>
+    <button type="button" class="pm-btn ${selected==='mada'?'pm-active':''}" data-v="mada" onclick="setPM(this,'${hiddenId}')">💳 مدى</button>
+    <button type="button" class="pm-btn ${selected==='transfer'?'pm-active':''}" data-v="transfer" onclick="setPM(this,'${hiddenId}')">🏦 حوالة</button>
+  </div><input type="hidden" id="${hiddenId}" value="${selected}">`;
+}
+
+function receiptField(fileId,hiddenId,previewId){
+  return `<div class="input-group" style="margin-top:10px">
+    <label style="font-size:13px;font-weight:600;color:#374151">📎 إيصال الدفع <span style="font-weight:400;color:#94a3b8">(اختياري)</span></label>
+    <input type="file" accept="image/*" class="input" style="padding:6px;font-size:13px" onchange="handleReceiptImg(this,'${hiddenId}','${previewId}')">
+    <input type="hidden" id="${hiddenId}" value="">
+    <div class="receipt-preview" id="${previewId}"></div>
+  </div>`;
+}
+
+function refreshTeachers(){
+  const branchId=document.getElementById('c-branch')?.value||'';
+  const period=document.getElementById('c-period')?.value||'';
+  const sel=document.getElementById('c-teacher');
+  if(!sel) return;
+  const sid=Auth.schoolId();
+  const teachers=DB.users().filter(u=>
+    u.role==='teacher'&&
+    (!sid||u.schoolId===sid)&&
+    (!branchId||u.branchId===branchId)&&
+    (!period||u.period===period)
+  );
+  sel.innerHTML=`<option value="">— اختر المعلمة —</option>`+
+    teachers.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+}
+
+function toggleSchoolField(){
+  const role=document.getElementById('u-role')?.value;
+  const sf=document.getElementById('school-field');
+  if(sf) sf.style.display=role==='superadmin'?'none':'';
+}
+
+function saveBranch(edit=false){
+  const name=document.getElementById('br-name')?.value?.trim();
+  if(!name){alert('اسم الفرع مطلوب');return}
+  const b={
+    id:edit?document.getElementById('br-id')?.value:uid(),
+    name,
+    location:document.getElementById('br-loc')?.value?.trim()||'',
+  };
+  if(edit) DB.updateBranch(b); else DB.addBranch(b);
+  App.closeModal();
+  App.go('branches');
+}
+
+function saveSchool(edit=false){
+  const name=document.getElementById('sc-name')?.value?.trim();
+  if(!name){alert('اسم المدرسة مطلوب');return}
+  const s={
+    id:edit?document.getElementById('sc-id')?.value:uid(),
+    name,
+    contactPerson:document.getElementById('sc-contact')?.value?.trim()||'',
+    phone:document.getElementById('sc-phone')?.value?.trim()||'',
+    email:document.getElementById('sc-email')?.value?.trim()||'',
+    joinDate:document.getElementById('sc-date')?.value||T0,
+    isActive:true,
+  };
+  if(edit) DB.updateSchool(s); else DB.addSchool(s);
+  App.closeModal();
+  App.go('schools');
+}
+
+function toggleSchool(id){
+  const s=DB.schools().find(x=>x.id===id);
+  if(!s) return;
+  s.isActive=!s.isActive;
+  DB.updateSchool(s);
+  App.go('schools');
+}
+
+function saveChild(edit=false){
+  const name=document.getElementById('c-name')?.value?.trim();
+  const parent=document.getElementById('c-parent')?.value?.trim();
+  const phone=document.getElementById('c-phone')?.value?.trim();
+  const schoolId=document.getElementById('c-school')?.value?.trim();
+  if(!name||!parent||!phone){alert('يرجى ملء الحقول المطلوبة');return}
+  const childId=edit?document.getElementById('c-id')?.value:uid();
+  const period=document.getElementById('c-period')?.value||'evening';
+  const c={
+    id:childId,
+    schoolId,
+    branchId:document.getElementById('c-branch')?.value||'',
+    period,
+    teacherId:document.getElementById('c-teacher')?.value||'',
+    name,
+    parentName:parent,
+    parentPhone:phone,
+    grade:document.getElementById('c-grade')?.value?.trim()||'',
+    notes:document.getElementById('c-notes')?.value?.trim()||'',
+    joinDate:document.getElementById('c-join')?.value||T0,
+    isActive:true,
+    isVip:document.getElementById('c-vip')?.checked||false,
+    discountPct:parseFloat(document.getElementById('c-disc')?.value||0),
+  };
+  if(edit) DB.updateChild(c); else DB.addChild(c);
+
+  // حفظ الاشتراك مع الطفل (للتسجيل الجديد فقط)
+  if(!edit){
+    const subType=document.getElementById('c-sub-type')?.value;
+    const subStart=document.getElementById('c-sub-start')?.value||T0;
+    const subPrice=parseFloat(document.getElementById('c-sub-price')?.value||0);
+    const subPaid=parseFloat(document.getElementById('c-sub-paid')?.value||0);
+    const subPay=document.getElementById('c-sub-pay')?.value||'paid';
+    if(subType&&subPrice>0){
+      const subEnd=subType==='daily'?subStart:subType==='weekly'?addDays(subStart,7):addDays(subStart,30);
+      const allSubs=DB.subscriptions();
+      const maxNum=allSubs.reduce((m,s)=>{const n=parseInt(s.invoiceNo?.replace('INV-','')||0);return n>m?n:m;},0);
+      const invoiceNo='INV-'+(maxNum+1).toString().padStart(4,'0');
+      const basePrice=(SUB_PRICES[period]||SUB_PRICES.evening)[subType]||subPrice;
+      const subPM=document.getElementById('c-sub-pm')?.value||'cash';
+      const subReceipt=document.getElementById('c-receipt-data')?.value||'';
+      DB.addSub({id:uid(),childId,schoolId,branchId:c.branchId,period,type:subType,startDate:subStart,endDate:subEnd,basePrice,discountPct:0,price:subPrice,paidAmount:subPaid,paymentStatus:subPay,paymentMethod:subPM,receiptImage:subReceipt,isActive:true,createdAt:T0,invoiceNo});
+    }
+  }
+  App.closeModal();
+  App.go('children');
+}
+
+function saveSub(){
+  const childId=document.getElementById('sub-child')?.value;
+  const schoolId=document.getElementById('sub-school')?.value;
+  const period=document.getElementById('sub-period')?.value||'evening';
+  const type=document.getElementById('sub-type')?.value;
+  const startDate=document.getElementById('sub-start')?.value;
+  const endDate=document.getElementById('sub-end')?.value;
+  const price=parseFloat(document.getElementById('sub-price')?.value||0);
+  const paidAmount=parseFloat(document.getElementById('sub-paid')?.value||0);
+  const paymentStatus=document.getElementById('sub-pay')?.value;
+  if(!childId||!type||!startDate||!endDate||!price){alert('يرجى ملء جميع الحقول');return}
+  const child=DB.children().find(c=>c.id===childId);
+  const allSubs=DB.subscriptions();
+  const maxNum=allSubs.reduce((m,s)=>{const n=parseInt(s.invoiceNo?.replace('INV-','')||0);return n>m?n:m;},0);
+  const invoiceNo='INV-'+(maxNum+1).toString().padStart(4,'0');
+  const discPct=parseFloat(document.getElementById('sub-disc')?.value||0);
+  const basePrice=(SUB_PRICES[period]||SUB_PRICES.evening)[type]||price;
+  const paymentMethod=document.getElementById('sub-pm')?.value||'cash';
+  const receiptImage=document.getElementById('sub-receipt-data')?.value||'';
+  const s={id:uid(),childId,schoolId,branchId:child?.branchId||'',period,type,startDate,endDate,basePrice,discountPct:discPct,price,paidAmount,paymentStatus,paymentMethod,receiptImage,isActive:true,createdAt:T0,invoiceNo};
+  DB.addSub(s);
+  App.closeModal();
+  App.go('subscriptions');
+}
+
+function savePay(){
+  const subId=document.getElementById('pay-sub')?.value;
+  const amount=parseFloat(document.getElementById('pay-amount')?.value||0);
+  const status=document.getElementById('pay-status')?.value;
+  const sub=DB.subscriptions().find(s=>s.id===subId);
+  if(!sub||amount<=0){alert('يرجى إدخال مبلغ صحيح');return}
+  sub.paidAmount=Math.min(sub.price,sub.paidAmount+amount);
+  sub.paymentStatus=sub.paidAmount>=sub.price?'paid':status;
+  DB.updateSub(sub);
+  App.closeModal();
+  App.go('subscriptions');
+}
+
+function saveUser(edit=false){
+  const name=document.getElementById('u-name')?.value?.trim();
+  const username=document.getElementById('u-username')?.value?.trim();
+  const pass=document.getElementById('u-pass')?.value?.trim();
+  const role=document.getElementById('u-role')?.value;
+  const schoolId=role!=='superadmin'?document.getElementById('u-school')?.value:'';
+  const phone=document.getElementById('u-phone')?.value?.trim()||'';
+  if(!name||!username){alert('الاسم واسم المستخدم مطلوبان');return}
+  if(!edit&&!pass){alert('كلمة المرور مطلوبة');return}
+  if(edit){
+    const u=DB.users().find(x=>x.id===document.getElementById('u-id')?.value);
+    if(!u) return;
+    u.name=name;u.username=username;u.role=role;u.schoolId=schoolId;u.phone=phone;
+    if(pass) u.password=pass;
+    DB.updateUser(u);
+  } else {
+    if(DB.users().find(x=>x.username===username)){alert('اسم المستخدم مستخدم مسبقاً');return}
+    DB.addUser({id:uid(),name,username,password:pass,role,schoolId,phone});
+  }
+  App.closeModal();
+  App.go('users');
+}
+
+function deleteUser(id){
+  if(!confirm('هل أنت متأكد من حذف هذا المستخدم؟')) return;
+  DB.deleteUser(id);
+  App.go('users');
+}
+
+// Attendance
+const pendingAtt={};
+function setAtt(childId,status,date,schoolId){
+  if(!pendingAtt[date]) pendingAtt[date]={};
+  pendingAtt[date][childId]={childId,status,date,schoolId,checkIn:'07:30',checkOut:'14:00',takenBy:Auth.user.id,notes:''};
+  // Update UI immediately
+  const card=document.getElementById('att-'+childId);
+  if(card){
+    card.className='attendance-card '+status;
+    card.querySelectorAll('button').forEach((b,i)=>{
+      const statuses=['present','absent','late'];
+      b.className='btn btn-xs'+(b.style.flex?' '+['btn-success','btn-danger','btn-warning'][i]:'')+' '+(status===statuses[i]?['btn-success','btn-danger','btn-warning'][i]:'');
+      b.className=`btn btn-xs ${status===statuses[i]?['btn-success','btn-danger','btn-warning'][i]:''}`;
+    });
+  }
+}
+
+function saveAttendance(date,schoolId){
+  const att=DB.attendance();
+  const entries=pendingAtt[date]||{};
+  Object.values(entries).forEach(entry=>{
+    const idx=att.findIndex(a=>a.childId===entry.childId&&a.date===date);
+    if(idx>=0) att[idx]={...att[idx],...entry};
+    else att.push({id:uid(),...entry});
+  });
+  DB.saveAttendance(att);
+  alert('✅ تم حفظ الحضور بنجاح');
+}
+
+// =========================================================
+//  INIT
+// =========================================================
+DB.init();
+Auth.init();
+App.render();
+</script>
+</body>
+</html>
