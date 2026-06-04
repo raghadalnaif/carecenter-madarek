@@ -649,7 +649,13 @@ children(){
               <span class="badge ${bColor}" style="font-size:11px">🏢 ${DB.branchName(c.branchId)}</span>
               <br><span class="badge ${c.period==='morning'?'badge-blue':'badge-orange'}" style="font-size:10px;margin-top:4px">${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'}</span>
             </td>
-            <td><strong>${esc(c.name)}</strong>${c.notes?`<br><small style="color:#f59e0b">⚠️ ${esc(c.notes)}</small>`:''}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px">
+                <strong>${esc(c.name)}</strong>
+                ${c.isVip?`<span class="badge badge-yellow" style="font-size:10px">⭐ VIP${c.discountPct?` ${c.discountPct}%`:''}</span>`:''}
+              </div>
+              ${c.notes?`<small style="color:#f59e0b">⚠️ ${esc(c.notes)}</small>`:''}
+            </td>
             <td style="font-size:13px;color:#374151">${teacher?esc(teacher.name):'<span style="color:#94a3b8">—</span>'}</td>
             <td>${esc(c.parentName)}</td>
             <td><a href="tel:${c.parentPhone}" style="color:#0f766e">${c.parentPhone}</a></td>
@@ -1175,7 +1181,18 @@ const Modals = {
         </div>
         <div class="input-group"><label>ملاحظات صحية</label><textarea class="input" id="c-notes" rows="2" placeholder="حساسية، حالة صحية..."></textarea></div>
 
-        <div style="font-size:13px;font-weight:700;color:#0f766e;padding:8px 12px;background:#f0fdf4;border-radius:8px;margin:16px 0 14px">💳 الاشتراك والدفع</div>
+        <div style="display:flex;align-items:center;gap:16px;padding:10px 14px;background:#fefce8;border-radius:8px;margin-bottom:14px;border:1px solid #fde68a">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:13px">
+            <input type="checkbox" id="c-vip" style="width:16px;height:16px;cursor:pointer">
+            ⭐ عميل مميز (VIP)
+          </label>
+          <div style="display:flex;align-items:center;gap:8px;flex:1">
+            <label style="font-size:13px;font-weight:600;white-space:nowrap">نسبة الخصم الدائم %</label>
+            <input class="input" id="c-disc" type="number" min="0" max="100" value="0" placeholder="0" style="width:80px" oninput="calcChildSubPrice()">
+          </div>
+        </div>
+
+        <div style="font-size:13px;font-weight:700;color:#0f766e;padding:8px 12px;background:#f0fdf4;border-radius:8px;margin:0 0 14px">💳 الاشتراك والدفع</div>
 
         <div class="grid-2">
           <div class="input-group">
@@ -1190,7 +1207,13 @@ const Modals = {
         </div>
         <div class="grid-2">
           <div class="input-group"><label>تاريخ الانتهاء</label><input class="input" id="c-sub-end" type="date" value="${addDays(T0,30)}" readonly style="background:#f8fafc;color:#64748b"></div>
-          <div class="input-group"><label>المبلغ الكلي (ر.س)</label><input class="input" id="c-sub-price" type="number" value="1800" oninput="syncPaidAmount('c-sub-price','c-sub-paid')"></div>
+          <div class="input-group">
+            <label>المبلغ بعد الخصم (ر.س)</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input class="input" id="c-sub-price" type="number" value="1800" oninput="syncPaidAmount('c-sub-price','c-sub-paid')" style="flex:1">
+              <span id="c-base-hint" style="font-size:11px;color:#94a3b8;white-space:nowrap"></span>
+            </div>
+          </div>
         </div>
         <div class="grid-2">
           <div class="input-group"><label>المبلغ المدفوع (ر.س)</label><input class="input" id="c-sub-paid" type="number" value="1800"></div>
@@ -1251,6 +1274,16 @@ const Modals = {
           <div class="input-group"><label>تاريخ الانتساب</label><input class="input" id="c-join" type="date" value="${c.joinDate}"></div>
         </div>
         <div class="input-group"><label>ملاحظات</label><textarea class="input" id="c-notes" rows="2">${esc(c.notes||'')}</textarea></div>
+        <div style="display:flex;align-items:center;gap:16px;padding:10px 14px;background:#fefce8;border-radius:8px;border:1px solid #fde68a">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:13px">
+            <input type="checkbox" id="c-vip" ${c.isVip?'checked':''} style="width:16px;height:16px;cursor:pointer">
+            ⭐ عميل مميز (VIP)
+          </label>
+          <div style="display:flex;align-items:center;gap:8px;flex:1">
+            <label style="font-size:13px;font-weight:600;white-space:nowrap">نسبة الخصم الدائم %</label>
+            <input class="input" id="c-disc" type="number" min="0" max="100" value="${c.discountPct||0}" placeholder="0" style="width:80px">
+          </div>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" onclick="saveChild(true)">حفظ التعديلات</button>
@@ -1273,10 +1306,11 @@ const Modals = {
         <input type="hidden" id="sub-child" value="${childId}">
         <input type="hidden" id="sub-school" value="${c.schoolId}">
         <input type="hidden" id="sub-period" value="${period}">
-        <div style="background:#f0fdf4;border-radius:8px;padding:12px;margin-bottom:14px;display:flex;gap:20px">
+        <div style="background:#f0fdf4;border-radius:8px;padding:12px;margin-bottom:14px;display:flex;gap:20px;flex-wrap:wrap">
           <div><div style="font-size:11px;color:#64748b">الطفل</div><div style="font-weight:700">${esc(c.name)}</div></div>
           <div><div style="font-size:11px;color:#64748b">الفترة</div><div style="font-weight:700">${periodLabel}</div></div>
           <div><div style="font-size:11px;color:#64748b">الفرع</div><div style="font-weight:700">${DB.branchName(c.branchId)}</div></div>
+          ${c.isVip?`<div><div style="font-size:11px;color:#64748b">التصنيف</div><div style="font-weight:700;color:#d97706">⭐ عميل مميز</div></div>`:''}
         </div>
         <div class="input-group">
           <label>مدة الاشتراك *</label>
@@ -1290,9 +1324,17 @@ const Modals = {
           <div class="input-group"><label>تاريخ البداية *</label><input class="input" id="sub-start" type="date" value="${T0}" onchange="calcEndDate()"></div>
           <div class="input-group"><label>تاريخ الانتهاء</label><input class="input" id="sub-end" type="date" value="${addDays(T0,30)}" readonly style="background:#f8fafc;color:#64748b"></div>
         </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#fefce8;border-radius:8px;margin-bottom:14px;border:1px solid #fde68a">
+          <span style="font-size:13px;font-weight:600">نسبة الخصم %</span>
+          <input class="input" id="sub-disc" type="number" min="0" max="100" value="${c.discountPct||0}" style="width:80px" oninput="calcEndDate()">
+          <span style="font-size:12px;color:#64748b">السعر الأساسي: <strong id="sub-base-label">${p.monthly} ر.س</strong></span>
+        </div>
         <div class="grid-2">
-          <div class="input-group"><label>المبلغ الكلي (ر.س)</label><input class="input" id="sub-price" type="number" value="${p.monthly}" oninput="syncPaidAmount('sub-price','sub-paid')"></div>
-          <div class="input-group"><label>المبلغ المدفوع (ر.س)</label><input class="input" id="sub-paid" type="number" value="${p.monthly}"></div>
+          <div class="input-group">
+            <label>المبلغ بعد الخصم (ر.س)</label>
+            <input class="input" id="sub-price" type="number" value="${Math.round(p.monthly*(1-(c.discountPct||0)/100))}" oninput="syncPaidAmount('sub-price','sub-paid')">
+          </div>
+          <div class="input-group"><label>المبلغ المدفوع (ر.س)</label><input class="input" id="sub-paid" type="number" value="${Math.round(p.monthly*(1-(c.discountPct||0)/100))}"></div>
         </div>
         <div class="input-group">
           <label>حالة الدفع *</label>
@@ -1440,8 +1482,12 @@ function calcEndDate(){
   else if(type==='monthly') end.value=addDays(start,30);
   const priceEl=document.getElementById('sub-price');
   const paidEl=document.getElementById('sub-paid');
+  const baseLabel=document.getElementById('sub-base-label');
   const base=(SUB_PRICES[period]||SUB_PRICES.evening)[type]||0;
-  if(priceEl){priceEl.value=base;if(paidEl)paidEl.value=base;}
+  const disc=parseFloat(document.getElementById('sub-disc')?.value||0);
+  const final=disc>0?Math.round(base*(1-disc/100)):base;
+  if(baseLabel) baseLabel.textContent=base+' ر.س';
+  if(priceEl){priceEl.value=final;if(paidEl)paidEl.value=final;}
 }
 
 function calcChildSubPrice(){
@@ -1456,10 +1502,14 @@ function calcChildSubPrice(){
   }
   const priceEl=document.getElementById('c-sub-price');
   const paidEl=document.getElementById('c-sub-paid');
+  const hintEl=document.getElementById('c-base-hint');
   if(priceEl&&type){
     const base=(SUB_PRICES[period]||SUB_PRICES.evening)[type]||0;
-    priceEl.value=base;
-    if(paidEl) paidEl.value=base;
+    const disc=parseFloat(document.getElementById('c-disc')?.value||0);
+    const final=disc>0?Math.round(base*(1-disc/100)):base;
+    if(hintEl) hintEl.textContent=disc>0?`أصل: ${base} ر.س`:'';
+    priceEl.value=final;
+    if(paidEl) paidEl.value=final;
   }
 }
 
@@ -1550,8 +1600,8 @@ function saveChild(edit=false){
     notes:document.getElementById('c-notes')?.value?.trim()||'',
     joinDate:document.getElementById('c-join')?.value||T0,
     isActive:true,
-    isVip:false,
-    discountPct:0,
+    isVip:document.getElementById('c-vip')?.checked||false,
+    discountPct:parseFloat(document.getElementById('c-disc')?.value||0),
   };
   if(edit) DB.updateChild(c); else DB.addChild(c);
 
@@ -1590,8 +1640,9 @@ function saveSub(){
   const allSubs=DB.subscriptions();
   const maxNum=allSubs.reduce((m,s)=>{const n=parseInt(s.invoiceNo?.replace('INV-','')||0);return n>m?n:m;},0);
   const invoiceNo='INV-'+(maxNum+1).toString().padStart(4,'0');
+  const discPct=parseFloat(document.getElementById('sub-disc')?.value||0);
   const basePrice=(SUB_PRICES[period]||SUB_PRICES.evening)[type]||price;
-  const s={id:uid(),childId,schoolId,branchId:child?.branchId||'',period,type,startDate,endDate,basePrice,discountPct:0,price,paidAmount,paymentStatus,isActive:true,createdAt:T0,invoiceNo};
+  const s={id:uid(),childId,schoolId,branchId:child?.branchId||'',period,type,startDate,endDate,basePrice,discountPct:discPct,price,paidAmount,paymentStatus,isActive:true,createdAt:T0,invoiceNo};
   DB.addSub(s);
   App.closeModal();
   App.go('subscriptions');
