@@ -350,18 +350,24 @@ const App = {
   },
   topbar(){
     const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات'};
+    const now=new Date();
+    const hm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
     return `
     <div class="topbar">
       <div style="display:flex;align-items:center;gap:10px">
         <button class="hamburger" onclick="toggleSidebar()">☰</button>
         <div class="topbar-title">${titles[App.view]||''}</div>
       </div>
-      <div class="topbar-user">
-        <div style="text-align:left">
-          <div style="font-size:13px;font-weight:600">${esc(Auth.user.name)}</div>
-          <div style="font-size:11px;color:#64748b">${Auth.user.role==='superadmin'?'مدير عام':Auth.user.role==='school_admin'?'مديرة فرع':'معلمة'}</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn btn-secondary btn-sm" onclick="App.go(App.view,App.params)" title="تحديث البيانات" style="padding:6px 10px;font-size:16px;line-height:1">🔄</button>
+        <span style="font-size:11px;color:#94a3b8">${hm}</span>
+        <div class="topbar-user">
+          <div style="text-align:left">
+            <div style="font-size:13px;font-weight:600">${esc(Auth.user.name)}</div>
+            <div style="font-size:11px;color:#64748b">${Auth.user.role==='superadmin'?'مدير عام':Auth.user.role==='school_admin'?'مديرة فرع':'معلمة'}</div>
+          </div>
+          <div class="avatar">${Auth.user.name.charAt(0)}</div>
         </div>
-        <div class="avatar">${Auth.user.name.charAt(0)}</div>
       </div>
     </div>`;
   },
@@ -2370,6 +2376,13 @@ function closeSidebar(){
 DB.init();
 Auth.init();
 App.render();
+
+// مزامنة تلقائية بين تابات المتصفح (نفس الجهاز)
+window.addEventListener('storage',(e)=>{
+  if(e.key&&e.key.startsWith('ccs_')&&Auth.user){
+    App.go(App.view,App.params);
+  }
+});
 </script>
 </body>
 </html>
