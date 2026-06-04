@@ -717,66 +717,112 @@ subscriptions(){
 
 // ---------- ATTENDANCE ----------
 attendance(){
+  const u=Auth.user;
   const sid=Auth.schoolId()||App.params.schoolId;
   const date=App.params.date||T0;
+  const allSubs=DB.subscriptions();
+
+  // دالة: هل للطفل اشتراك يغطي هذا التاريخ؟
+  const hasActiveSub=(childId)=>allSubs.some(s=>
+    s.childId===childId && s.isActive &&
+    s.startDate<=date && s.endDate>=date
+  );
+  // دالة: جلب اشتراك الطفل ليوم معيّن
+  const subForDate=(childId)=>allSubs.find(s=>
+    s.childId===childId && s.isActive &&
+    s.startDate<=date && s.endDate>=date
+  )||null;
+
   let kids=DB.children();
   if(sid) kids=kids.filter(c=>c.schoolId===sid);
-  if(!kids.length&&!sid){
-    // superadmin without filter — show all
-    kids=DB.children();
-  }
+
+  // المعلمة: ترى فقط أطفالها المسندون إليها
+  if(u.role==='teacher') kids=kids.filter(c=>c.teacherId===u.id);
+
+  // فلترة الفرع
+  if(App.params.branchFilter) kids=kids.filter(c=>c.branchId===App.params.branchFilter);
+
+  // ✅ الأساسي: فقط أطفال لديهم اشتراك يغطي هذا التاريخ
+  const activeKids=kids.filter(c=>hasActiveSub(c.id));
+  const expiredKids=kids.filter(c=>!hasActiveSub(c.id));
+
   const attList=DB.attendance();
   const todayAtt=attList.filter(a=>a.date===date&&(sid?a.schoolId===sid:true));
   const attMap={};
   todayAtt.forEach(a=>{attMap[a.childId]=a});
   const isToday=date===T0;
+
+  const renderCard=(c,disabled=false)=>{
+    const a=attMap[c.id];
+    const status=a?.status||'';
+    const sub=subForDate(c.id);
+    const daysLeft=sub?diffDays(sub.endDate,date):null;
+    const urgency=daysLeft!==null?(daysLeft===0?'today':daysLeft<=3?'soon':'ok'):'none';
+    const urgencyStyle={today:'background:#fffbeb;border-color:#f59e0b',soon:'background:#fff7ed;border-color:#fed7aa',ok:'',none:'background:#f8fafc;border-color:#e2e8f0;opacity:.7'}[urgency];
+    return `<div class="attendance-card ${disabled?'':status}" id="att-${c.id}" style="${disabled?'opacity:.55;background:#f8fafc;':urgencyStyle?urgencyStyle+';':''};border:2px solid;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:14px">${esc(c.name)}</div>
+          <div style="font-size:11px;color:#64748b;margin-top:2px">${c.grade||''} — ${esc(c.parentName)}</div>
+          <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">
+            <span class="badge badge-blue" style="font-size:10px">🏢 ${DB.branchName(c.branchId)}</span>
+            <span class="badge ${c.period==='morning'?'badge-blue':'badge-orange'}" style="font-size:10px">${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'}</span>
+          </div>
+        </div>
+        ${sub?`<div style="text-align:center;min-width:52px">
+          <div style="font-size:10px;color:#64748b">ينتهي</div>
+          <div style="font-size:11px;font-weight:700;color:${daysLeft===0?'#f59e0b':daysLeft<=3?'#f97316':'#10b981'}">${daysLeft===0?'اليوم':daysLeft<=3?daysLeft+' أيام':formatDate(sub.endDate)}</div>
+        </div>`:''}
+      </div>
+      ${disabled?`<div style="text-align:center;padding:8px 0;font-size:12px;color:#94a3b8;font-weight:600">⛔ اشتراك منتهٍ</div>`:`
+      <div style="display:flex;gap:6px;margin-top:10px">
+        <button class="btn btn-xs ${status==='present'?'btn-success':''}" style="flex:1;justify-content:center" onclick="setAtt('${c.id}','present','${date}','${c.schoolId}')">✅ حاضر</button>
+        <button class="btn btn-xs ${status==='absent'?'btn-danger':''}" style="flex:1;justify-content:center" onclick="setAtt('${c.id}','absent','${date}','${c.schoolId}')">❌ غائب</button>
+        <button class="btn btn-xs ${status==='late'?'btn-warning':''}" style="flex:1;justify-content:center" onclick="setAtt('${c.id}','late','${date}','${c.schoolId}')">⏰ متأخر</button>
+      </div>
+      ${a?`<div style="font-size:11px;margin-top:6px;color:#64748b">دخول: ${a.checkIn||'—'} · خروج: ${a.checkOut||'—'}</div>`:''}
+      `}
+    </div>`;
+  };
+
   return `
   <div class="actions-bar" style="flex-wrap:wrap">
     <div style="display:flex;align-items:center;gap:8px">
       <label style="font-weight:600;font-size:14px">التاريخ:</label>
-      <input type="date" class="input" style="width:160px" value="${date}" onchange="App.go('attendance',{date:this.value,schoolId:'${sid||''}'})" max="${T0}">
+      <input type="date" class="input" style="width:160px" value="${date}" onchange="App.go('attendance',{date:this.value,schoolId:'${sid||''}',branchFilter:'${App.params.branchFilter||''}'})" max="${T0}">
     </div>
     ${isToday?`<button class="btn btn-primary btn-sm" onclick="saveAttendance('${date}','${sid||''}')">💾 حفظ الحضور</button>`:''}
     <div style="margin-right:auto;display:flex;gap:8px">
       <span class="badge badge-green">✅ ${Object.values(attMap).filter(a=>a.status==='present').length} حاضر</span>
       <span class="badge badge-red">❌ ${Object.values(attMap).filter(a=>a.status==='absent').length} غائب</span>
       <span class="badge badge-yellow">⏰ ${Object.values(attMap).filter(a=>a.status==='late').length} متأخر</span>
+      <span class="badge badge-gray">📋 ${activeKids.length} مشترك</span>
     </div>
   </div>
-  ${Auth.isSuperAdmin()?`<div class="card" style="padding:14px">
+  ${Auth.isSuperAdmin()?`<div class="card" style="padding:12px">
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       ${DB.schools().map(s=>`<span class="chip ${(App.params.schoolId||'')==s.id?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${s.id}'})">${esc(s.name)}</span>`).join('')}
     </div>
   </div>`:''}
   <div class="card" style="padding:12px">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span style="font-size:13px;font-weight:600;color:#64748b">🏢 تصفية بالفرع:</span>
+      <span style="font-size:13px;font-weight:600;color:#64748b">🏢 الفرع:</span>
       <span class="chip ${!App.params.branchFilter?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:''})">الكل</span>
       ${DB.branches().map(b=>`<span class="chip ${App.params.branchFilter===b.id?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${b.id}'})">${esc(b.name)}</span>`).join('')}
     </div>
   </div>
+  ${activeKids.length===0&&expiredKids.length===0?`<div class="card"><div class="empty-state"><div class="es-icon">👶</div><p>لا يوجد أطفال في هذا الفرع</p></div></div>`:''}
   <div class="attendance-grid" id="att-grid">
-    ${(App.params.branchFilter?kids.filter(c=>c.branchId===App.params.branchFilter):kids).length?
-      (App.params.branchFilter?kids.filter(c=>c.branchId===App.params.branchFilter):kids).map(c=>{
-      const a=attMap[c.id];
-      const status=a?.status||'';
-      return `<div class="attendance-card ${status}" id="att-${c.id}">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-          <div>
-            <div style="font-weight:700;font-size:15px">${esc(c.name)}</div>
-            <div style="font-size:12px;color:#64748b;margin-top:2px">${c.grade||''} — ${esc(c.parentName)}</div>
-            <div style="font-size:11px;margin-top:2px"><span class="badge badge-blue" style="font-size:10px">🏢 ${DB.branchName(c.branchId)}</span></div>
-          </div>
-        </div>
-        <div style="display:flex;gap:6px;margin-top:12px">
-          <button class="btn btn-xs ${status==='present'?'btn-success':''}" style="flex:1;justify-content:center" onclick="setAtt('${c.id}','present','${date}','${c.schoolId}')">✅ حاضر</button>
-          <button class="btn btn-xs ${status==='absent'?'btn-danger':''}" style="flex:1;justify-content:center" onclick="setAtt('${c.id}','absent','${date}','${c.schoolId}')">❌ غائب</button>
-          <button class="btn btn-xs ${status==='late'?'btn-warning':''}" style="flex:1;justify-content:center" onclick="setAtt('${c.id}','late','${date}','${c.schoolId}')">⏰ متأخر</button>
-        </div>
-        ${a?`<div style="font-size:12px;margin-top:8px;color:#64748b">دخول: ${a.checkIn||'—'}  خروج: ${a.checkOut||'—'}</div>`:''}
-      </div>`;
-    }).join(''):`<div style="grid-column:1/-1"><div class="empty-state"><div class="es-icon">👶</div><p>لا يوجد أطفال</p></div></div>`}
-  </div>`;
+    ${activeKids.map(c=>renderCard(c,false)).join('')}
+  </div>
+  ${expiredKids.length?`
+  <div style="margin-top:20px">
+    <div style="font-size:13px;font-weight:700;color:#94a3b8;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+      <span>⛔ اشتراكات منتهية في هذا التاريخ (${expiredKids.length})</span>
+    </div>
+    <div class="attendance-grid">${expiredKids.map(c=>renderCard(c,true)).join('')}</div>
+  </div>`:''}
+  `;
 },
 
 // ---------- REPORTS ----------
@@ -970,14 +1016,18 @@ whatsapp(){
 
 // ---------- MY REPORTS (Teacher) ----------
 myReports(){
+  const u=Auth.user;
   const sid=Auth.schoolId();
-  const kids=DB.children().filter(c=>c.schoolId===sid);
-  const attList=DB.attendance().filter(a=>a.schoolId===sid&&a.takenBy===Auth.user.id);
+  // أطفال المعلمة فقط
+  const kids=DB.children().filter(c=>c.schoolId===sid&&c.teacherId===u.id);
+  const attList=DB.attendance().filter(a=>a.schoolId===sid);
+  const allSubs=DB.subscriptions();
   return `
   <div class="card">
-    <div class="card-title">📊 تقرير حضور طلابي</div>
+    <div class="card-title">📊 تقرير حضور أطفالي (${kids.length} طفل)</div>
+    ${kids.length===0?`<div class="empty-state"><div class="es-icon">👶</div><p>لا يوجد أطفال مسندون إليك حتى الآن</p></div>`:`
     <table>
-      <thead><tr><th>الطفل</th><th>حضور</th><th>غياب</th><th>تأخر</th><th>نسبة</th></tr></thead>
+      <thead><tr><th>الطفل</th><th>الفرع / الفترة</th><th>حالة الاشتراك</th><th>حضور</th><th>غياب</th><th>تأخر</th><th>نسبة</th></tr></thead>
       <tbody>
         ${kids.map(c=>{
           const cAtt=attList.filter(a=>a.childId===c.id);
@@ -986,10 +1036,28 @@ myReports(){
           const late=cAtt.filter(a=>a.status==='late').length;
           const total=cAtt.length||1;
           const pct=Math.round((present+late)/total*100);
-          return `<tr><td>${esc(c.name)}</td><td style="color:#10b981">${present}</td><td style="color:#ef4444">${absent}</td><td style="color:#f59e0b">${late}</td><td>${pct}%</td></tr>`;
+          const activeSub=allSubs.find(s=>s.childId===c.id&&s.isActive&&s.startDate<=T0&&s.endDate>=T0);
+          const subStatus=activeSub?`<span class="badge badge-green" style="font-size:11px">✅ حتى ${formatDate(activeSub.endDate)}</span>`:`<span class="badge badge-red" style="font-size:11px">⛔ منتهي</span>`;
+          return `<tr>
+            <td><strong>${esc(c.name)}</strong><br><small style="color:#94a3b8">${esc(c.parentName)}</small></td>
+            <td>
+              <span class="badge badge-blue" style="font-size:10px">🏢 ${DB.branchName(c.branchId)}</span><br>
+              <span class="badge ${c.period==='morning'?'badge-blue':'badge-orange'}" style="font-size:10px;margin-top:3px">${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'}</span>
+            </td>
+            <td>${subStatus}</td>
+            <td style="color:#10b981;font-weight:700">${present}</td>
+            <td style="color:#ef4444;font-weight:700">${absent}</td>
+            <td style="color:#f59e0b;font-weight:700">${late}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px">
+                <div class="progress-bar" style="width:60px"><div class="progress-fill" style="width:${pct}%;background:${pct>80?'#10b981':pct>60?'#f59e0b':'#ef4444'}"></div></div>
+                <span style="font-size:12px;font-weight:700">${pct}%</span>
+              </div>
+            </td>
+          </tr>`;
         }).join('')}
       </tbody>
-    </table>
+    </table>`}
   </div>`;
 },
 
