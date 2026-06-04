@@ -812,14 +812,16 @@ attendance(){
   let kids=DB.children();
   if(sid) kids=kids.filter(c=>c.schoolId===sid);
 
-  // المعلمة: أطفالها فقط + الاشتراك فعّال — بدون أي قسم آخر
+  // المعلمة: جميع أطفال فرعها ونفس فترتها (بدون شرط اشتراك)
   if(isTeacher){
-    kids=kids.filter(c=>c.teacherId===u.id&&hasActiveSub(c.id));
+    kids=kids.filter(c=>c.branchId===u.branchId&&c.period===u.period);
   } else {
-    // الإدارة: فلترة بالمعلمة لو اختارت (غياب معلمة)
+    // الإدارة: فلترة بالفرع / فلترة بالمعلمة (فرع+فترة المعلمة)
     const teacherFilter=App.params.teacherFilter||'';
-    if(teacherFilter) kids=kids.filter(c=>c.teacherId===teacherFilter);
-    // فلترة الفرع
+    if(teacherFilter){
+      const tf=DB.users().find(t=>t.id===teacherFilter);
+      if(tf) kids=kids.filter(c=>c.branchId===tf.branchId&&c.period===tf.period);
+    }
     if(App.params.branchFilter) kids=kids.filter(c=>c.branchId===App.params.branchFilter);
   }
 
@@ -833,8 +835,8 @@ attendance(){
     const a=attMap[c.id];
     const status=a?.status||'';
     const teacher=isAdmin?DB.users().find(t=>t.id===c.teacherId):null;
-    const noSub=isAdmin&&!hasActiveSub(c.id);
-    return `<div class="attendance-card ${status}" id="att-${c.id}" style="${noSub?'opacity:0.75;border:1px dashed #fbbf24;':''}">
+    const noSub=!hasActiveSub(c.id);
+    return `<div class="attendance-card ${status}" id="att-${c.id}" style="${noSub?'opacity:0.78;border:1px dashed #fbbf24;':''}">
       <div style="font-weight:700;font-size:14px">${esc(c.name)}</div>
       <div style="font-size:11px;color:#64748b;margin-top:2px">${c.grade||''} — ${esc(c.parentName)}</div>
       ${teacher?`<div style="font-size:11px;color:#0f766e;margin-top:3px">👩‍🏫 ${esc(teacher.name)}</div>`:''}
@@ -887,7 +889,7 @@ attendance(){
     </div>
   </div>`:''}
 
-  ${kids.length===0?`<div class="card"><div class="empty-state"><div class="es-icon">👶</div><p>${isTeacher?'لا يوجد أطفال نشطون في فصلك اليوم':'لا يوجد أطفال مسجلون في هذا الفرع'}</p></div></div>`:`
+  ${kids.length===0?`<div class="card"><div class="empty-state"><div class="es-icon">👶</div><p>${isTeacher?'لا يوجد أطفال مسجلون في فرعك وفترتك':'لا يوجد أطفال مسجلون في هذا الفرع'}</p></div></div>`:`
   <div class="attendance-grid" id="att-grid">
     ${kids.map(c=>renderCard(c)).join('')}
   </div>`}
