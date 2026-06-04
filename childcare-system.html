@@ -632,7 +632,7 @@ children(){
   </div>
   <div class="card">
     <table>
-      <thead><tr>${Auth.isSuperAdmin()?'<th>المدرسة</th>':''}<th>الفرع</th><th>اسم الطفل</th><th>ولي الأمر</th><th>الهاتف</th><th>الصف</th><th>الاشتراك الحالي</th><th>حالة الدفع</th><th>إجراءات</th></tr></thead>
+      <thead><tr>${Auth.isSuperAdmin()?'<th>المدرسة</th>':''}<th>الفرع / الفترة</th><th>اسم الطفل</th><th>المعلمة</th><th>ولي الأمر</th><th>الهاتف</th><th>الاشتراك الحالي</th><th>حالة الدفع</th><th>إجراءات</th></tr></thead>
       <tbody>
         ${kids.length?kids.map(c=>{
           const sub=DB.activeSub(c.id);
@@ -642,13 +642,17 @@ children(){
           const school=schools.find(s=>s.id===c.schoolId);
           const branchIdx=branches.findIndex(b=>b.id===c.branchId);
           const bColor=branchColors[branchIdx]||'badge-gray';
+          const teacher=DB.users().find(u=>u.id===c.teacherId);
           return `<tr>
             ${Auth.isSuperAdmin()?`<td><span class="badge badge-blue" style="font-size:11px">${esc(school?.name||'')}</span></td>`:''}
-            <td><span class="badge ${bColor}" style="font-size:11px">🏢 ${DB.branchName(c.branchId)}</span></td>
+            <td>
+              <span class="badge ${bColor}" style="font-size:11px">🏢 ${DB.branchName(c.branchId)}</span>
+              <br><span class="badge ${c.period==='morning'?'badge-blue':'badge-orange'}" style="font-size:10px;margin-top:4px">${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'}</span>
+            </td>
             <td><strong>${esc(c.name)}</strong>${c.notes?`<br><small style="color:#f59e0b">⚠️ ${esc(c.notes)}</small>`:''}</td>
+            <td style="font-size:13px;color:#374151">${teacher?esc(teacher.name):'<span style="color:#94a3b8">—</span>'}</td>
             <td>${esc(c.parentName)}</td>
             <td><a href="tel:${c.parentPhone}" style="color:#0f766e">${c.parentPhone}</a></td>
-            <td>${c.grade||'—'}</td>
             <td><span class="badge ${stMap[st]}">${stLbl[st]}${sub?' — '+formatDate(sub.endDate):''}</span></td>
             <td>${sub?Views._payBadge(sub):'—'}</td>
             <td style="white-space:nowrap">
@@ -1090,14 +1094,18 @@ const Modals = {
 
         ${!sid?`<div class="input-group"><label>المدرسة *</label><select class="input" id="c-school"><option value="">اختر مدرسة</option>${schools.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>`:`<input type="hidden" id="c-school" value="${sid}">`}
         <div class="grid-2">
-          <div class="input-group"><label>🏢 الفرع *</label><select class="input" id="c-branch"><option value="">اختر الفرع</option>${branches.map(b=>`<option value="${b.id}">${esc(b.name)}${b.location?' — '+b.location:''}</option>`).join('')}</select></div>
+          <div class="input-group"><label>🏢 الفرع *</label><select class="input" id="c-branch" onchange="refreshTeachers()">${branches.map(b=>`<option value="${b.id}">${esc(b.name)}${b.location?' — '+b.location:''}</option>`).join('')}</select></div>
           <div class="input-group">
             <label>⏰ الفترة *</label>
-            <select class="input" id="c-period" onchange="calcChildSubPrice()">
+            <select class="input" id="c-period" onchange="calcChildSubPrice();refreshTeachers()">
               <option value="morning">🌅 صباحية (150 / 600 / 1800 ر.س)</option>
               <option value="evening">🌙 مسائية (70 / 300 / 900 ر.س)</option>
             </select>
           </div>
+        </div>
+        <div class="input-group">
+          <label>👩‍🏫 عند أي معلمة؟</label>
+          <select class="input" id="c-teacher"><option value="">— اختر المعلمة —</option></select>
         </div>
         <div class="input-group"><label>اسم الطفل *</label><input class="input" id="c-name" placeholder="الاسم الثلاثي"></div>
         <div class="grid-2">
@@ -1145,7 +1153,7 @@ const Modals = {
         <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
       </div>
     </div></div>`);
-    setTimeout(calcChildSubPrice,30);
+    setTimeout(()=>{calcChildSubPrice();refreshTeachers();},30);
   },
 
   editChild(id){
@@ -1160,14 +1168,21 @@ const Modals = {
         <input type="hidden" id="c-id" value="${c.id}">
         <input type="hidden" id="c-school" value="${c.schoolId}">
         <div class="grid-2">
-          <div class="input-group"><label>🏢 الفرع *</label><select class="input" id="c-branch">${branches.map(b=>`<option value="${b.id}" ${c.branchId===b.id?'selected':''}>${esc(b.name)}${b.location?' — '+b.location:''}</option>`).join('')}</select></div>
+          <div class="input-group"><label>🏢 الفرع *</label><select class="input" id="c-branch" onchange="refreshTeachers()">${branches.map(b=>`<option value="${b.id}" ${c.branchId===b.id?'selected':''}>${esc(b.name)}${b.location?' — '+b.location:''}</option>`).join('')}</select></div>
           <div class="input-group">
             <label>⏰ الفترة *</label>
-            <select class="input" id="c-period">
+            <select class="input" id="c-period" onchange="refreshTeachers()">
               <option value="morning" ${(c.period||'evening')==='morning'?'selected':''}>🌅 صباحية</option>
               <option value="evening" ${(c.period||'evening')==='evening'?'selected':''}>🌙 مسائية</option>
             </select>
           </div>
+        </div>
+        <div class="input-group">
+          <label>👩‍🏫 المعلمة</label>
+          <select class="input" id="c-teacher">
+            <option value="">— بدون تحديد —</option>
+            ${DB.users().filter(u=>u.role==='teacher'&&u.schoolId===c.schoolId&&u.branchId===c.branchId&&u.period===(c.period||'evening')).map(t=>`<option value="${t.id}" ${c.teacherId===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
+          </select>
         </div>
         <div class="input-group"><label>اسم الطفل *</label><input class="input" id="c-name" value="${esc(c.name)}"></div>
         <div class="grid-2">
@@ -1397,6 +1412,22 @@ function syncPaidAmount(srcId,tgtId){
   if(src&&tgt) tgt.value=src.value;
 }
 
+function refreshTeachers(){
+  const branchId=document.getElementById('c-branch')?.value||'';
+  const period=document.getElementById('c-period')?.value||'';
+  const sel=document.getElementById('c-teacher');
+  if(!sel) return;
+  const sid=Auth.schoolId();
+  const teachers=DB.users().filter(u=>
+    u.role==='teacher'&&
+    (!sid||u.schoolId===sid)&&
+    (!branchId||u.branchId===branchId)&&
+    (!period||u.period===period)
+  );
+  sel.innerHTML=`<option value="">— اختر المعلمة —</option>`+
+    teachers.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+}
+
 function toggleSchoolField(){
   const role=document.getElementById('u-role')?.value;
   const sf=document.getElementById('school-field');
@@ -1454,6 +1485,7 @@ function saveChild(edit=false){
     schoolId,
     branchId:document.getElementById('c-branch')?.value||'',
     period,
+    teacherId:document.getElementById('c-teacher')?.value||'',
     name,
     parentName:parent,
     parentPhone:phone,
