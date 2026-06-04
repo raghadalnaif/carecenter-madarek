@@ -288,10 +288,8 @@ const DB = {
     }catch(e){console.warn('Firebase:',e);}
   },
   init(){
-    const DATA_VER='v8';
-    if(this.get('data_version')===DATA_VER) return;
-    Object.keys(SEED).forEach(k=>this.set(k,SEED[k]));
-    this.set('data_version',DATA_VER);
+    // يضيف المفاتيح الناقصة فقط — لا يمسح البيانات الموجودة أبداً
+    Object.keys(SEED).forEach(k=>{if(this.get(k)===null) this.set(k,SEED[k]);});
   },
   users(){return this.get('users')||[]},
   schools(){return this.get('schools')||[]},
