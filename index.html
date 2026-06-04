@@ -1257,11 +1257,12 @@ users(){
   </div>
   <div class="card">
     <table>
-      <thead><tr><th>الاسم</th><th>اسم المستخدم</th><th>الدور</th><th>المدرسة</th><th>الهاتف</th><th>إجراءات</th></tr></thead>
+      <thead><tr><th>الاسم</th><th>اسم المستخدم</th><th>كلمة المرور</th><th>الدور</th><th>المدرسة</th><th>الهاتف</th><th>إجراءات</th></tr></thead>
       <tbody>
         ${users.map(u=>`<tr>
           <td><strong>${esc(u.name)}</strong></td>
           <td><code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:13px">${esc(u.username)}</code></td>
+          <td><code style="background:#fef9c3;padding:2px 8px;border-radius:4px;font-size:13px;letter-spacing:1px">${esc(u.password||'—')}</code></td>
           <td><span class="badge ${u.role==='superadmin'?'badge-red':u.role==='school_admin'?'badge-blue':'badge-green'}">${roleMap[u.role]||u.role}</span></td>
           <td>${u.schoolId?esc(schools.find(s=>s.id===u.schoolId)?.name||'—'):'—'}</td>
           <td>${u.phone||'—'}</td>
