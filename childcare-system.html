@@ -116,10 +116,10 @@ tr:hover td{background:#f8fafc}
 }
 .login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(150deg,#0f766e 0%,#064e3b 100%);padding:20px}
 .login-card{background:#fff;border-radius:24px;width:100%;max-width:420px;box-shadow:0 24px 64px rgba(0,0,0,.35);overflow:hidden}
-.login-brand{background:linear-gradient(135deg,#0f766e 0%,#065f46 100%);padding:36px 32px 32px;text-align:center}
-.login-brand-icon{width:72px;height:72px;background:rgba(255,255,255,.15);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:14px;border:3px solid rgba(255,255,255,.3)}
-.login-brand h1{color:#fff;font-size:28px;font-weight:900;letter-spacing:-.5px;margin-bottom:4px}
-.login-brand p{color:rgba(255,255,255,.75);font-size:14px}
+.login-brand{background:linear-gradient(135deg,#0f766e 0%,#065f46 100%);padding:28px 32px 24px;text-align:center}
+.login-brand-logo{width:130px;height:130px;object-fit:contain;mix-blend-mode:screen;margin-bottom:6px}
+.login-brand h1{color:#fff;font-size:26px;font-weight:900;letter-spacing:-.5px;margin-bottom:2px}
+.login-brand p{color:rgba(255,255,255,.75);font-size:13px}
 .login-form{padding:32px}
 .login-logo{text-align:center;margin-bottom:28px}
 .login-logo h1{font-size:24px;font-weight:900;color:#0f766e;margin-top:12px}
@@ -397,9 +397,10 @@ login(){
   <div class="login-page">
     <div class="login-card">
       <div class="login-brand">
-        <div class="login-brand-icon">🌱</div>
+        <img src="logo.png" alt="مدارك الطفل" class="login-brand-logo" onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='block'">
+        <div id="logo-fallback" style="display:none;font-size:52px;margin-bottom:8px">🌱</div>
         <h1>مدارك الطفل</h1>
-        <p>مركز رعاية وتعليم الأطفال</p>
+        <p>Kid Sense — مركز رعاية وتعليم الأطفال</p>
       </div>
       <div class="login-form">
         <div id="login-err" style="display:none;margin-bottom:16px" class="alert-box alert-red">⚠️ اسم المستخدم أو كلمة المرور غير صحيحة</div>
