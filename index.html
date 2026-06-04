@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -242,6 +243,7 @@ const DB = {
   async initFirebase(){
     try{
       if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+      await firebase.auth().signInAnonymously();
       _fdb=firebase.database();
       // تحميل البيانات من RTDB
       const snap=await _fdb.ref('ccs').get();
