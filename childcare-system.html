@@ -159,6 +159,11 @@ tr:hover td{background:#f8fafc}
   .stats-grid{grid-template-columns:repeat(3,1fr)!important}
   @page{margin:1.5cm;size:A4 landscape}
 }
+.notif-panel{position:absolute;top:48px;left:0;width:340px;max-height:480px;overflow-y:auto;background:#fff;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.2);z-index:500;border:1px solid #e2e8f0;direction:rtl}
+.notif-item{padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;gap:10px;transition:.15s}
+.notif-item:hover{background:#f8fafc}
+.notif-item.unread{background:#f0fdf4}
+.notif-badge{position:absolute;top:-5px;left:-5px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;border-radius:50%;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;padding:0 3px;pointer-events:none}
 </style>
 </head>
 <body>
@@ -209,6 +214,7 @@ const SEED = {
   children: [],
   subscriptions: [],
   attendance: [],
+  notifications: [],
 };
 
 // =========================================================
@@ -277,7 +283,7 @@ const DB = {
     }catch(e){console.warn('Firebase:',e);}
   },
   init(){
-    const DATA_VER='v7';
+    const DATA_VER='v8';
     if(this.get('data_version')===DATA_VER) return;
     Object.keys(SEED).forEach(k=>this.set(k,SEED[k]));
     this.set('data_version',DATA_VER);
@@ -299,6 +305,15 @@ const DB = {
   addSub(s){const a=this.subscriptions();a.push(s);this.save('subscriptions',a)},
   updateSub(s){const a=this.subscriptions();const i=a.findIndex(x=>x.id===s.id);a[i]=s;this.save('subscriptions',a)},
   saveAttendance(list){this.save('attendance',list)},
+  notifications(){return this.get('notifications')||[]},
+  addNotification(n){
+    const a=this.notifications();
+    a.unshift({...n,id:uid(),createdAt:new Date().toISOString(),isRead:false});
+    if(a.length>50) a.splice(50);
+    this.save('notifications',a);
+  },
+  markNotifsRead(){this.save('notifications',this.notifications().map(n=>({...n,isRead:true})));},
+  unreadCount(){return this.notifications().filter(n=>!n.isRead).length;},
   // get active subscription for child (latest by endDate)
   activeSub(childId){
     return this.subscriptions().filter(s=>s.childId===childId&&s.isActive).sort((a,b)=>b.endDate>a.endDate?1:-1)[0]||null;
@@ -414,6 +429,9 @@ const App = {
     const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات'};
     const now=new Date();
     const hm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+    const unread=DB.unreadCount();
+    const notifs=DB.notifications();
+    const typeIcon={new_child:'👶',new_sub:'📋',first_att:'🌟'};
     return `
     <div class="topbar">
       <div style="display:flex;align-items:center;gap:10px">
@@ -424,6 +442,28 @@ const App = {
         <button class="btn btn-secondary btn-sm" onclick="App.go(App.view,App.params)" title="تحديث البيانات" style="padding:6px 10px;font-size:16px;line-height:1">🔄</button>
         <button class="btn btn-success btn-sm" onclick="exportAllData()" title="تصدير جميع البيانات Excel" style="padding:6px 12px;font-size:13px">⬇️ تصدير</button>
         <span style="font-size:11px;color:#94a3b8">${hm}</span>
+        ${Auth.isSuperAdmin()?`
+        <div style="position:relative">
+          <button class="btn btn-secondary btn-sm" id="notif-btn" onclick="toggleNotifPanel()" style="padding:6px 10px;font-size:17px;line-height:1;position:relative">
+            🔔${unread>0?`<span class="notif-badge">${unread>9?'9+':unread}</span>`:''}
+          </button>
+          <div class="notif-panel" id="notif-panel" style="display:none">
+            <div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1">
+              <strong style="font-size:14px">🔔 الإشعارات ${unread>0?`<span class="badge badge-red" style="font-size:11px">${unread} جديد</span>`:''}</strong>
+              ${unread>0?`<button class="btn btn-secondary btn-xs" onclick="markAllNotifsRead()">قراءة الكل ✓</button>`:''}
+            </div>
+            ${notifs.length===0?`<div style="padding:32px;text-align:center;color:#94a3b8;font-size:14px">لا توجد إشعارات بعد</div>`:
+            notifs.slice(0,30).map(n=>`
+              <div class="notif-item ${n.isRead?'':'unread'}">
+                <span style="font-size:20px;flex-shrink:0">${typeIcon[n.type]||'🔔'}</span>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;font-weight:600;color:#1e293b">${esc(n.title)}</div>
+                  <div style="font-size:12px;color:#64748b;margin-top:2px">${esc(n.body)}</div>
+                  <div style="font-size:11px;color:#94a3b8;margin-top:3px">${formatRelTime(n.createdAt)}</div>
+                </div>
+              </div>`).join('')}
+          </div>
+        </div>`:''}
         <div class="topbar-user">
           <div style="text-align:left">
             <div style="font-size:13px;font-weight:600">${esc(Auth.user.name)}</div>
@@ -2095,7 +2135,10 @@ function saveChild(edit=false){
     isVip:document.getElementById('c-vip')?.checked||false,
     discountPct:parseFloat(document.getElementById('c-disc')?.value||0),
   };
-  if(edit) DB.updateChild(c); else DB.addChild(c);
+  if(edit) DB.updateChild(c); else {
+    DB.addChild(c);
+    DB.addNotification({type:'new_child',title:'👶 طفل جديد',body:`تم تسجيل ${name} في ${DB.branchName(c.branchId)}`,addedBy:Auth.user.name});
+  }
 
   // حفظ الاشتراك مع الطفل (للتسجيل الجديد فقط)
   if(!edit){
@@ -2113,6 +2156,8 @@ function saveChild(edit=false){
       const subPM=document.getElementById('c-sub-pm')?.value||'cash';
       const subReceipt=document.getElementById('c-receipt-data')?.value||'';
       DB.addSub({id:uid(),childId,schoolId,branchId:c.branchId,period,type:subType,startDate:subStart,endDate:subEnd,basePrice,discountPct:0,price:subPrice,paidAmount:subPaid,paymentStatus:subPay,paymentMethod:subPM,receiptImage:subReceipt,isActive:true,createdAt:T0,invoiceNo});
+      const tl={'daily':'يومي','weekly':'أسبوعي','monthly':'شهري'};
+      DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[subType]||subType} لـ ${name} — ${subPrice} ر.س`,addedBy:Auth.user.name});
     }
   }
   App.closeModal();
@@ -2140,6 +2185,8 @@ function saveSub(){
   const receiptImage=document.getElementById('sub-receipt-data')?.value||'';
   const s={id:uid(),childId,schoolId,branchId:child?.branchId||'',period,type,startDate,endDate,basePrice,discountPct:discPct,price,paidAmount,paymentStatus,paymentMethod,receiptImage,isActive:true,createdAt:T0,invoiceNo};
   DB.addSub(s);
+  const tl={'daily':'يومي','weekly':'أسبوعي','monthly':'شهري'};
+  DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[type]||type} لـ ${child?.name||''} — ${price} ر.س`,addedBy:Auth.user.name});
   App.closeModal();
   App.go('subscriptions');
 }
@@ -2467,9 +2514,14 @@ function saveAttendance(date,schoolId){
   const att=DB.attendance();
   const entries=pendingAtt[date]||{};
   Object.values(entries).forEach(entry=>{
+    const hadPrev=att.some(a=>a.childId===entry.childId);
     const idx=att.findIndex(a=>a.childId===entry.childId&&a.date===date);
     if(idx>=0) att[idx]={...att[idx],...entry};
     else att.push({id:uid(),...entry});
+    if(!hadPrev&&entry.status==='present'){
+      const child=DB.children().find(c=>c.id===entry.childId);
+      if(child) DB.addNotification({type:'first_att',title:'🌟 أول حضور',body:`${child.name} حضر لأول مرة — ${DB.branchName(child.branchId)}`,addedBy:Auth.user.name});
+    }
   });
   DB.saveAttendance(att);
   alert('✅ تم حفظ الحضور بنجاح');
@@ -2490,6 +2542,44 @@ function closeSidebar(){
   const ov=document.getElementById('sb-overlay');
   if(sb) sb.classList.remove('open');
   if(ov) ov.classList.remove('open');
+}
+
+// =========================================================
+//  NOTIFICATIONS HELPERS
+// =========================================================
+function formatRelTime(iso){
+  if(!iso) return '';
+  const diff=Date.now()-new Date(iso).getTime();
+  const m=Math.floor(diff/60000),h=Math.floor(diff/3600000),d=Math.floor(diff/86400000);
+  if(m<1) return 'الآن';
+  if(m<60) return `منذ ${m} دقيقة`;
+  if(h<24) return `منذ ${h} ساعة`;
+  if(d<7) return `منذ ${d} يوم`;
+  return formatDate(iso.split('T')[0]);
+}
+function toggleNotifPanel(){
+  const p=document.getElementById('notif-panel');
+  if(!p) return;
+  const open=p.style.display!=='none';
+  p.style.display=open?'none':'block';
+  if(!open){
+    setTimeout(()=>{
+      document.addEventListener('click',function h(e){
+        if(!p.contains(e.target)&&e.target.id!=='notif-btn'&&!e.target.closest('#notif-btn')){
+          p.style.display='none';document.removeEventListener('click',h);
+        }
+      });
+    },150);
+  }
+}
+function markAllNotifsRead(){
+  DB.markNotifsRead();
+  // تحديث الواجهة بدون إغلاق البانيل
+  const topbarEl=document.querySelector('.topbar');
+  if(topbarEl) topbarEl.outerHTML=App.topbar();
+  // أعد فتح البانيل
+  const p=document.getElementById('notif-panel');
+  if(p) p.style.display='block';
 }
 
 // =========================================================
