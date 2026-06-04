@@ -215,7 +215,7 @@ const DB = {
   get(k){try{return JSON.parse(localStorage.getItem('ccs_'+k))}catch{return null}},
   set(k,v){localStorage.setItem('ccs_'+k,JSON.stringify(v))},
   init(){
-    const DATA_VER='v6';
+    const DATA_VER='v7';
     if(this.get('data_version')===DATA_VER) return;
     Object.keys(SEED).forEach(k=>this.set(k,SEED[k]));
     this.set('data_version',DATA_VER);
@@ -821,8 +821,6 @@ attendance(){
     if(teacherFilter) kids=kids.filter(c=>c.teacherId===teacherFilter);
     // فلترة الفرع
     if(App.params.branchFilter) kids=kids.filter(c=>c.branchId===App.params.branchFilter);
-    // الإدارة تعرف من لديه اشتراك فعّال فقط
-    kids=kids.filter(c=>hasActiveSub(c.id));
   }
 
   const attList=DB.attendance();
@@ -834,15 +832,16 @@ attendance(){
   const renderCard=(c)=>{
     const a=attMap[c.id];
     const status=a?.status||'';
-    // للإدارة فقط: نعرض اسم المعلمة فوق الطفل
     const teacher=isAdmin?DB.users().find(t=>t.id===c.teacherId):null;
-    return `<div class="attendance-card ${status}" id="att-${c.id}">
+    const noSub=isAdmin&&!hasActiveSub(c.id);
+    return `<div class="attendance-card ${status}" id="att-${c.id}" style="${noSub?'opacity:0.75;border:1px dashed #fbbf24;':''}">
       <div style="font-weight:700;font-size:14px">${esc(c.name)}</div>
       <div style="font-size:11px;color:#64748b;margin-top:2px">${c.grade||''} — ${esc(c.parentName)}</div>
       ${teacher?`<div style="font-size:11px;color:#0f766e;margin-top:3px">👩‍🏫 ${esc(teacher.name)}</div>`:''}
       <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">
         <span class="badge badge-blue" style="font-size:10px">🏢 ${DB.branchName(c.branchId)}</span>
         <span class="badge ${c.period==='morning'?'badge-blue':'badge-orange'}" style="font-size:10px">${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'}</span>
+        ${noSub?`<span class="badge badge-yellow" style="font-size:10px">⚠️ بدون اشتراك</span>`:''}
       </div>
       <div style="display:flex;gap:6px;margin-top:10px">
         <button class="btn btn-xs ${status==='present'?'btn-success':''}" style="flex:1;justify-content:center" onclick="setAtt('${c.id}','present','${date}','${c.schoolId}')">✅ حاضر</button>
@@ -888,7 +887,7 @@ attendance(){
     </div>
   </div>`:''}
 
-  ${kids.length===0?`<div class="card"><div class="empty-state"><div class="es-icon">👶</div><p>${isTeacher?'لا يوجد أطفال نشطون في فصلك اليوم':'لا يوجد أطفال لديهم اشتراك فعّال في هذا التاريخ'}</p></div></div>`:`
+  ${kids.length===0?`<div class="card"><div class="empty-state"><div class="es-icon">👶</div><p>${isTeacher?'لا يوجد أطفال نشطون في فصلك اليوم':'لا يوجد أطفال مسجلون في هذا الفرع'}</p></div></div>`:`
   <div class="attendance-grid" id="att-grid">
     ${kids.map(c=>renderCard(c)).join('')}
   </div>`}
@@ -1406,7 +1405,7 @@ const Modals = {
 
         <div style="font-size:13px;font-weight:700;color:#0f766e;padding:8px 12px;background:#f0fdf4;border-radius:8px;margin-bottom:14px">📋 بيانات الطفل</div>
 
-        ${!sid?`<div class="input-group"><label>المدرسة *</label><select class="input" id="c-school"><option value="">اختر مدرسة</option>${schools.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>`:`<input type="hidden" id="c-school" value="${sid}">`}
+        ${!sid?`<div class="input-group"><label>المدرسة *</label><select class="input" id="c-school">${schools.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>`:`<input type="hidden" id="c-school" value="${sid}">`}
         <div class="grid-2">
           <div class="input-group"><label>🏢 الفرع *</label><select class="input" id="c-branch" onchange="refreshTeachers()">${branches.map(b=>`<option value="${b.id}">${esc(b.name)}${b.location?' — '+b.location:''}</option>`).join('')}</select></div>
           <div class="input-group">
@@ -1457,7 +1456,7 @@ const Modals = {
           <div class="input-group"><label>تاريخ البداية</label><input class="input" id="c-sub-start" type="date" value="${T0}" onchange="calcChildSubPrice()"></div>
         </div>
         <div class="grid-2">
-          <div class="input-group"><label>تاريخ الانتهاء</label><input class="input" id="c-sub-end" type="date" value="${addDays(T0,30)}" readonly style="background:#f8fafc;color:#64748b"></div>
+          <div class="input-group"><label>تاريخ الانتهاء</label><input class="input" id="c-sub-end" type="date" value="${addDays(T0,30)}"></div>
           <div class="input-group">
             <label>المبلغ بعد الخصم (ر.س)</label>
             <div style="display:flex;gap:6px;align-items:center">
@@ -1578,7 +1577,7 @@ const Modals = {
         </div>
         <div class="grid-2">
           <div class="input-group"><label>تاريخ البداية *</label><input class="input" id="sub-start" type="date" value="${T0}" onchange="calcEndDate()"></div>
-          <div class="input-group"><label>تاريخ الانتهاء</label><input class="input" id="sub-end" type="date" value="${addDays(T0,30)}" readonly style="background:#f8fafc;color:#64748b"></div>
+          <div class="input-group"><label>تاريخ الانتهاء</label><input class="input" id="sub-end" type="date" value="${addDays(T0,30)}"></div>
         </div>
         <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#fefce8;border-radius:8px;margin-bottom:14px;border:1px solid #fde68a">
           <span style="font-size:13px;font-weight:600">نسبة الخصم %</span>
@@ -2005,7 +2004,7 @@ function saveChild(edit=false){
   const name=document.getElementById('c-name')?.value?.trim();
   const parent=document.getElementById('c-parent')?.value?.trim();
   const phone=document.getElementById('c-phone')?.value?.trim();
-  const schoolId=document.getElementById('c-school')?.value?.trim();
+  const schoolId=document.getElementById('c-school')?.value?.trim()||Auth.schoolId()||DB.schools()[0]?.id||'';
   if(!name||!parent||!phone){alert('يرجى ملء الحقول المطلوبة');return}
   const childId=edit?document.getElementById('c-id')?.value:uid();
   const period=document.getElementById('c-period')?.value||'evening';
@@ -2035,7 +2034,7 @@ function saveChild(edit=false){
     const subPaid=parseFloat(document.getElementById('c-sub-paid')?.value||0);
     const subPay=document.getElementById('c-sub-pay')?.value||'paid';
     if(subType&&subPrice>0){
-      const subEnd=subType==='daily'?subStart:subType==='weekly'?addDays(subStart,7):addDays(subStart,30);
+      const subEnd=document.getElementById('c-sub-end')?.value||addDays(subStart,30);
       const allSubs=DB.subscriptions();
       const maxNum=allSubs.reduce((m,s)=>{const n=parseInt(s.invoiceNo?.replace('INV-','')||0);return n>m?n:m;},0);
       const invoiceNo='INV-'+(maxNum+1).toString().padStart(4,'0');
