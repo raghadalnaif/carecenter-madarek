@@ -369,7 +369,7 @@ const App = {
     </div>`;
   },
   topbar(){
-    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور'};
+    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات'};
     return `
     <div class="topbar">
       <div style="display:flex;align-items:center;gap:10px">
@@ -395,7 +395,7 @@ const App = {
       subscriptions:()=>role!=='teacher',
       reports:()=>role!=='teacher',
       whatsapp:()=>role!=='teacher',
-      teachers:()=>Auth.isSchoolAdmin(),
+      teachers:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
       my_reports:()=>role==='teacher',
     };
     const guard=guards[App.view];
@@ -743,17 +743,41 @@ subscriptions(){
   let subs=DB.subscriptions();
   if(sid) subs=subs.filter(s=>s.schoolId===sid);
   const filter=App.params.filter||'all';
+  const subQ=(App.params.subQ||'').trim();
+  const allChildren=DB.children();
   let filtered=subs;
   if(filter==='active') filtered=subs.filter(s=>s.isActive&&diffDays(s.endDate,T0)>=0);
   if(filter==='expired') filtered=subs.filter(s=>diffDays(s.endDate,T0)<0);
   if(filter==='expiring') filtered=subs.filter(s=>s.isActive&&diffDays(s.endDate,T0)>=0&&diffDays(s.endDate,T0)<=7);
   if(filter==='unpaid') filtered=subs.filter(s=>s.paymentStatus!=='paid');
+  if(subQ) filtered=filtered.filter(s=>{const c=allChildren.find(x=>x.id===s.childId);return c&&c.name.includes(subQ)});
   filtered.sort((a,b)=>a.endDate>b.endDate?1:-1);
   const chips=[['all','الكل'],['active','فعالة'],['expiring','تنتهي قريباً'],['expired','منتهية'],['unpaid','غير مدفوعة']];
+  // ملخص مالي للطالب المبحوث
+  let studentSummary='';
+  if(subQ&&filtered.length){
+    const totalBilled=filtered.reduce((a,s)=>a+s.price,0);
+    const totalPaid=filtered.reduce((a,s)=>a+s.paidAmount,0);
+    const totalDue=totalBilled-totalPaid;
+    studentSummary=`<div class="alert-box alert-blue" style="margin-bottom:14px">
+      📊 <div style="display:flex;gap:24px;flex-wrap:wrap">
+        <span>نتائج: <strong>${filtered.length}</strong> اشتراك</span>
+        <span>إجمالي الفواتير: <strong>${totalBilled} ر.س</strong></span>
+        <span style="color:#10b981">المدفوع: <strong>${totalPaid} ر.س</strong></span>
+        <span style="color:${totalDue>0?'#ef4444':'#10b981'}">المتبقي: <strong>${totalDue} ر.س</strong></span>
+      </div>
+    </div>`;
+  }
   return `
-  <div class="actions-bar">
-    ${chips.map(([v,l])=>`<span class="chip ${filter===v?'active':''}" onclick="App.go('subscriptions',{filter:'${v}'})">${l} (${v==='all'?subs.length:v==='active'?subs.filter(s=>s.isActive&&diffDays(s.endDate,T0)>=0).length:v==='expiring'?subs.filter(s=>s.isActive&&diffDays(s.endDate,T0)>=0&&diffDays(s.endDate,T0)<=7).length:v==='expired'?subs.filter(s=>diffDays(s.endDate,T0)<0).length:subs.filter(s=>s.paymentStatus!=='paid').length})</span>`).join('')}
+  <div class="actions-bar" style="gap:10px;align-items:center">
+    <div class="search-bar" style="position:relative;flex:1;max-width:280px;margin:0">
+      <span class="search-icon">🔍</span>
+      <input class="input" style="padding-right:34px" placeholder="بحث باسم الطالب..." value="${esc(subQ)}"
+        oninput="App.go('subscriptions',{filter:'${filter}',subQ:this.value})">
+    </div>
+    ${chips.map(([v,l])=>`<span class="chip ${filter===v?'active':''}" onclick="App.go('subscriptions',{filter:'${v}',subQ:'${esc(subQ)}'})">${l}</span>`).join('')}
   </div>
+  ${studentSummary}
   <div class="card">
     <table>
       <thead><tr><th>الطفل</th><th>النوع</th><th>يبدأ</th><th>ينتهي</th><th>المبلغ</th><th>طريقة الدفع</th><th>حالة الدفع</th><th>الحالة</th><th>إجراءات</th></tr></thead>
@@ -906,27 +930,37 @@ reports(){
   const monthlyCount=subs.filter(s=>s.type==='monthly').length;
   const weeklyCount=subs.filter(s=>s.type==='weekly').length;
   const dailyCount=subs.filter(s=>s.type==='daily').length;
-  const tab=App.params.tab||'financial';
-  const tabLabel={financial:'التقرير المالي',attendance:'تقرير الحضور',subscriptions:'تقرير الاشتراكات'};
-  const tabId={financial:'rpt-financial',attendance:'rpt-attendance',subscriptions:'rpt-subscriptions'};
+  const isAdmin=Auth.isSchoolAdmin();
+  const isSA=Auth.isSuperAdmin();
+  // school_admin يرى فقط الحضور + تقرير الطالب
+  const defaultTab=isSA?'financial':'attendance';
+  const tab=App.params.tab||defaultTab;
+  const tabLabel={financial:'التقرير المالي',attendance:'تقرير الحضور',subscriptions:'تقرير الاشتراكات',student:'تقرير طالب'};
+  const tabId={financial:'rpt-financial',attendance:'rpt-attendance',subscriptions:'rpt-subscriptions',student:'rpt-student'};
+  // بحث تقرير الطالب
+  const stQ=(App.params.stQ||'').trim();
+  const stId=App.params.stId||'';
+  const stChild=stId?children.find(c=>c.id===stId):null;
   return `
   <div class="print-cover">
     <h1>🌱 مدارك الطفل</h1>
-    <p>${tabLabel[tab]||''} — تاريخ الطباعة: ${formatDate(T0)}</p>
+    <p>${tabLabel[tab]||''}${stChild?' — '+stChild.name:''} — تاريخ الطباعة: ${formatDate(T0)}</p>
   </div>
   <div class="tabs no-print">
-    <div class="tab ${tab==='financial'?'active':''}" onclick="App.go('reports',{tab:'financial'})">💰 التقرير المالي</div>
-    <div class="tab ${tab==='attendance'?'active':''}" onclick="App.go('reports',{tab:'attendance'})">✅ تقرير الحضور</div>
-    <div class="tab ${tab==='subscriptions'?'active':''}" onclick="App.go('reports',{tab:'subscriptions'})">📋 تقرير الاشتراكات</div>
+    ${isSA?`<div class="tab ${tab==='financial'?'active':''}" onclick="App.go('reports',{tab:'financial'})">💰 المالي</div>`:''}
+    <div class="tab ${tab==='attendance'?'active':''}" onclick="App.go('reports',{tab:'attendance'})">✅ الحضور</div>
+    ${isSA?`<div class="tab ${tab==='subscriptions'?'active':''}" onclick="App.go('reports',{tab:'subscriptions'})">📋 الاشتراكات</div>`:''}
+    <div class="tab ${tab==='student'?'active':''}" onclick="App.go('reports',{tab:'student'})">👤 تقرير طالب</div>
   </div>
   <div class="rpt-bar no-print">
     <span class="rpt-bar-title">${tabLabel[tab]||''}</span>
     <div class="rpt-bar-btns">
       <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ طباعة / PDF</button>
-      <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('${tabId[tab]}','${tabLabel[tab]}')">📊 Excel</button>
+      ${tab!=='student'?`<button class="btn btn-secondary btn-sm" onclick="exportTableCSV('${tabId[tab]}','${tabLabel[tab]}')">📊 Excel</button>`:''}
     </div>
   </div>
-  ${tab==='financial'?`
+
+  ${tab==='financial'&&isSA?`
   <div class="stats-grid">
     <div class="stat-card green"><div class="stat-val">${totalRev.toLocaleString()}</div><div class="stat-lbl">ر.س إجمالي محصّل</div></div>
     <div class="stat-card red"><div class="stat-val">${pendingRev.toLocaleString()}</div><div class="stat-lbl">ر.س مبالغ معلقة</div></div>
@@ -938,13 +972,12 @@ reports(){
   <div class="card">
     <div class="card-title">تفاصيل المدفوعات لكل طفل</div>
     <table id="rpt-financial">
-      <thead><tr><th>الطفل</th>${Auth.isSuperAdmin()?'<th>المدرسة</th>':''}<th>نوع الاشتراك</th><th>المبلغ الكلي</th><th>المدفوع</th><th>المتبقي</th><th>حالة الدفع</th></tr></thead>
+      <thead><tr><th>الطفل</th><th>نوع الاشتراك</th><th>المبلغ الكلي</th><th>المدفوع</th><th>المتبقي</th><th>حالة الدفع</th></tr></thead>
       <tbody>
         ${subs.map(s=>{
           const c=children.find(x=>x.id===s.childId)||DB.children().find(x=>x.id===s.childId);
           return `<tr>
             <td>${esc(c?.name||'—')}</td>
-            ${Auth.isSuperAdmin()?`<td><small>${DB.schoolName(s.schoolId)}</small></td>`:''}
             <td>${{daily:'يومي',weekly:'أسبوعي',monthly:'شهري'}[s.type]||s.type}</td>
             <td>${s.price} ر.س</td>
             <td style="color:#10b981;font-weight:600">${s.paidAmount} ر.س</td>
@@ -955,8 +988,9 @@ reports(){
       </tbody>
     </table>
   </div>`:''}
+
   ${tab==='attendance'?`
-  <div class="card" style="padding:14px;margin-bottom:16px">
+  <div class="card no-print" style="padding:14px;margin-bottom:16px">
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
       <div class="input-group" style="margin:0;flex:1;min-width:180px">
         <label style="font-size:12px">🔍 بحث باسم الطفل</label>
@@ -970,15 +1004,15 @@ reports(){
         <label style="font-size:12px">📅 إلى تاريخ</label>
         <input class="input" id="att-to" type="date" value="${App.params.attTo||''}" onchange="App.go('reports',{tab:'attendance',attQ:document.getElementById('att-search')?.value||'',attFrom:document.getElementById('att-from')?.value||'',attTo:this.value})">
       </div>
-      ${(App.params.attQ||App.params.attFrom||App.params.attTo)?`<button class="btn btn-secondary btn-sm" onclick="App.go('reports',{tab:'attendance'})">✕ مسح الفلتر</button>`:''}
+      ${(App.params.attQ||App.params.attFrom||App.params.attTo)?`<button class="btn btn-secondary btn-sm" onclick="App.go('reports',{tab:'attendance'})">✕ مسح</button>`:''}
     </div>
   </div>
   <div class="card">
-    <div class="card-title">تقرير حضور الأطفال${App.params.attFrom||App.params.attTo?` (${App.params.attFrom||'البداية'} — ${App.params.attTo||'اليوم'})`:''}</div>
+    <div class="card-title">تقرير حضور الأطفال${App.params.attFrom||App.params.attTo?` (${formatDate(App.params.attFrom)||'البداية'} — ${formatDate(App.params.attTo)||'اليوم'})`:''}</div>
     <table id="rpt-attendance">
-      <thead><tr><th>الطفل</th><th>الفرع / الفترة</th><th>حضور</th><th>غياب</th><th>تأخر</th><th>الأيام</th><th>النسبة</th><th>تفاصيل</th></tr></thead>
+      <thead><tr><th>الطفل</th><th>الفرع / الفترة</th><th>حضور</th><th>غياب</th><th>تأخر</th><th>الأيام</th><th>النسبة</th><th>آخر غياب</th></tr></thead>
       <tbody>
-        ${children.filter(c=>!(App.params.attQ)||c.name.includes(App.params.attQ||'')).map(c=>{
+        ${children.filter(c=>!App.params.attQ||c.name.includes(App.params.attQ)).map(c=>{
           let cAtt=attList.filter(a=>a.childId===c.id);
           if(App.params.attFrom) cAtt=cAtt.filter(a=>a.date>=App.params.attFrom);
           if(App.params.attTo) cAtt=cAtt.filter(a=>a.date<=App.params.attTo);
@@ -998,42 +1032,122 @@ reports(){
             <td style="color:#ef4444;font-weight:700">${absent}</td>
             <td style="color:#f59e0b;font-weight:700">${late}</td>
             <td style="color:#64748b">${cAtt.length}</td>
-            <td>
-              <div style="display:flex;align-items:center;gap:6px">
-                <div class="progress-bar" style="width:60px"><div class="progress-fill" style="width:${pct}%;background:${pct>80?'#10b981':pct>60?'#f59e0b':'#ef4444'}"></div></div>
-                <span style="font-size:12px;font-weight:700">${pct}%</span>
-              </div>
-            </td>
-            <td style="font-size:11px;color:#94a3b8">${lastAbs?'آخر غياب: '+formatDate(lastAbs.date):'—'}</td>
+            <td><div style="display:flex;align-items:center;gap:6px">
+              <div class="progress-bar" style="width:55px"><div class="progress-fill" style="width:${pct}%;background:${pct>80?'#10b981':pct>60?'#f59e0b':'#ef4444'}"></div></div>
+              <span style="font-size:12px;font-weight:700">${pct}%</span>
+            </div></td>
+            <td style="font-size:11px;color:#94a3b8">${lastAbs?formatDate(lastAbs.date):'—'}</td>
           </tr>`;
         }).join('')}
       </tbody>
     </table>
   </div>`:''}
-  ${tab==='subscriptions'?`
+
+  ${tab==='subscriptions'&&isSA?`
   <div class="card">
     <div class="card-title">تقرير الاشتراكات التفصيلي</div>
     <table id="rpt-subscriptions">
-      <thead><tr><th>الطفل</th>${Auth.isSuperAdmin()?'<th>المدرسة</th>':''}<th>النوع</th><th>البداية</th><th>النهاية</th><th>الحالة</th><th>الدفع</th></tr></thead>
+      <thead><tr><th>الطفل</th><th>النوع</th><th>البداية</th><th>النهاية</th><th>المبلغ</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead>
       <tbody>
         ${subs.map(s=>{
           const c=children.find(x=>x.id===s.childId)||DB.children().find(x=>x.id===s.childId);
           const st=DB.subStatus(s);
           const stMap={active:'badge-green',today:'badge-yellow',soon3:'badge-orange',soon7:'badge-blue',expired:'badge-red',none:'badge-gray'};
-          const stLbl={active:'نشط',today:'ينتهي اليوم',soon3:'ينتهي قريباً',soon7:'قريباً',expired:'منتهي',none:'—'};
+          const stLbl={active:'نشط',today:'ينتهي اليوم',soon3:'قريباً',soon7:'قريباً',expired:'منتهي',none:'—'};
           return `<tr>
             <td>${esc(c?.name||'—')}</td>
-            ${Auth.isSuperAdmin()?`<td><small>${DB.schoolName(s.schoolId)}</small></td>`:''}
             <td>${{daily:'يومي',weekly:'أسبوعي',monthly:'شهري'}[s.type]}</td>
             <td>${formatDate(s.startDate)}</td>
             <td>${formatDate(s.endDate)}</td>
+            <td>${s.price} ر.س</td>
+            <td style="color:#10b981;font-weight:600">${s.paidAmount} ر.س</td>
+            <td style="color:${s.price-s.paidAmount>0?'#ef4444':'#10b981'};font-weight:600">${s.price-s.paidAmount} ر.س</td>
             <td><span class="badge ${stMap[st]}">${stLbl[st]}</span></td>
-            <td>${Views._payBadge(s)}</td>
           </tr>`;
         }).join('')}
       </tbody>
     </table>
   </div>`:''}
+
+  ${tab==='student'?`
+  <div class="card no-print" style="margin-bottom:16px">
+    <div class="input-group" style="margin:0">
+      <label style="font-size:13px;font-weight:600">🔍 ابحث باسم الطالب</label>
+      <input class="input" style="margin-top:6px" placeholder="اكتب اسم الطالب..." value="${esc(stQ)}"
+        oninput="App.go('reports',{tab:'student',stQ:this.value,stId:''})">
+    </div>
+    ${stQ&&!stId?`<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px">
+      ${children.filter(c=>c.name.includes(stQ)).map(c=>`
+        <div style="padding:10px 14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;cursor:pointer;transition:.2s"
+          onclick="App.go('reports',{tab:'student',stQ:'${esc(c.name)}',stId:'${c.id}'})"
+          onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background='#f8fafc'">
+          <strong>${esc(c.name)}</strong>
+          <span style="font-size:12px;color:#64748b;margin-right:8px">${DB.branchName(c.branchId)}</span>
+        </div>`).join('')}
+      ${children.filter(c=>c.name.includes(stQ)).length===0?'<p style="color:#94a3b8;font-size:13px">لا توجد نتائج</p>':''}
+    </div>`:''}
+  </div>
+  ${stChild?`
+  <div class="print-cover" style="display:block;margin-bottom:16px">
+    <h1>🌱 مدارك الطفل — تقرير طالب</h1>
+    <p>${esc(stChild.name)} · ${DB.branchName(stChild.branchId)} · ${stChild.period==='morning'?'صباحية':'مسائية'} · تاريخ الطباعة: ${formatDate(T0)}</p>
+  </div>
+  <div class="stats-grid">
+    ${(()=>{
+      const cSubs=subs.filter(s=>s.childId===stId);
+      const cAtt=attList.filter(a=>a.childId===stId);
+      const paid=cSubs.reduce((a,s)=>a+s.paidAmount,0);
+      const due=cSubs.reduce((a,s)=>a+(s.price-s.paidAmount),0);
+      const present=cAtt.filter(a=>a.status==='present').length;
+      const absent=cAtt.filter(a=>a.status==='absent').length;
+      const late=cAtt.filter(a=>a.status==='late').length;
+      const pct=cAtt.length?Math.round((present+late)/cAtt.length*100):0;
+      return `
+      <div class="stat-card green"><div class="stat-val">${paid} ر.س</div><div class="stat-lbl">إجمالي المدفوع</div></div>
+      <div class="stat-card ${due>0?'red':'green'}"><div class="stat-val">${due} ر.س</div><div class="stat-lbl">المبلغ المتبقي</div></div>
+      <div class="stat-card blue"><div class="stat-val">${present}</div><div class="stat-lbl">✅ أيام حضور</div></div>
+      <div class="stat-card red"><div class="stat-val">${absent}</div><div class="stat-lbl">❌ أيام غياب</div></div>
+      <div class="stat-card yellow"><div class="stat-val">${late}</div><div class="stat-lbl">⏰ تأخر</div></div>
+      <div class="stat-card ${pct>80?'green':pct>60?'yellow':'red'}"><div class="stat-val">${pct}%</div><div class="stat-lbl">نسبة الحضور</div></div>`;
+    })()}
+  </div>
+  <div class="card">
+    <div class="card-title">📋 سجل الاشتراكات</div>
+    <table id="rpt-student">
+      <thead><tr><th>النوع</th><th>البداية</th><th>النهاية</th><th>المبلغ</th><th>المدفوع</th><th>المتبقي</th><th>طريقة الدفع</th><th>الحالة</th></tr></thead>
+      <tbody>
+        ${subs.filter(s=>s.childId===stId).sort((a,b)=>b.startDate.localeCompare(a.startDate)).map(s=>`<tr>
+          <td>${{daily:'يومي',weekly:'أسبوعي',monthly:'شهري'}[s.type]||s.type}</td>
+          <td>${formatDate(s.startDate)}</td>
+          <td>${formatDate(s.endDate)}</td>
+          <td>${s.price} ر.س</td>
+          <td style="color:#10b981;font-weight:600">${s.paidAmount} ر.س</td>
+          <td style="color:${s.price-s.paidAmount>0?'#ef4444':'#10b981'};font-weight:600">${s.price-s.paidAmount} ر.س</td>
+          <td>${{cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'}[s.paymentMethod]||'—'}</td>
+          <td>${Views._payBadge(s)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">✅ سجل الحضور</div>
+    <table>
+      <thead><tr><th>التاريخ</th><th>الحالة</th></tr></thead>
+      <tbody>
+        ${attList.filter(a=>a.childId===stId).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30).map(a=>`<tr>
+          <td>${formatDate(a.date)}</td>
+          <td><span class="badge ${a.status==='present'?'badge-green':a.status==='absent'?'badge-red':'badge-yellow'}">${{present:'حاضر',absent:'غائب',late:'متأخر'}[a.status]||a.status}</span></td>
+        </tr>`).join('')||'<tr><td colspan="2"><div class="empty-state" style="padding:20px"><p>لا يوجد سجل حضور</p></div></td></tr>'}
+      </tbody>
+    </table>
+    <div style="margin-top:8px;font-size:12px;color:#94a3b8;no-print">يعرض آخر 30 سجل</div>
+  </div>
+  <div class="no-print" style="margin-top:12px;display:flex;gap:8px">
+    <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ طباعة / PDF</button>
+    <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('rpt-student','تقرير-${esc(stChild.name)}')">📊 Excel</button>
+  </div>
+  `:'<div class="empty-state" style="padding:40px"><div class="es-icon">👤</div><p>ابحث باسم الطالب لعرض تقريره</p></div>'}
+  `:''}
   `;
 },
 
