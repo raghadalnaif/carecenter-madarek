@@ -360,6 +360,7 @@ const App = {
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <button class="btn btn-secondary btn-sm" onclick="App.go(App.view,App.params)" title="تحديث البيانات" style="padding:6px 10px;font-size:16px;line-height:1">🔄</button>
+        <button class="btn btn-success btn-sm" onclick="exportAllData()" title="تصدير جميع البيانات Excel" style="padding:6px 12px;font-size:13px">⬇️ تصدير</button>
         <span style="font-size:11px;color:#94a3b8">${hm}</span>
         <div class="topbar-user">
           <div style="text-align:left">
@@ -2262,6 +2263,65 @@ function exportTableCSV(tableId, filename){
   a.href=url;a.download=(filename||'تقرير')+'.csv';
   document.body.appendChild(a);a.click();
   document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+
+function exportAllData(){
+  if(typeof XLSX==='undefined'){alert('مكتبة Excel غير محملة');return}
+  const sid=Auth.schoolId();
+  const allChildren=DB.children();
+  const children=(sid?allChildren.filter(c=>c.schoolId===sid):allChildren);
+  const subs=(sid?DB.subscriptions().filter(s=>s.schoolId===sid):DB.subscriptions());
+  const att=(sid?DB.attendance().filter(a=>a.schoolId===sid):DB.attendance());
+  const periodLabel=p=>p==='morning'?'صباحي':'مسائي';
+  const subTypeLabel={'daily':'يومي','weekly':'أسبوعي','monthly':'شهري'};
+  const attStatusLabel={'present':'حاضر','absent':'غائب','late':'متأخر'};
+  const wb=XLSX.utils.book_new();
+
+  // ورقة الأطفال
+  const wsChildren=XLSX.utils.json_to_sheet(children.map(c=>({
+    'الاسم':c.name,
+    'اسم ولي الأمر':c.parentName,
+    'هاتف ولي الأمر':c.parentPhone,
+    'الفرع':DB.branchName(c.branchId),
+    'الفترة':periodLabel(c.period),
+    'المرحلة':c.grade||'',
+    'تاريخ الانضمام':c.joinDate||'',
+    'ملاحظات':c.notes||'',
+  })));
+  XLSX.utils.book_append_sheet(wb,wsChildren,'الأطفال');
+
+  // ورقة الاشتراكات
+  const wsSubs=XLSX.utils.json_to_sheet(subs.map(s=>{
+    const child=allChildren.find(c=>c.id===s.childId);
+    return {
+      'اسم الطفل':child?.name||'',
+      'النوع':subTypeLabel[s.type]||s.type,
+      'الفترة':periodLabel(s.period),
+      'من':s.startDate||'',
+      'إلى':s.endDate||'',
+      'السعر':s.price||0,
+      'المدفوع':s.paidAmount||0,
+      'المتبقي':(s.price||0)-(s.paidAmount||0),
+      'رقم الفاتورة':s.invoiceNo||'',
+    };
+  }));
+  XLSX.utils.book_append_sheet(wb,wsSubs,'الاشتراكات');
+
+  // ورقة الحضور
+  const wsAtt=XLSX.utils.json_to_sheet(att.map(a=>{
+    const child=allChildren.find(c=>c.id===a.childId);
+    return {
+      'اسم الطفل':child?.name||'',
+      'التاريخ':a.date||'',
+      'الحالة':attStatusLabel[a.status]||a.status,
+      'دخول':a.checkIn||'',
+      'خروج':a.checkOut||'',
+    };
+  }));
+  XLSX.utils.book_append_sheet(wb,wsAtt,'الحضور');
+
+  const date=new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb,'مدارك-الطفل-'+date+'.xlsx');
 }
 
 function saveTeacher(edit=false){
