@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مدارك الطفل — مزايا النظام</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Tajawal',sans-serif;background:#f1f5f9;color:#1e293b;direction:rtl}
+
+/* HEADER */
+.hero{background:linear-gradient(150deg,#0f766e 0%,#064e3b 100%);padding:60px 40px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Ccircle cx='30' cy='30' r='20'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.hero-logo{width:130px;height:130px;object-fit:contain;margin-bottom:16px;position:relative}
+.hero-logo-fallback{font-size:70px;margin-bottom:16px;display:block}
+.hero h1{color:#fff;font-size:42px;font-weight:900;position:relative;margin-bottom:8px}
+.hero h1 span{color:#5eead4}
+.hero p{color:rgba(255,255,255,.8);font-size:18px;position:relative;margin-bottom:24px}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);padding:8px 20px;border-radius:30px;color:#fff;font-size:14px;font-weight:600}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.08)}
+.stat{padding:28px 20px;text-align:center;border-left:1px solid #f1f5f9}
+.stat:last-child{border-left:none}
+.stat-num{font-size:36px;font-weight:900;color:#0f766e}
+.stat-txt{font-size:13px;color:#64748b;margin-top:4px;font-weight:500}
+
+/* CONTAINER */
+.container{max-width:1100px;margin:0 auto;padding:48px 24px}
+
+/* SECTION TITLE */
+.section-title{text-align:center;margin-bottom:40px}
+.section-title h2{font-size:28px;font-weight:900;color:#1e293b;margin-bottom:8px}
+.section-title p{font-size:15px;color:#64748b}
+.section-title .line{width:60px;height:4px;background:#0f766e;border-radius:2px;margin:12px auto 0}
+
+/* FEATURES GRID */
+.features{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:60px}
+.feature-card{background:#fff;border-radius:16px;padding:28px 24px;box-shadow:0 2px 12px rgba(0,0,0,.06);border-top:4px solid transparent;transition:.2s;position:relative;overflow:hidden}
+.feature-card::before{content:'';position:absolute;top:0;right:0;width:80px;height:80px;border-radius:0 0 0 80px;opacity:.05}
+.feature-card.green{border-color:#0f766e}.feature-card.green::before{background:#0f766e}
+.feature-card.blue{border-color:#3b82f6}.feature-card.blue::before{background:#3b82f6}
+.feature-card.purple{border-color:#8b5cf6}.feature-card.purple::before{background:#8b5cf6}
+.feature-card.orange{border-color:#f59e0b}.feature-card.orange::before{background:#f59e0b}
+.feature-card.red{border-color:#ef4444}.feature-card.red::before{background:#ef4444}
+.feature-card.teal{border-color:#14b8a6}.feature-card.teal::before{background:#14b8a6}
+.feature-icon{font-size:36px;margin-bottom:14px;display:block}
+.feature-title{font-size:17px;font-weight:800;color:#1e293b;margin-bottom:10px}
+.feature-desc{font-size:13px;color:#64748b;line-height:2}
+.feature-list{list-style:none;margin-top:10px}
+.feature-list li{font-size:13px;color:#475569;padding:4px 0;display:flex;align-items:flex-start;gap:8px;line-height:1.6}
+.feature-list li::before{content:'✓';color:#0f766e;font-weight:700;flex-shrink:0;margin-top:1px}
+
+/* ROLES */
+.roles{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:60px}
+.role-card{background:#fff;border-radius:16px;padding:28px;box-shadow:0 2px 12px rgba(0,0,0,.06);text-align:center}
+.role-icon{font-size:40px;margin-bottom:12px}
+.role-name{font-size:18px;font-weight:800;margin-bottom:6px}
+.role-desc{font-size:13px;color:#64748b;margin-bottom:16px}
+.role-perms{display:flex;flex-direction:column;gap:6px;text-align:right}
+.perm{display:flex;align-items:center;gap:8px;font-size:13px;padding:5px 10px;border-radius:6px;background:#f8fafc}
+.perm.yes{color:#166534;background:#f0fdf4}.perm.no{color:#991b1b;background:#fef2f2}
+
+/* PRICING */
+.pricing{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:60px}
+.price-card{background:#fff;border-radius:16px;padding:32px;box-shadow:0 2px 12px rgba(0,0,0,.06);text-align:center}
+.price-card.morning{border:2px solid #fbbf24}
+.price-card.evening{border:2px solid #6366f1}
+.price-badge{display:inline-block;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:700;margin-bottom:16px}
+.price-badge.morning{background:#fef9c3;color:#92400e}
+.price-badge.evening{background:#ede9fe;color:#5b21b6}
+.price-title{font-size:22px;font-weight:900;margin-bottom:20px}
+.price-row{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:8px;margin-bottom:8px;background:#f8fafc}
+.price-row:last-child{margin:0}
+.price-label{font-size:14px;font-weight:600;color:#475569}
+.price-amount{font-size:20px;font-weight:900;color:#0f766e}
+.price-unit{font-size:11px;color:#94a3b8;margin-right:4px}
+
+/* FOOTER */
+.footer{background:linear-gradient(150deg,#0f766e 0%,#064e3b 100%);color:#fff;text-align:center;padding:40px 24px}
+.footer h3{font-size:22px;font-weight:900;margin-bottom:8px}
+.footer p{color:rgba(255,255,255,.7);font-size:14px}
+
+/* PRINT */
+@media print{
+  body{background:#fff}
+  .hero{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .feature-card,.role-card,.price-card{break-inside:avoid}
+  @page{margin:1.5cm;size:A4}
+}
+
+@media(max-width:768px){
+  .features,.roles{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .pricing{grid-template-columns:1fr}
+  .hero h1{font-size:28px}
+}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <img src="logo.png" class="hero-logo" alt="مدارك الطفل" onerror="this.style.display='none'">
+  <h1>نظام <span>مدارك الطفل</span></h1>
+  <p>نظام إداري متكامل لمراكز رعاية وتعليم الأطفال</p>
+  <div class="hero-badge">🌟 Kid Sense — نظام ذكي وسهل الاستخدام</div>
+</div>
+
+<!-- STATS -->
+<div class="stats">
+  <div class="stat"><div class="stat-num">3</div><div class="stat-txt">مستويات صلاحيات</div></div>
+  <div class="stat"><div class="stat-num">6</div><div class="stat-txt">وحدات رئيسية</div></div>
+  <div class="stat"><div class="stat-num">∞</div><div class="stat-txt">عدد الأطفال</div></div>
+  <div class="stat"><div class="stat-num">100%</div><div class="stat-txt">عربي وسهل</div></div>
+</div>
+
+<!-- FEATURES -->
+<div class="container">
+
+  <div class="section-title">
+    <h2>مزايا النظام</h2>
+    <p>كل ما تحتاجه لإدارة مركزك بكفاءة واحترافية</p>
+    <div class="line"></div>
+  </div>
+
+  <div class="features">
+
+    <div class="feature-card green">
+      <span class="feature-icon">👶</span>
+      <div class="feature-title">إدارة الأطفال</div>
+      <ul class="feature-list">
+        <li>تسجيل بيانات الطفل وولي الأمر</li>
+        <li>تحديد الفرع والفترة والمعلمة</li>
+        <li>استيراد جماعي من ملف Excel</li>
+        <li>خصومات خاصة وتمييز VIP</li>
+        <li>بحث وفلترة متقدمة</li>
+      </ul>
+    </div>
+
+    <div class="feature-card blue">
+      <span class="feature-icon">📋</span>
+      <div class="feature-title">نظام الاشتراكات</div>
+      <ul class="feature-list">
+        <li>اشتراكات يومية وأسبوعية وشهرية</li>
+        <li>أسعار تلقائية حسب الفترة</li>
+        <li>تجديد الاشتراكات بضغطة واحدة</li>
+        <li>تنبيهات الاشتراكات المنتهية</li>
+        <li>بحث سريع بالاسم لمعرفة الرصيد</li>
+      </ul>
+    </div>
+
+    <div class="feature-card purple">
+      <span class="feature-icon">✅</span>
+      <div class="feature-title">تسجيل الحضور</div>
+      <ul class="feature-list">
+        <li>حضور / غياب / تأخر بضغطة واحدة</li>
+        <li>الأطفال يظهرون تلقائياً حسب الاشتراك</li>
+        <li>فلترة حسب الفصل والمعلمة</li>
+        <li>الإدارة تحضّر نيابةً عن أي معلمة</li>
+        <li>سجل حضور كامل لكل طفل</li>
+      </ul>
+    </div>
+
+    <div class="feature-card orange">
+      <span class="feature-icon">📊</span>
+      <div class="feature-title">التقارير والإحصاءات</div>
+      <ul class="feature-list">
+        <li>تقرير مالي شامل للإيرادات</li>
+        <li>تقرير حضور مفصّل مع نسب</li>
+        <li>تقرير طالب — كامل حضوره ومدفوعاته</li>
+        <li>طباعة وتصدير PDF و Excel</li>
+        <li>بحث بالاسم والتاريخ</li>
+      </ul>
+    </div>
+
+    <div class="feature-card teal">
+      <span class="feature-icon">💰</span>
+      <div class="feature-title">إدارة المدفوعات</div>
+      <ul class="feature-list">
+        <li>دفع كاش / مدى / حوالة بنكية</li>
+        <li>رفع صورة الإيصال اختيارياً</li>
+        <li>تتبع المبالغ المدفوعة والمتبقية</li>
+        <li>خصومات تلقائية على الاشتراكات</li>
+        <li>فواتير برقم تسلسلي تلقائي</li>
+      </ul>
+    </div>
+
+    <div class="feature-card red">
+      <span class="feature-icon">💬</span>
+      <div class="feature-title">رسائل واتساب</div>
+      <ul class="feature-list">
+        <li>رسائل جاهزة لتذكير ولي الأمر</li>
+        <li>تنبيه قبل انتهاء الاشتراك</li>
+        <li>رسالة للاشتراكات المنتهية</li>
+        <li>إرسال مباشر لرقم الهاتف</li>
+        <li>تخصيص الرسائل تلقائياً باسم الطفل</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- PRICING -->
+  <div class="section-title">
+    <h2>هيكل الأسعار</h2>
+    <p>أسعار مرنة تناسب جميع الأسر</p>
+    <div class="line"></div>
+  </div>
+
+  <div class="pricing">
+    <div class="price-card morning">
+      <div class="price-badge morning">🌅 الفترة الصباحية</div>
+      <div class="price-title">الاشتراكات الصباحية</div>
+      <div class="price-row">
+        <span class="price-label">📅 يومي</span>
+        <span class="price-amount">150<span class="price-unit">ر.س</span></span>
+      </div>
+      <div class="price-row">
+        <span class="price-label">📅 أسبوعي</span>
+        <span class="price-amount">600<span class="price-unit">ر.س</span></span>
+      </div>
+      <div class="price-row">
+        <span class="price-label">📅 شهري</span>
+        <span class="price-amount">1,800<span class="price-unit">ر.س</span></span>
+      </div>
+    </div>
+    <div class="price-card evening">
+      <div class="price-badge evening">🌙 الفترة المسائية</div>
+      <div class="price-title">الاشتراكات المسائية</div>
+      <div class="price-row">
+        <span class="price-label">📅 يومي</span>
+        <span class="price-amount">70<span class="price-unit">ر.س</span></span>
+      </div>
+      <div class="price-row">
+        <span class="price-label">📅 أسبوعي</span>
+        <span class="price-amount">300<span class="price-unit">ر.س</span></span>
+      </div>
+      <div class="price-row">
+        <span class="price-label">📅 شهري</span>
+        <span class="price-amount">900<span class="price-unit">ر.س</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROLES -->
+  <div class="section-title">
+    <h2>مستويات الصلاحيات</h2>
+    <p>نظام صلاحيات مرن يحفظ خصوصية كل دور</p>
+    <div class="line"></div>
+  </div>
+
+  <div class="roles">
+
+    <div class="role-card">
+      <div class="role-icon">👨‍💼</div>
+      <div class="role-name" style="color:#0f766e">المدير العام</div>
+      <div class="role-desc">كامل الصلاحيات على جميع الفروع</div>
+      <div class="role-perms">
+        <div class="perm yes">✓ إدارة المدارس والفروع</div>
+        <div class="perm yes">✓ جميع التقارير المالية</div>
+        <div class="perm yes">✓ إدارة جميع المستخدمين</div>
+        <div class="perm yes">✓ عرض كل الأطفال والاشتراكات</div>
+        <div class="perm yes">✓ رفع وتغيير اللوغو</div>
+      </div>
+    </div>
+
+    <div class="role-card">
+      <div class="role-icon">👩‍💼</div>
+      <div class="role-name" style="color:#3b82f6">إدارة الفرع</div>
+      <div class="role-desc">إدارة فرعها فقط بصلاحيات محددة</div>
+      <div class="role-perms">
+        <div class="perm yes">✓ تسجيل الأطفال والاشتراكات</div>
+        <div class="perm yes">✓ تسجيل الحضور</div>
+        <div class="perm yes">✓ تقرير الحضور وتقرير طالب</div>
+        <div class="perm yes">✓ إضافة معلمات الفرع</div>
+        <div class="perm yes">✓ رسائل واتساب</div>
+        <div class="perm no">✗ التقارير المالية</div>
+      </div>
+    </div>
+
+    <div class="role-card">
+      <div class="role-icon">👩‍🏫</div>
+      <div class="role-name" style="color:#8b5cf6">المعلمة</div>
+      <div class="role-desc">تسجيل حضور طلابها فقط</div>
+      <div class="role-perms">
+        <div class="perm yes">✓ تسجيل حضور فصلها</div>
+        <div class="perm yes">✓ تقرير حضور أطفالها</div>
+        <div class="perm no">✗ بيانات الأطفال الأخرى</div>
+        <div class="perm no">✗ الاشتراكات والمدفوعات</div>
+        <div class="perm no">✗ التقارير المالية</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <h3>🌟 مدارك الطفل — Kid Sense</h3>
+  <p>حي الروابي — الرياض، المملكة العربية السعودية</p>
+  <p style="margin-top:8px;font-size:12px;color:rgba(255,255,255,.4)">نظام إداري متكامل · جميع الحقوق محفوظة</p>
+</div>
+
+</body>
+</html>
