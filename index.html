@@ -7,7 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Tajawal',sans-serif;background:#f1f5f9;color:#1e293b;direction:rtl}
@@ -216,12 +216,14 @@ const SEED = {
 const firebaseConfig={
   apiKey:'AIzaSyAAr6lyp0BPImfA-5PNlO1iOKaOoVtnL5w',
   authDomain:'madarekdaycare.firebaseapp.com',
+  databaseURL:'https://madarekdaycare-default-rtdb.firebaseio.com',
   projectId:'madarekdaycare',
   storageBucket:'madarekdaycare.firebasestorage.app',
   messagingSenderId:'531902685451',
   appId:'1:531902685451:web:6241e4c5479eba9267420e'
 };
 let _fdb=null;
+let _lastWrite=0;
 const _mem={};
 
 // =========================================================
@@ -235,39 +237,35 @@ const DB = {
   set(k,v){
     _mem[k]=v;
     try{localStorage.setItem('ccs_'+k,JSON.stringify(v))}catch{}
-    if(_fdb) _fdb.collection('ccs').doc(k).set({data:v}).catch(()=>{});
+    if(_fdb){_lastWrite=Date.now();_fdb.ref('ccs/'+k).set(v).catch(()=>{});}
   },
   async initFirebase(){
     try{
       if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-      _fdb=firebase.firestore();
-      const keys=[...Object.keys(SEED),'data_version'];
-      const snaps=await Promise.all(keys.map(k=>_fdb.collection('ccs').doc(k).get()));
-      const fbHasData=snaps.some(s=>s.exists);
-      if(fbHasData){
-        // تحميل البيانات من Firebase
-        snaps.forEach((s,i)=>{if(s.exists) _mem[keys[i]]=s.data().data;});
+      _fdb=firebase.database();
+      // تحميل البيانات من RTDB
+      const snap=await _fdb.ref('ccs').get();
+      const fbData=snap.val();
+      if(fbData&&Object.keys(fbData).length){
+        Object.assign(_mem,fbData);
       } else {
-        // نقل بيانات localStorage الحالية إلى Firebase (مرة واحدة فقط)
+        // نقل بيانات localStorage إلى Firebase (مرة واحدة)
+        const keys=[...Object.keys(SEED),'data_version'];
         const toMigrate={};
         keys.forEach(k=>{
           const raw=localStorage.getItem('ccs_'+k);
           if(raw){try{toMigrate[k]=JSON.parse(raw);_mem[k]=toMigrate[k];}catch{}}
         });
-        if(Object.keys(toMigrate).length){
-          await Promise.all(Object.entries(toMigrate).map(([k,v])=>
-            _fdb.collection('ccs').doc(k).set({data:v})
-          ));
-        }
+        if(Object.keys(toMigrate).length) await _fdb.ref('ccs').set(toMigrate);
       }
-      // مستمع التحديثات الفورية من الأجهزة الأخرى
-      _fdb.collection('ccs').onSnapshot(qs=>{
+      // مستمع التحديثات الفورية
+      _fdb.ref('ccs').on('value',snap=>{
+        if(Date.now()-_lastWrite<3000) return;
+        const d=snap.val();
+        if(!d) return;
         let changed=false;
-        qs.docChanges().forEach(ch=>{
-          if(ch.type==='modified'||ch.type==='added'){
-            const k=ch.doc.id;const nv=ch.doc.data().data;
-            if(JSON.stringify(_mem[k])!==JSON.stringify(nv)){_mem[k]=nv;changed=true;}
-          }
+        Object.keys(d).forEach(k=>{
+          if(JSON.stringify(_mem[k])!==JSON.stringify(d[k])){_mem[k]=d[k];changed=true;}
         });
         if(changed&&Auth.user&&!App.modal){
           const el=document.getElementById('content');
