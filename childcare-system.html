@@ -718,33 +718,31 @@ subscriptions(){
 // ---------- ATTENDANCE ----------
 attendance(){
   const u=Auth.user;
+  const isTeacher=u.role==='teacher';
+  const isAdmin=u.role==='school_admin'||u.role==='superadmin';
   const sid=Auth.schoolId()||App.params.schoolId;
   const date=App.params.date||T0;
   const allSubs=DB.subscriptions();
 
-  // دالة: هل للطفل اشتراك يغطي هذا التاريخ؟
   const hasActiveSub=(childId)=>allSubs.some(s=>
-    s.childId===childId && s.isActive &&
-    s.startDate<=date && s.endDate>=date
+    s.childId===childId&&s.isActive&&s.startDate<=date&&s.endDate>=date
   );
-  // دالة: جلب اشتراك الطفل ليوم معيّن
-  const subForDate=(childId)=>allSubs.find(s=>
-    s.childId===childId && s.isActive &&
-    s.startDate<=date && s.endDate>=date
-  )||null;
 
   let kids=DB.children();
   if(sid) kids=kids.filter(c=>c.schoolId===sid);
 
-  // المعلمة: ترى فقط أطفالها المسندون إليها
-  if(u.role==='teacher') kids=kids.filter(c=>c.teacherId===u.id);
-
-  // فلترة الفرع
-  if(App.params.branchFilter) kids=kids.filter(c=>c.branchId===App.params.branchFilter);
-
-  // ✅ الأساسي: فقط أطفال لديهم اشتراك يغطي هذا التاريخ
-  const activeKids=kids.filter(c=>hasActiveSub(c.id));
-  const expiredKids=kids.filter(c=>!hasActiveSub(c.id));
+  // المعلمة: أطفالها فقط + الاشتراك فعّال — بدون أي قسم آخر
+  if(isTeacher){
+    kids=kids.filter(c=>c.teacherId===u.id&&hasActiveSub(c.id));
+  } else {
+    // الإدارة: فلترة بالمعلمة لو اختارت (غياب معلمة)
+    const teacherFilter=App.params.teacherFilter||'';
+    if(teacherFilter) kids=kids.filter(c=>c.teacherId===teacherFilter);
+    // فلترة الفرع
+    if(App.params.branchFilter) kids=kids.filter(c=>c.branchId===App.params.branchFilter);
+    // الإدارة تعرف من لديه اشتراك فعّال فقط
+    kids=kids.filter(c=>hasActiveSub(c.id));
+  }
 
   const attList=DB.attendance();
   const todayAtt=attList.filter(a=>a.date===date&&(sid?a.schoolId===sid:true));
@@ -752,76 +750,67 @@ attendance(){
   todayAtt.forEach(a=>{attMap[a.childId]=a});
   const isToday=date===T0;
 
-  const renderCard=(c,disabled=false)=>{
+  const renderCard=(c)=>{
     const a=attMap[c.id];
     const status=a?.status||'';
-    const sub=subForDate(c.id);
-    const daysLeft=sub?diffDays(sub.endDate,date):null;
-    const urgency=daysLeft!==null?(daysLeft===0?'today':daysLeft<=3?'soon':'ok'):'none';
-    const urgencyStyle={today:'background:#fffbeb;border-color:#f59e0b',soon:'background:#fff7ed;border-color:#fed7aa',ok:'',none:'background:#f8fafc;border-color:#e2e8f0;opacity:.7'}[urgency];
-    return `<div class="attendance-card ${disabled?'':status}" id="att-${c.id}" style="${disabled?'opacity:.55;background:#f8fafc;':urgencyStyle?urgencyStyle+';':''};border:2px solid;">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-        <div style="flex:1">
-          <div style="font-weight:700;font-size:14px">${esc(c.name)}</div>
-          <div style="font-size:11px;color:#64748b;margin-top:2px">${c.grade||''} — ${esc(c.parentName)}</div>
-          <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">
-            <span class="badge badge-blue" style="font-size:10px">🏢 ${DB.branchName(c.branchId)}</span>
-            <span class="badge ${c.period==='morning'?'badge-blue':'badge-orange'}" style="font-size:10px">${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'}</span>
-          </div>
-        </div>
-        ${sub?`<div style="text-align:center;min-width:52px">
-          <div style="font-size:10px;color:#64748b">ينتهي</div>
-          <div style="font-size:11px;font-weight:700;color:${daysLeft===0?'#f59e0b':daysLeft<=3?'#f97316':'#10b981'}">${daysLeft===0?'اليوم':daysLeft<=3?daysLeft+' أيام':formatDate(sub.endDate)}</div>
-        </div>`:''}
+    // للإدارة فقط: نعرض اسم المعلمة فوق الطفل
+    const teacher=isAdmin?DB.users().find(t=>t.id===c.teacherId):null;
+    return `<div class="attendance-card ${status}" id="att-${c.id}">
+      <div style="font-weight:700;font-size:14px">${esc(c.name)}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:2px">${c.grade||''} — ${esc(c.parentName)}</div>
+      ${teacher?`<div style="font-size:11px;color:#0f766e;margin-top:3px">👩‍🏫 ${esc(teacher.name)}</div>`:''}
+      <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">
+        <span class="badge badge-blue" style="font-size:10px">🏢 ${DB.branchName(c.branchId)}</span>
+        <span class="badge ${c.period==='morning'?'badge-blue':'badge-orange'}" style="font-size:10px">${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'}</span>
       </div>
-      ${disabled?`<div style="text-align:center;padding:8px 0;font-size:12px;color:#94a3b8;font-weight:600">⛔ اشتراك منتهٍ</div>`:`
       <div style="display:flex;gap:6px;margin-top:10px">
         <button class="btn btn-xs ${status==='present'?'btn-success':''}" style="flex:1;justify-content:center" onclick="setAtt('${c.id}','present','${date}','${c.schoolId}')">✅ حاضر</button>
         <button class="btn btn-xs ${status==='absent'?'btn-danger':''}" style="flex:1;justify-content:center" onclick="setAtt('${c.id}','absent','${date}','${c.schoolId}')">❌ غائب</button>
         <button class="btn btn-xs ${status==='late'?'btn-warning':''}" style="flex:1;justify-content:center" onclick="setAtt('${c.id}','late','${date}','${c.schoolId}')">⏰ متأخر</button>
       </div>
       ${a?`<div style="font-size:11px;margin-top:6px;color:#64748b">دخول: ${a.checkIn||'—'} · خروج: ${a.checkOut||'—'}</div>`:''}
-      `}
     </div>`;
   };
+
+  // قائمة المعلمات للفلترة (للإدارة فقط)
+  const teachers=isAdmin?DB.users().filter(t=>t.role==='teacher'&&(!sid||t.schoolId===sid)):[];
+  const teacherFilter=App.params.teacherFilter||'';
+  const branchFilter=App.params.branchFilter||'';
 
   return `
   <div class="actions-bar" style="flex-wrap:wrap">
     <div style="display:flex;align-items:center;gap:8px">
       <label style="font-weight:600;font-size:14px">التاريخ:</label>
-      <input type="date" class="input" style="width:160px" value="${date}" onchange="App.go('attendance',{date:this.value,schoolId:'${sid||''}',branchFilter:'${App.params.branchFilter||''}'})" max="${T0}">
+      <input type="date" class="input" style="width:160px" value="${date}" onchange="App.go('attendance',{date:this.value,schoolId:'${sid||''}',branchFilter:'${branchFilter}',teacherFilter:'${teacherFilter}'})" max="${T0}">
     </div>
     ${isToday?`<button class="btn btn-primary btn-sm" onclick="saveAttendance('${date}','${sid||''}')">💾 حفظ الحضور</button>`:''}
     <div style="margin-right:auto;display:flex;gap:8px">
       <span class="badge badge-green">✅ ${Object.values(attMap).filter(a=>a.status==='present').length} حاضر</span>
       <span class="badge badge-red">❌ ${Object.values(attMap).filter(a=>a.status==='absent').length} غائب</span>
       <span class="badge badge-yellow">⏰ ${Object.values(attMap).filter(a=>a.status==='late').length} متأخر</span>
-      <span class="badge badge-gray">📋 ${activeKids.length} مشترك</span>
     </div>
   </div>
-  ${Auth.isSuperAdmin()?`<div class="card" style="padding:12px">
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${DB.schools().map(s=>`<span class="chip ${(App.params.schoolId||'')==s.id?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${s.id}'})">${esc(s.name)}</span>`).join('')}
-    </div>
-  </div>`:''}
-  <div class="card" style="padding:12px">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+
+  ${isAdmin?`
+  <div class="card" style="padding:12px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
       <span style="font-size:13px;font-weight:600;color:#64748b">🏢 الفرع:</span>
-      <span class="chip ${!App.params.branchFilter?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:''})">الكل</span>
-      ${DB.branches().map(b=>`<span class="chip ${App.params.branchFilter===b.id?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${b.id}'})">${esc(b.name)}</span>`).join('')}
+      <span class="chip ${!branchFilter?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'',teacherFilter:'${teacherFilter}'})">الكل</span>
+      ${DB.branches().map(b=>`<span class="chip ${branchFilter===b.id?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${b.id}',teacherFilter:'${teacherFilter}'})">${esc(b.name)}</span>`).join('')}
     </div>
-  </div>
-  ${activeKids.length===0&&expiredKids.length===0?`<div class="card"><div class="empty-state"><div class="es-icon">👶</div><p>لا يوجد أطفال في هذا الفرع</p></div></div>`:''}
-  <div class="attendance-grid" id="att-grid">
-    ${activeKids.map(c=>renderCard(c,false)).join('')}
-  </div>
-  ${expiredKids.length?`
-  <div style="margin-top:20px">
-    <div style="font-size:13px;font-weight:700;color:#94a3b8;margin-bottom:10px;display:flex;align-items:center;gap:8px">
-      <span>⛔ اشتراكات منتهية في هذا التاريخ (${expiredKids.length})</span>
+    <div style="border-top:1px solid #f1f5f9;padding-top:10px">
+      <span style="font-size:13px;font-weight:600;color:#64748b">👩‍🏫 الفصل:</span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        <span class="chip ${!teacherFilter?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${branchFilter}',teacherFilter:''})">جميع الفصول</span>
+        ${teachers.map(t=>`<span class="chip ${teacherFilter===t.id?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${branchFilter}',teacherFilter:'${t.id}'})">${esc(t.name)}</span>`).join('')}
+      </div>
     </div>
-    <div class="attendance-grid">${expiredKids.map(c=>renderCard(c,true)).join('')}</div>
   </div>`:''}
+
+  ${kids.length===0?`<div class="card"><div class="empty-state"><div class="es-icon">👶</div><p>${isTeacher?'لا يوجد أطفال نشطون في فصلك اليوم':'لا يوجد أطفال لديهم اشتراك فعّال في هذا التاريخ'}</p></div></div>`:`
+  <div class="attendance-grid" id="att-grid">
+    ${kids.map(c=>renderCard(c)).join('')}
+  </div>`}
   `;
 },
 
