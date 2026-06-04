@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>مدارك الطفل — نظام الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Tajawal',sans-serif;background:#f1f5f9;color:#1e293b;direction:rtl}
@@ -202,31 +203,9 @@ const SEED = {
   schools: [
     {id:'s1',name:'مدارك الطفل',contactPerson:'ادارة الفرع الرئيسي',phone:'0501234567',email:'madarik@center.com',isActive:true,joinDate:'2024-09-01',vatNumber:'310123456700003',address:'الرياض، المملكة العربية السعودية'},
   ],
-  children: [
-    {id:'c1',schoolId:'s1',branchId:'b1',teacherId:'u3',period:'morning',name:'عبدالله محمد العمري',parentName:'محمد العمري',parentPhone:'0551234567',grade:'KG1',notes:'',isActive:true,joinDate:'2024-09-01',isVip:false,discountPct:0},
-    {id:'c2',schoolId:'s1',branchId:'b1',teacherId:'u4',period:'evening',name:'نورة عبدالله السالم',parentName:'عبدالله السالم',parentPhone:'0557654321',grade:'KG2',notes:'حساسية من اللاكتوز',isActive:true,joinDate:'2024-09-01',isVip:true,discountPct:10},
-    {id:'c3',schoolId:'s1',branchId:'b2',teacherId:'u5',period:'morning',name:'فيصل خالد الحربي',parentName:'خالد الحربي',parentPhone:'0559876543',grade:'KG1',notes:'',isActive:true,joinDate:'2024-10-01',isVip:false,discountPct:0},
-    {id:'c4',schoolId:'s1',branchId:'b2',teacherId:'u6',period:'evening',name:'ريم سعد القحطاني',parentName:'سعد القحطاني',parentPhone:'0551122334',grade:'KG2',notes:'',isActive:true,joinDate:'2024-09-15',isVip:false,discountPct:0},
-    {id:'c5',schoolId:'s1',branchId:'b1',teacherId:'u3',period:'morning',name:'يوسف أحمد الزهراني',parentName:'أحمد الزهراني',parentPhone:'0554455667',grade:'KG1',notes:'',isActive:true,joinDate:'2024-11-01',isVip:true,discountPct:20},
-  ],
-  subscriptions: [
-    {id:'sub1',childId:'c1',schoolId:'s1',branchId:'b1',period:'morning',type:'monthly',startDate:addDays(T0,-20),endDate:addDays(T0,10),basePrice:1800,discountPct:0,price:1800,paidAmount:1800,paymentStatus:'paid',isActive:true,createdAt:addDays(T0,-20),invoiceNo:'INV-0001'},
-    {id:'sub2',childId:'c2',schoolId:'s1',branchId:'b1',period:'evening',type:'monthly',startDate:addDays(T0,-28),endDate:addDays(T0,2),basePrice:900,discountPct:10,price:810,paidAmount:400,paymentStatus:'partial',isActive:true,createdAt:addDays(T0,-28),invoiceNo:'INV-0002'},
-    {id:'sub3',childId:'c3',schoolId:'s1',branchId:'b2',period:'morning',type:'weekly',startDate:addDays(T0,-4),endDate:addDays(T0,3),basePrice:600,discountPct:0,price:600,paidAmount:600,paymentStatus:'paid',isActive:true,createdAt:addDays(T0,-4),invoiceNo:'INV-0003'},
-    {id:'sub4',childId:'c4',schoolId:'s1',branchId:'b2',period:'evening',type:'weekly',startDate:addDays(T0,-8),endDate:addDays(T0,-1),basePrice:300,discountPct:0,price:300,paidAmount:0,paymentStatus:'deferred',isActive:true,createdAt:addDays(T0,-8),invoiceNo:'INV-0004'},
-    {id:'sub5',childId:'c5',schoolId:'s1',branchId:'b1',period:'morning',type:'daily',startDate:T0,endDate:T0,basePrice:150,discountPct:20,price:120,paidAmount:120,paymentStatus:'paid',isActive:true,createdAt:T0,invoiceNo:'INV-0005'},
-  ],
-  attendance: (() => {
-    const arr = [];
-    const kids = ['c1','c2','c3','c4','c5'];
-    const statuses = ['present','present','present','absent','present','late','present'];
-    for(let i=1;i<=7;i++){
-      for(const cid of kids){
-        arr.push({id:uid(),childId:cid,schoolId:'s1',date:addDays(T0,-i),status:statuses[Math.floor(Math.random()*statuses.length)],checkIn:'07:30',checkOut:'14:00',takenBy:'u2',notes:''});
-      }
-    }
-    return arr;
-  })(),
+  children: [],
+  subscriptions: [],
+  attendance: [],
 };
 
 // =========================================================
@@ -236,7 +215,7 @@ const DB = {
   get(k){try{return JSON.parse(localStorage.getItem('ccs_'+k))}catch{return null}},
   set(k,v){localStorage.setItem('ccs_'+k,JSON.stringify(v))},
   init(){
-    const DATA_VER='v5';
+    const DATA_VER='v6';
     if(this.get('data_version')===DATA_VER) return;
     Object.keys(SEED).forEach(k=>this.set(k,SEED[k]));
     this.set('data_version',DATA_VER);
@@ -682,6 +661,7 @@ children(){
   return `
   <div class="actions-bar" style="flex-wrap:wrap">
     <button class="btn btn-primary btn-sm" onclick="Modals.addChild()">+ إضافة طفل</button>
+    <button class="btn btn-secondary btn-sm" onclick="Modals.importChildren()">📥 استيراد Excel</button>
     <div class="search-bar" style="flex:1;max-width:300px;margin:0">
       <span class="search-icon">🔍</span>
       <input class="input" placeholder="بحث بالاسم أو الوالد..." value="${esc(App.params.q||'')}" oninput="App.go('children',{q:this.value,branch:'${bFilter}'})">
@@ -1739,6 +1719,36 @@ const Modals = {
     </div></div>`);
   },
 
+  importChildren(){
+    const branches=DB.branches();
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal" style="max-width:640px">
+      <div class="modal-header"><h2>📥 استيراد أطفال من Excel</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px;margin-bottom:16px">
+          <div style="font-size:13px;font-weight:700;color:#166534;margin-bottom:8px">📋 تعليمات الاستيراد</div>
+          <ul style="font-size:13px;color:#166534;line-height:2.2;padding-right:18px;margin:0">
+            <li>حمّل القالب وافتحه في Excel أو Google Sheets</li>
+            <li>أعمدة مطلوبة: <strong>الاسم، اسم ولي الأمر، هاتف ولي الأمر</strong></li>
+            <li>الفرع: <strong>الفرع الرئيسي</strong> أو <strong>الفرع الثاني</strong></li>
+            <li>الفترة: <strong>صباحية</strong> أو <strong>مسائية</strong></li>
+          </ul>
+          <button class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="downloadChildTemplate()">⬇️ تحميل القالب (CSV)</button>
+        </div>
+        <div class="input-group">
+          <label>📎 اختر ملف Excel (.xlsx) أو CSV</label>
+          <input class="input" type="file" id="import-file-input" accept=".xlsx,.xls,.csv" onchange="previewImport(this)">
+        </div>
+        <div id="import-preview"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="confirm-import-btn" onclick="confirmChildImport()" style="display:none">✅ استيراد البيانات</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+
   addUser(){
     const schools=DB.schools();
     App.showModal(`
@@ -2074,6 +2084,131 @@ function savePay(){
   DB.updateSub(sub);
   App.closeModal();
   App.go('subscriptions');
+}
+
+// =========================================================
+//  EXCEL IMPORT
+// =========================================================
+let _importRows = [];
+
+function downloadChildTemplate(){
+  const rows = [
+    ['الاسم','اسم ولي الأمر','هاتف ولي الأمر','الفرع','الفترة','المرحلة','ملاحظات'],
+    ['مثال: عبدالله محمد','محمد العمري','0551234567','الفرع الرئيسي','صباحية','KG1',''],
+    ['مثال: نورة سعد','سعد القحطاني','0557654321','الفرع الثاني','مسائية','KG2','حساسية'],
+  ];
+  const csv = rows.map(r => r.map(c => '"'+String(c)+'"').join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'قالب-استيراد-الأطفال.csv';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+function previewImport(input){
+  const file = input.files[0];
+  if(!file) return;
+  const isCSV = file.name.toLowerCase().endsWith('.csv');
+  const reader = new FileReader();
+  reader.onload = function(e){
+    let rows = [];
+    try{
+      if(isCSV){
+        rows = _parseCSV(e.target.result);
+      } else {
+        if(typeof XLSX === 'undefined'){
+          document.getElementById('import-preview').innerHTML='<div class="alert-box alert-red">⚠️ مكتبة Excel غير محملة، استخدم ملف CSV بدلاً</div>';
+          return;
+        }
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, {type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:''});
+      }
+      _showImportPreview(rows);
+    } catch(err){
+      document.getElementById('import-preview').innerHTML=`<div class="alert-box alert-red">⚠️ خطأ في قراءة الملف: ${err.message}</div>`;
+    }
+  };
+  if(isCSV) reader.readAsText(file, 'UTF-8');
+  else reader.readAsArrayBuffer(file);
+}
+
+function _parseCSV(text){
+  return text.split('\n').filter(l=>l.trim()).map(line=>{
+    const row=[]; let q=false, cell='';
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(ch==='"'){q=!q;}
+      else if(ch===','&&!q){row.push(cell.trim());cell='';}
+      else cell+=ch;
+    }
+    row.push(cell.trim());
+    return row;
+  });
+}
+
+function _showImportPreview(rows){
+  const preview = document.getElementById('import-preview');
+  const btn = document.getElementById('confirm-import-btn');
+  if(!rows||rows.length<2){
+    preview.innerHTML='<div class="alert-box alert-red">⚠️ الملف فارغ أو لا يحتوي على بيانات</div>';
+    btn.style.display='none'; return;
+  }
+  _importRows = rows.slice(1)
+    .map(r=>({
+      name:String(r[0]||'').trim(),
+      parentName:String(r[1]||'').trim(),
+      parentPhone:String(r[2]||'').trim(),
+      branchHint:String(r[3]||'').trim(),
+      periodHint:String(r[4]||'').trim(),
+      grade:String(r[5]||'').trim(),
+      notes:String(r[6]||'').trim(),
+    }))
+    .filter(r=>r.name && !r.name.startsWith('مثال'));
+  if(!_importRows.length){
+    preview.innerHTML='<div class="alert-box alert-red">⚠️ لا توجد بيانات صالحة (تأكد من حذف سطر المثال)</div>';
+    btn.style.display='none'; return;
+  }
+  preview.innerHTML=`
+    <div class="alert-box alert-green" style="margin-bottom:12px">✅ تم قراءة <strong>${_importRows.length}</strong> سجل — راجع البيانات قبل الاستيراد</div>
+    <div style="overflow-x:auto;max-height:240px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px">
+    <table style="margin:0">
+      <thead><tr><th>#</th><th>الاسم</th><th>ولي الأمر</th><th>الهاتف</th><th>الفرع</th><th>الفترة</th><th>المرحلة</th></tr></thead>
+      <tbody>
+        ${_importRows.map((r,i)=>`<tr>
+          <td style="color:#94a3b8">${i+1}</td>
+          <td><strong>${esc(r.name)}</strong></td>
+          <td>${esc(r.parentName)||'—'}</td>
+          <td>${esc(r.parentPhone)||'—'}</td>
+          <td>${esc(r.branchHint)||'—'}</td>
+          <td>${r.periodHint.includes('صباح')||r.periodHint.toLowerCase()==='morning'?'🌅 صباحية':'🌙 مسائية'}</td>
+          <td>${esc(r.grade)||'—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>`;
+  btn.style.display='';
+}
+
+function confirmChildImport(){
+  const sid = Auth.schoolId() || DB.schools()[0]?.id || 's1';
+  const branches = DB.branches();
+  let added = 0;
+  _importRows.forEach(r=>{
+    if(!r.name) return;
+    const branch = branches.find(b=>r.branchHint&&(b.name.includes(r.branchHint)||r.branchHint.includes(b.name)))||branches[0];
+    const period = r.periodHint.includes('صباح')||r.periodHint.toLowerCase()==='morning'?'morning':'evening';
+    const teacher = DB.users().find(u=>u.role==='teacher'&&u.branchId===branch?.id&&u.period===period);
+    DB.addChild({id:uid(),schoolId:sid,branchId:branch?.id||'',teacherId:teacher?.id||'',period,
+      name:r.name,parentName:r.parentName,parentPhone:r.parentPhone,
+      grade:r.grade,notes:r.notes,joinDate:T0,isActive:true,isVip:false,discountPct:0});
+    added++;
+  });
+  App.closeModal();
+  App.go('children');
+  alert(`✅ تم استيراد ${added} طفل بنجاح`);
 }
 
 function exportTableCSV(tableId, filename){
