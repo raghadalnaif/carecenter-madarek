@@ -147,15 +147,15 @@ const SEED = {
   ],
   users: [
     {id:'sa1',username:'admin',password:'admin123',role:'superadmin',name:'المدير العام',phone:''},
-    {id:'u1',username:'manal',password:'123456',role:'school_admin',schoolId:'s1',name:'منال',phone:'0501234567'},
-    {id:'u2',username:'rawan',password:'123456',role:'school_admin',schoolId:'s1',name:'روان',phone:'0509876543'},
+    {id:'u1',username:'main',password:'123456',role:'school_admin',schoolId:'s1',branchId:'b1',name:'ادارة الفرع الرئيسي',phone:'0501234567'},
+    {id:'u2',username:'second',password:'123456',role:'school_admin',schoolId:'s1',branchId:'b2',name:'ادارة الفرع الثاني',phone:'0509876543'},
     {id:'u3',username:'sarah',password:'123456',role:'teacher',schoolId:'s1',branchId:'b1',period:'morning',name:'الأستاذة سارة',phone:'0507654321'},
     {id:'u4',username:'hessa',password:'123456',role:'teacher',schoolId:'s1',branchId:'b1',period:'evening',name:'الأستاذة هيفاء',phone:'0508765432'},
     {id:'u5',username:'noura',password:'123456',role:'teacher',schoolId:'s1',branchId:'b2',period:'morning',name:'الأستاذة نورا',phone:'0506543210'},
     {id:'u6',username:'lama',password:'123456',role:'teacher',schoolId:'s1',branchId:'b2',period:'evening',name:'الأستاذة لمى',phone:'0505432109'},
   ],
   schools: [
-    {id:'s1',name:'مدارك الطفل',contactPerson:'منال',phone:'0501234567',email:'madarik@center.com',isActive:true,joinDate:'2024-09-01',vatNumber:'310123456700003',address:'الرياض، المملكة العربية السعودية'},
+    {id:'s1',name:'مدارك الطفل',contactPerson:'ادارة الفرع الرئيسي',phone:'0501234567',email:'madarik@center.com',isActive:true,joinDate:'2024-09-01',vatNumber:'310123456700003',address:'الرياض، المملكة العربية السعودية'},
   ],
   children: [
     {id:'c1',schoolId:'s1',branchId:'b1',teacherId:'u3',period:'morning',name:'عبدالله محمد العمري',parentName:'محمد العمري',parentPhone:'0551234567',grade:'KG1',notes:'',isActive:true,joinDate:'2024-09-01',isVip:false,discountPct:0},
@@ -309,7 +309,7 @@ const App = {
     return `
     <div class="sidebar">
       <div class="sidebar-logo">
-        <h1>🌟 دار الضيافة</h1>
+        <h1>🌟 مدارك الطفل</h1>
         <p>نظام إدارة متكامل</p>
       </div>
       <div class="nav-section">
@@ -328,7 +328,7 @@ const App = {
       <div class="topbar-user">
         <div style="text-align:left">
           <div style="font-size:13px;font-weight:600">${esc(Auth.user.name)}</div>
-          <div style="font-size:11px;color:#64748b">${Auth.user.role==='superadmin'?'مدير عام':Auth.user.role==='school_admin'?'مديرة مدرسة':'معلمة'}</div>
+          <div style="font-size:11px;color:#64748b">${Auth.user.role==='superadmin'?'مدير عام':Auth.user.role==='school_admin'?'مديرة فرع':'معلمة'}</div>
         </div>
         <div class="avatar">${Auth.user.name.charAt(0)}</div>
       </div>
@@ -354,7 +354,7 @@ login(){
     <div class="login-card">
       <div class="login-logo">
         <div style="font-size:52px">🌟</div>
-        <h1>دار الضيافة للأطفال</h1>
+        <h1>مدارك الطفل</h1>
         <p>نظام الإدارة المتكاملة</p>
       </div>
       <div id="login-err" style="display:none" class="alert-box alert-red" style="margin-bottom:14px">اسم المستخدم أو كلمة المرور غير صحيحة</div>
@@ -367,12 +367,11 @@ login(){
         <input class="input" id="l-pass" type="password" placeholder="أدخل كلمة المرور" onkeydown="if(event.key==='Enter')doLogin()">
       </div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="doLogin()">دخول</button>
-      <div style="margin-top:20px;padding:14px;background:#f8fafc;border-radius:8px;font-size:12px;color:#64748b;line-height:2">
-        <strong>حسابات تجريبية:</strong><br>
-        👑 مدير عام: admin / admin123<br>
-        🏫 مديرة (النور): noor / 123456<br>
-        🏫 مديرة (الفجر): fajr / 123456<br>
-        👩‍🏫 معلمة: sarah / 123456
+      <div style="margin-top:20px;padding:14px;background:#f8fafc;border-radius:8px;font-size:12px;color:#64748b;line-height:2.2">
+        <strong style="color:#374151">بيانات الدخول:</strong><br>
+        🏢 ادارة الفرع الرئيسي: <code style="background:#e2e8f0;padding:1px 5px;border-radius:4px">main</code> / 123456<br>
+        🏢 ادارة الفرع الثاني: <code style="background:#e2e8f0;padding:1px 5px;border-radius:4px">second</code> / 123456<br>
+        👩‍🏫 معلمة: <code style="background:#e2e8f0;padding:1px 5px;border-radius:4px">sarah</code> / 123456
       </div>
     </div>
   </div>`;
@@ -968,7 +967,7 @@ reports(){
 users(){
   const users=DB.users();
   const schools=DB.schools();
-  const roleMap={superadmin:'مدير عام',school_admin:'مديرة مدرسة',teacher:'معلمة'};
+  const roleMap={superadmin:'مدير عام',school_admin:'مديرة فرع',teacher:'معلمة'};
   return `
   <div class="section-header">
     <h2>إدارة المستخدمين</h2>
@@ -1004,7 +1003,7 @@ whatsapp(){
     const c=children.find(x=>x.id===sub.childId);
     if(!c) return null;
     const msgs={
-      expired:`السلام عليكم 🌟\nنود إشعاركم بأن اشتراك الطفل ${c.name} في دار الضيافة قد انتهى بتاريخ ${formatDate(sub.endDate)}.\nيسعدنا التواصل معكم لتجديد الاشتراك.\nشكراً لثقتكم 🌺`,
+      expired:`السلام عليكم 🌟\nنود إشعاركم بأن اشتراك الطفل ${c.name} في مدارك الطفل قد انتهى بتاريخ ${formatDate(sub.endDate)}.\nيسعدنا التواصل معكم لتجديد الاشتراك.\nشكراً لثقتكم 🌺`,
       today:`السلام عليكم 🌟\nتذكير ودي: اشتراك ${c.name} ينتهي اليوم.\nلتجديد الاشتراك تواصلوا معنا.\nشكراً 🌺`,
       soon:`السلام عليكم 🌟\nتذكير: اشتراك ${c.name} سينتهي بتاريخ ${formatDate(sub.endDate)} (خلال ${days} أيام).\nيسعدنا خدمتكم لتجديد الاشتراك.\nشكراً 🌺`,
     };
@@ -1447,7 +1446,7 @@ const Modals = {
         <div class="grid-2">
           <div class="input-group"><label>الدور *</label>
             <select class="input" id="u-role" onchange="toggleSchoolField()">
-              <option value="school_admin">مديرة مدرسة</option>
+              <option value="school_admin">مديرة فرع</option>
               <option value="teacher">معلمة</option>
               <option value="superadmin">مدير عام</option>
             </select>
@@ -1504,7 +1503,7 @@ const Modals = {
         <div class="grid-2">
           <div class="input-group"><label>الدور</label>
             <select class="input" id="u-role" onchange="toggleSchoolField()">
-              <option value="school_admin" ${u.role==='school_admin'?'selected':''}>مديرة مدرسة</option>
+              <option value="school_admin" ${u.role==='school_admin'?'selected':''}>مديرة فرع</option>
               <option value="teacher" ${u.role==='teacher'?'selected':''}>معلمة</option>
               <option value="superadmin" ${u.role==='superadmin'?'selected':''}>مدير عام</option>
             </select>
