@@ -1082,27 +1082,70 @@ const Modals = {
     const branches=DB.branches();
     App.showModal(`
     <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
-    <div class="modal">
-      <div class="modal-header"><h2>👶 إضافة طفل</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+    <div class="modal" style="max-width:560px">
+      <div class="modal-header"><h2>👶 تسجيل طفل جديد</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
       <div class="modal-body">
+
+        <div style="font-size:13px;font-weight:700;color:#0f766e;padding:8px 12px;background:#f0fdf4;border-radius:8px;margin-bottom:14px">📋 بيانات الطفل</div>
+
         ${!sid?`<div class="input-group"><label>المدرسة *</label><select class="input" id="c-school"><option value="">اختر مدرسة</option>${schools.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>`:`<input type="hidden" id="c-school" value="${sid}">`}
-        <div class="input-group"><label>🏢 الفرع *</label><select class="input" id="c-branch"><option value="">اختر الفرع</option>${branches.map(b=>`<option value="${b.id}">${esc(b.name)}${b.location?' — '+b.location:''}</option>`).join('')}</select></div>
+        <div class="grid-2">
+          <div class="input-group"><label>🏢 الفرع *</label><select class="input" id="c-branch"><option value="">اختر الفرع</option>${branches.map(b=>`<option value="${b.id}">${esc(b.name)}${b.location?' — '+b.location:''}</option>`).join('')}</select></div>
+          <div class="input-group">
+            <label>⏰ الفترة *</label>
+            <select class="input" id="c-period" onchange="calcChildSubPrice()">
+              <option value="morning">🌅 صباحية (150 / 600 / 1800 ر.س)</option>
+              <option value="evening">🌙 مسائية (70 / 300 / 900 ر.س)</option>
+            </select>
+          </div>
+        </div>
         <div class="input-group"><label>اسم الطفل *</label><input class="input" id="c-name" placeholder="الاسم الثلاثي"></div>
         <div class="grid-2">
           <div class="input-group"><label>اسم ولي الأمر *</label><input class="input" id="c-parent" placeholder="الاسم"></div>
           <div class="input-group"><label>هاتف ولي الأمر *</label><input class="input" id="c-phone" placeholder="05xxxxxxxx"></div>
         </div>
         <div class="grid-2">
-          <div class="input-group"><label>الصف</label><input class="input" id="c-grade" placeholder="KG1 / KG2 ..."></div>
+          <div class="input-group"><label>الصف</label><input class="input" id="c-grade" placeholder="KG1 / KG2"></div>
           <div class="input-group"><label>تاريخ الانتساب</label><input class="input" id="c-join" type="date" value="${T0}"></div>
         </div>
         <div class="input-group"><label>ملاحظات صحية</label><textarea class="input" id="c-notes" rows="2" placeholder="حساسية، حالة صحية..."></textarea></div>
+
+        <div style="font-size:13px;font-weight:700;color:#0f766e;padding:8px 12px;background:#f0fdf4;border-radius:8px;margin:16px 0 14px">💳 الاشتراك والدفع</div>
+
+        <div class="grid-2">
+          <div class="input-group">
+            <label>مدة الاشتراك *</label>
+            <select class="input" id="c-sub-type" onchange="calcChildSubPrice()">
+              <option value="daily">📅 يومي</option>
+              <option value="weekly">📅 أسبوعي</option>
+              <option value="monthly" selected>📅 شهري</option>
+            </select>
+          </div>
+          <div class="input-group"><label>تاريخ البداية</label><input class="input" id="c-sub-start" type="date" value="${T0}" onchange="calcChildSubPrice()"></div>
+        </div>
+        <div class="grid-2">
+          <div class="input-group"><label>تاريخ الانتهاء</label><input class="input" id="c-sub-end" type="date" value="${addDays(T0,30)}" readonly style="background:#f8fafc;color:#64748b"></div>
+          <div class="input-group"><label>المبلغ الكلي (ر.س)</label><input class="input" id="c-sub-price" type="number" value="1800" oninput="syncPaidAmount('c-sub-price','c-sub-paid')"></div>
+        </div>
+        <div class="grid-2">
+          <div class="input-group"><label>المبلغ المدفوع (ر.س)</label><input class="input" id="c-sub-paid" type="number" value="1800"></div>
+          <div class="input-group">
+            <label>حالة الدفع</label>
+            <select class="input" id="c-sub-pay">
+              <option value="paid">✅ مدفوع بالكامل</option>
+              <option value="partial">🟡 جزئي</option>
+              <option value="deferred">⏳ مؤجل</option>
+            </select>
+          </div>
+        </div>
+
       </div>
       <div class="modal-footer">
-        <button class="btn btn-primary" onclick="saveChild()">حفظ</button>
+        <button class="btn btn-primary" onclick="saveChild()">✅ حفظ وتسجيل الاشتراك</button>
         <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
       </div>
     </div></div>`);
+    setTimeout(calcChildSubPrice,30);
   },
 
   editChild(id){
@@ -1115,7 +1158,17 @@ const Modals = {
       <div class="modal-header"><h2>✏️ تعديل بيانات الطفل</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
       <div class="modal-body">
         <input type="hidden" id="c-id" value="${c.id}">
-        <div class="input-group"><label>🏢 الفرع *</label><select class="input" id="c-branch">${branches.map(b=>`<option value="${b.id}" ${c.branchId===b.id?'selected':''}>${esc(b.name)}${b.location?' — '+b.location:''}</option>`).join('')}</select></div>
+        <input type="hidden" id="c-school" value="${c.schoolId}">
+        <div class="grid-2">
+          <div class="input-group"><label>🏢 الفرع *</label><select class="input" id="c-branch">${branches.map(b=>`<option value="${b.id}" ${c.branchId===b.id?'selected':''}>${esc(b.name)}${b.location?' — '+b.location:''}</option>`).join('')}</select></div>
+          <div class="input-group">
+            <label>⏰ الفترة *</label>
+            <select class="input" id="c-period">
+              <option value="morning" ${(c.period||'evening')==='morning'?'selected':''}>🌅 صباحية</option>
+              <option value="evening" ${(c.period||'evening')==='evening'?'selected':''}>🌙 مسائية</option>
+            </select>
+          </div>
+        </div>
         <div class="input-group"><label>اسم الطفل *</label><input class="input" id="c-name" value="${esc(c.name)}"></div>
         <div class="grid-2">
           <div class="input-group"><label>اسم ولي الأمر</label><input class="input" id="c-parent" value="${esc(c.parentName)}"></div>
@@ -1137,6 +1190,9 @@ const Modals = {
   addSub(childId){
     const c=DB.children().find(x=>x.id===childId);
     if(!c) return;
+    const period=c.period||'evening';
+    const p=SUB_PRICES[period]||SUB_PRICES.evening;
+    const periodLabel=period==='morning'?'🌅 صباحية':'🌙 مسائية';
     App.showModal(`
     <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
     <div class="modal">
@@ -1144,28 +1200,34 @@ const Modals = {
       <div class="modal-body">
         <input type="hidden" id="sub-child" value="${childId}">
         <input type="hidden" id="sub-school" value="${c.schoolId}">
+        <input type="hidden" id="sub-period" value="${period}">
+        <div style="background:#f0fdf4;border-radius:8px;padding:12px;margin-bottom:14px;display:flex;gap:20px">
+          <div><div style="font-size:11px;color:#64748b">الطفل</div><div style="font-weight:700">${esc(c.name)}</div></div>
+          <div><div style="font-size:11px;color:#64748b">الفترة</div><div style="font-weight:700">${periodLabel}</div></div>
+          <div><div style="font-size:11px;color:#64748b">الفرع</div><div style="font-weight:700">${DB.branchName(c.branchId)}</div></div>
+        </div>
         <div class="input-group">
-          <label>نوع الاشتراك *</label>
+          <label>مدة الاشتراك *</label>
           <select class="input" id="sub-type" onchange="calcEndDate()">
-            <option value="daily">يومي</option>
-            <option value="weekly">أسبوعي</option>
-            <option value="monthly" selected>شهري</option>
+            <option value="daily">📅 يومي — ${p.daily} ر.س</option>
+            <option value="weekly">📅 أسبوعي — ${p.weekly} ر.س</option>
+            <option value="monthly" selected>📅 شهري — ${p.monthly} ر.س</option>
           </select>
         </div>
         <div class="grid-2">
           <div class="input-group"><label>تاريخ البداية *</label><input class="input" id="sub-start" type="date" value="${T0}" onchange="calcEndDate()"></div>
-          <div class="input-group"><label>تاريخ النهاية</label><input class="input" id="sub-end" type="date" value="${addDays(T0,30)}"></div>
+          <div class="input-group"><label>تاريخ الانتهاء</label><input class="input" id="sub-end" type="date" value="${addDays(T0,30)}" readonly style="background:#f8fafc;color:#64748b"></div>
         </div>
         <div class="grid-2">
-          <div class="input-group"><label>السعر الكلي (ر.س) *</label><input class="input" id="sub-price" type="number" value="800" placeholder="0"></div>
-          <div class="input-group"><label>المبلغ المدفوع (ر.س)</label><input class="input" id="sub-paid" type="number" value="800" placeholder="0"></div>
+          <div class="input-group"><label>المبلغ الكلي (ر.س)</label><input class="input" id="sub-price" type="number" value="${p.monthly}" oninput="syncPaidAmount('sub-price','sub-paid')"></div>
+          <div class="input-group"><label>المبلغ المدفوع (ر.س)</label><input class="input" id="sub-paid" type="number" value="${p.monthly}"></div>
         </div>
         <div class="input-group">
           <label>حالة الدفع *</label>
           <select class="input" id="sub-pay">
-            <option value="paid">مدفوع بالكامل</option>
-            <option value="partial">مدفوع جزئياً</option>
-            <option value="deferred">مؤجل</option>
+            <option value="paid">✅ مدفوع بالكامل</option>
+            <option value="partial">🟡 مدفوع جزئياً</option>
+            <option value="deferred">⏳ مؤجل</option>
           </select>
         </div>
       </div>
@@ -1293,15 +1355,46 @@ function doLogin(){
   else{const e=document.getElementById('login-err');if(e)e.style.display='flex'}
 }
 
+const SUB_PRICES={morning:{daily:150,weekly:600,monthly:1800},evening:{daily:70,weekly:300,monthly:900}};
+
 function calcEndDate(){
   const type=document.getElementById('sub-type')?.value;
   const start=document.getElementById('sub-start')?.value;
   const end=document.getElementById('sub-end');
-  const price=document.getElementById('sub-price');
+  const period=document.getElementById('sub-period')?.value||'evening';
   if(!type||!start||!end) return;
-  if(type==='daily'){end.value=start;if(price)price.value=100;}
-  else if(type==='weekly'){end.value=addDays(start,7);if(price)price.value=300;}
-  else if(type==='monthly'){end.value=addDays(start,30);if(price)price.value=800;}
+  if(type==='daily') end.value=start;
+  else if(type==='weekly') end.value=addDays(start,7);
+  else if(type==='monthly') end.value=addDays(start,30);
+  const priceEl=document.getElementById('sub-price');
+  const paidEl=document.getElementById('sub-paid');
+  const base=(SUB_PRICES[period]||SUB_PRICES.evening)[type]||0;
+  if(priceEl){priceEl.value=base;if(paidEl)paidEl.value=base;}
+}
+
+function calcChildSubPrice(){
+  const type=document.getElementById('c-sub-type')?.value;
+  const start=document.getElementById('c-sub-start')?.value;
+  const period=document.getElementById('c-period')?.value||'evening';
+  const endEl=document.getElementById('c-sub-end');
+  if(type&&start&&endEl){
+    if(type==='daily') endEl.value=start;
+    else if(type==='weekly') endEl.value=addDays(start,7);
+    else endEl.value=addDays(start,30);
+  }
+  const priceEl=document.getElementById('c-sub-price');
+  const paidEl=document.getElementById('c-sub-paid');
+  if(priceEl&&type){
+    const base=(SUB_PRICES[period]||SUB_PRICES.evening)[type]||0;
+    priceEl.value=base;
+    if(paidEl) paidEl.value=base;
+  }
+}
+
+function syncPaidAmount(srcId,tgtId){
+  const src=document.getElementById(srcId);
+  const tgt=document.getElementById(tgtId);
+  if(src&&tgt) tgt.value=src.value;
 }
 
 function toggleSchoolField(){
@@ -1354,10 +1447,13 @@ function saveChild(edit=false){
   const phone=document.getElementById('c-phone')?.value?.trim();
   const schoolId=document.getElementById('c-school')?.value?.trim();
   if(!name||!parent||!phone){alert('يرجى ملء الحقول المطلوبة');return}
+  const childId=edit?document.getElementById('c-id')?.value:uid();
+  const period=document.getElementById('c-period')?.value||'evening';
   const c={
-    id:edit?document.getElementById('c-id')?.value:uid(),
+    id:childId,
     schoolId,
     branchId:document.getElementById('c-branch')?.value||'',
+    period,
     name,
     parentName:parent,
     parentPhone:phone,
@@ -1365,8 +1461,27 @@ function saveChild(edit=false){
     notes:document.getElementById('c-notes')?.value?.trim()||'',
     joinDate:document.getElementById('c-join')?.value||T0,
     isActive:true,
+    isVip:false,
+    discountPct:0,
   };
   if(edit) DB.updateChild(c); else DB.addChild(c);
+
+  // حفظ الاشتراك مع الطفل (للتسجيل الجديد فقط)
+  if(!edit){
+    const subType=document.getElementById('c-sub-type')?.value;
+    const subStart=document.getElementById('c-sub-start')?.value||T0;
+    const subPrice=parseFloat(document.getElementById('c-sub-price')?.value||0);
+    const subPaid=parseFloat(document.getElementById('c-sub-paid')?.value||0);
+    const subPay=document.getElementById('c-sub-pay')?.value||'paid';
+    if(subType&&subPrice>0){
+      const subEnd=subType==='daily'?subStart:subType==='weekly'?addDays(subStart,7):addDays(subStart,30);
+      const allSubs=DB.subscriptions();
+      const maxNum=allSubs.reduce((m,s)=>{const n=parseInt(s.invoiceNo?.replace('INV-','')||0);return n>m?n:m;},0);
+      const invoiceNo='INV-'+(maxNum+1).toString().padStart(4,'0');
+      const basePrice=(SUB_PRICES[period]||SUB_PRICES.evening)[subType]||subPrice;
+      DB.addSub({id:uid(),childId,schoolId,branchId:c.branchId,period,type:subType,startDate:subStart,endDate:subEnd,basePrice,discountPct:0,price:subPrice,paidAmount:subPaid,paymentStatus:subPay,isActive:true,createdAt:T0,invoiceNo});
+    }
+  }
   App.closeModal();
   App.go('children');
 }
@@ -1374,6 +1489,7 @@ function saveChild(edit=false){
 function saveSub(){
   const childId=document.getElementById('sub-child')?.value;
   const schoolId=document.getElementById('sub-school')?.value;
+  const period=document.getElementById('sub-period')?.value||'evening';
   const type=document.getElementById('sub-type')?.value;
   const startDate=document.getElementById('sub-start')?.value;
   const endDate=document.getElementById('sub-end')?.value;
@@ -1381,7 +1497,12 @@ function saveSub(){
   const paidAmount=parseFloat(document.getElementById('sub-paid')?.value||0);
   const paymentStatus=document.getElementById('sub-pay')?.value;
   if(!childId||!type||!startDate||!endDate||!price){alert('يرجى ملء جميع الحقول');return}
-  const s={id:uid(),childId,schoolId,type,startDate,endDate,price,paidAmount,paymentStatus,isActive:true,createdAt:T0};
+  const child=DB.children().find(c=>c.id===childId);
+  const allSubs=DB.subscriptions();
+  const maxNum=allSubs.reduce((m,s)=>{const n=parseInt(s.invoiceNo?.replace('INV-','')||0);return n>m?n:m;},0);
+  const invoiceNo='INV-'+(maxNum+1).toString().padStart(4,'0');
+  const basePrice=(SUB_PRICES[period]||SUB_PRICES.evening)[type]||price;
+  const s={id:uid(),childId,schoolId,branchId:child?.branchId||'',period,type,startDate,endDate,basePrice,discountPct:0,price,paidAmount,paymentStatus,isActive:true,createdAt:T0,invoiceNo};
   DB.addSub(s);
   App.closeModal();
   App.go('subscriptions');
