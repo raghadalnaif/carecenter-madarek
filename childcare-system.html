@@ -263,7 +263,7 @@ const DB = {
         Object.assign(_mem,fbData);
       } else {
         // نقل بيانات localStorage إلى Firebase (مرة واحدة)
-        const keys=[...Object.keys(SEED),'data_version'];
+        const keys=Object.keys(SEED);
         const toMigrate={};
         keys.forEach(k=>{
           const raw=localStorage.getItem('ccs_'+k);
@@ -280,9 +280,21 @@ const DB = {
         Object.keys(d).forEach(k=>{
           if(JSON.stringify(_mem[k])!==JSON.stringify(d[k])){_mem[k]=d[k];changed=true;}
         });
-        if(changed&&Auth.user&&!App.modal){
-          const el=document.getElementById('content');
-          if(el) el.innerHTML=App.currentView();
+        if(changed&&Auth.user){
+          // تحديث Auth.user إن تغيّرت بياناته (الدور أو الفرع أو كلمة المرور)
+          if(Auth.user.id){
+            const fresh=DB.users().find(u=>u.id===Auth.user.id);
+            if(fresh){Auth.user=fresh;sessionStorage.setItem('ccs_user',JSON.stringify(fresh));}
+          }
+          if(!App.modal){
+            const el=document.getElementById('content');
+            if(!el) return;
+            // حفظ قيم حقول البحث/الفلترة قبل إعادة الرسم وإعادتها بعده
+            const saved={};
+            el.querySelectorAll('input[id],select[id]').forEach(inp=>{saved[inp.id]=inp.value;});
+            el.innerHTML=App.currentView();
+            Object.entries(saved).forEach(([id,val])=>{const f=document.getElementById(id);if(f&&f.value===''&&val)f.value=val;});
+          }
         }
       });
     }catch(e){console.warn('Firebase:',e);}
