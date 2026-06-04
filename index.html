@@ -300,8 +300,19 @@ const DB = {
     }catch(e){console.warn('Firebase:',e);}
   },
   init(){
-    // يضيف المفاتيح الناقصة فقط — لا يمسح البيانات الموجودة أبداً
-    Object.keys(SEED).forEach(k=>{if(this.get(k)===null) this.set(k,SEED[k]);});
+    // يضيف المفاتيح الناقصة في كتابة Firebase واحدة بدل N كتابة
+    const missing={};
+    Object.keys(SEED).forEach(k=>{
+      if(this.get(k)===null){
+        _mem[k]=SEED[k];
+        try{localStorage.setItem('ccs_'+k,JSON.stringify(SEED[k]));}catch{}
+        missing[k]=SEED[k];
+      }
+    });
+    if(_fdb&&Object.keys(missing).length){
+      _lastWrite=Date.now();
+      _fdb.ref('ccs').update(missing).catch(()=>{});
+    }
   },
   users(){return this.get('users')||[]},
   schools(){return this.get('schools')||[]},
@@ -457,7 +468,7 @@ const App = {
         <button class="btn btn-secondary btn-sm" onclick="App.go(App.view,App.params)" title="تحديث البيانات" style="padding:6px 10px;font-size:16px;line-height:1">🔄</button>
         <button class="btn btn-success btn-sm" onclick="exportAllData()" title="تصدير جميع البيانات Excel" style="padding:6px 12px;font-size:13px">⬇️ <span class="export-label">تصدير</span></button>
         <span style="font-size:11px;color:#94a3b8">${hm}</span>
-        ${Auth.isSuperAdmin()?`
+        ${Auth.isSuperAdmin()||Auth.isSchoolAdmin()?`
         <div style="position:relative">
           <button class="btn btn-secondary btn-sm" id="notif-btn" onclick="toggleNotifPanel()" style="padding:6px 10px;font-size:17px;line-height:1;position:relative">
             🔔${unread>0?`<span class="notif-badge">${unread>9?'9+':unread}</span>`:''}
@@ -530,7 +541,7 @@ login(){
         <div id="login-err" style="display:none;margin-bottom:16px" class="alert-box alert-red">⚠️ اسم المستخدم أو كلمة المرور غير صحيحة</div>
         <div class="input-group">
           <label>اسم المستخدم</label>
-          <input class="input" id="l-user" placeholder="أدخل اسم المستخدم" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
+          <input class="input" id="l-user" placeholder="أدخل اسم المستخدم" autocomplete="username" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('l-pass').focus();}">
         </div>
         <div class="input-group">
           <label>كلمة المرور</label>
@@ -989,7 +1000,7 @@ attendance(){
       <label style="font-weight:600;font-size:14px">التاريخ:</label>
       <input type="date" class="input" style="width:160px" value="${date}" onchange="App.go('attendance',{date:this.value,schoolId:'${sid||''}',branchFilter:'${branchFilter}',teacherFilter:'${teacherFilter}'})" max="${T0}">
     </div>
-    ${isToday?`<button class="btn btn-primary btn-sm" onclick="saveAttendance('${date}','${sid||''}')">💾 حفظ الحضور</button>`:''}
+    <button class="btn btn-primary btn-sm" onclick="saveAttendance('${date}','${sid||''}')">💾 حفظ الحضور</button>
     <div style="margin-right:auto;display:flex;gap:8px">
       <span class="badge badge-green">✅ ${Object.values(attMap).filter(a=>a.status==='present').length} حاضر</span>
       <span class="badge badge-red">❌ ${Object.values(attMap).filter(a=>a.status==='absent').length} غائب</span>
@@ -1062,7 +1073,7 @@ reports(){
     <span class="rpt-bar-title">${tabLabel[tab]||''}</span>
     <div class="rpt-bar-btns">
       <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ طباعة / PDF</button>
-      ${tab!=='student'?`<button class="btn btn-secondary btn-sm" onclick="exportTableCSV('${tabId[tab]}','${tabLabel[tab]}')">📊 Excel</button>`:''}
+      ${tab!=='student'?`<button class="btn btn-secondary btn-sm" onclick="exportTableCSV('${tabId[tab]}','${tabLabel[tab]}')">📊 CSV</button>`:''}
     </div>
   </div>
 
@@ -1250,7 +1261,7 @@ reports(){
   </div>
   <div class="no-print" style="margin-top:12px;display:flex;gap:8px">
     <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ طباعة / PDF</button>
-    <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('rpt-student','تقرير-${esc(stChild.name)}')">📊 Excel</button>
+    <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('rpt-student','تقرير-${esc(stChild.name)}')">📊 CSV</button>
   </div>
   `:'<div class="empty-state" style="padding:40px"><div class="es-icon">👤</div><p>ابحث باسم الطالب لعرض تقريره</p></div>'}
   `:''}
@@ -1392,7 +1403,7 @@ myReports(){
     <span class="rpt-bar-title">📊 تقرير حضور أطفالي</span>
     <div class="rpt-bar-btns">
       <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ طباعة / PDF</button>
-      <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('rpt-teacher','تقرير-حضور')">📊 Excel</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('rpt-teacher','تقرير-حضور')">📊 CSV</button>
     </div>
   </div>
   <div class="card">
@@ -1565,7 +1576,7 @@ const Modals = {
           </label>
           <div style="display:flex;align-items:center;gap:8px;flex:1">
             <label style="font-size:13px;font-weight:600;white-space:nowrap">نسبة الخصم الدائم %</label>
-            <input class="input" id="c-disc" type="number" min="0" max="100" value="0" placeholder="0" style="width:80px" oninput="calcChildSubPrice()">
+            <input class="input" id="c-disc" type="number" min="0" max="100" value="0" placeholder="0" style="width:80px" oninput="calcChildSubPrice(false)">
           </div>
         </div>
 
@@ -1708,7 +1719,7 @@ const Modals = {
         </div>
         <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#fefce8;border-radius:8px;margin-bottom:14px;border:1px solid #fde68a">
           <span style="font-size:13px;font-weight:600">نسبة الخصم %</span>
-          <input class="input" id="sub-disc" type="number" min="0" max="100" value="${c.discountPct||0}" style="width:80px" oninput="calcEndDate()">
+          <input class="input" id="sub-disc" type="number" min="0" max="100" value="${c.discountPct||0}" style="width:80px" oninput="calcEndDate(false)">
           <span style="font-size:12px;color:#64748b">السعر الأساسي: <strong id="sub-base-label">${p.monthly} ر.س</strong></span>
         </div>
         <div class="grid-2">
@@ -1878,6 +1889,7 @@ const Modals = {
 
   addUser(){
     const schools=DB.schools();
+    const branches=DB.branches();
     App.showModal(`
     <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
     <div class="modal">
@@ -1900,6 +1912,10 @@ const Modals = {
             <label>المدرسة *</label>
             <select class="input" id="u-school"><option value="">اختر مدرسة</option>${schools.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select>
           </div>
+        </div>
+        <div class="input-group" id="branch-field">
+          <label>الفرع</label>
+          <select class="input" id="u-branch"><option value="">— اختر الفرع —</option>${branches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select>
         </div>
         <div class="input-group"><label>الهاتف</label><input class="input" id="u-phone" placeholder="05xxxxxxxx"></div>
       </div>
@@ -1933,6 +1949,7 @@ const Modals = {
   editUser(id){
     const u=DB.users().find(x=>x.id===id);
     const schools=DB.schools();
+    const branches=DB.branches();
     if(!u) return;
     App.showModal(`
     <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
@@ -1958,6 +1975,10 @@ const Modals = {
             <select class="input" id="u-school">${schools.map(s=>`<option value="${s.id}" ${u.schoolId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select>
           </div>
         </div>
+        <div class="input-group" id="branch-field" style="${u.role==='superadmin'?'display:none':''}">
+          <label>الفرع</label>
+          <select class="input" id="u-branch"><option value="">— اختر الفرع —</option>${branches.map(b=>`<option value="${b.id}" ${u.branchId===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}</select>
+        </div>
         <div class="input-group"><label>الهاتف</label><input class="input" id="u-phone" value="${esc(u.phone||'')}"></div>
       </div>
       <div class="modal-footer">
@@ -1980,15 +2001,17 @@ function doLogin(){
 
 const SUB_PRICES={morning:{daily:150,weekly:600,monthly:1800},evening:{daily:70,weekly:300,monthly:900}};
 
-function calcEndDate(){
+function calcEndDate(recalcEnd=true){
   const type=document.getElementById('sub-type')?.value;
   const start=document.getElementById('sub-start')?.value;
   const end=document.getElementById('sub-end');
   const period=document.getElementById('sub-period')?.value||'evening';
   if(!type||!start||!end) return;
-  if(type==='daily') end.value=start;
-  else if(type==='weekly') end.value=addDays(start,7);
-  else if(type==='monthly') end.value=addDays(start,30);
+  if(recalcEnd){
+    if(type==='daily') end.value=start;
+    else if(type==='weekly') end.value=addDays(start,7);
+    else if(type==='monthly') end.value=addDays(start,30);
+  }
   const priceEl=document.getElementById('sub-price');
   const paidEl=document.getElementById('sub-paid');
   const baseLabel=document.getElementById('sub-base-label');
@@ -1999,12 +2022,12 @@ function calcEndDate(){
   if(priceEl){priceEl.value=final;if(paidEl)paidEl.value=final;}
 }
 
-function calcChildSubPrice(){
+function calcChildSubPrice(recalcEnd=true){
   const type=document.getElementById('c-sub-type')?.value;
   const start=document.getElementById('c-sub-start')?.value;
   const period=document.getElementById('c-period')?.value||'evening';
   const endEl=document.getElementById('c-sub-end');
-  if(type&&start&&endEl){
+  if(recalcEnd&&type&&start&&endEl){
     if(type==='daily') endEl.value=start;
     else if(type==='weekly') endEl.value=addDays(start,7);
     else endEl.value=addDays(start,30);
@@ -2086,7 +2109,9 @@ function refreshTeachers(){
 function toggleSchoolField(){
   const role=document.getElementById('u-role')?.value;
   const sf=document.getElementById('school-field');
+  const bf=document.getElementById('branch-field');
   if(sf) sf.style.display=role==='superadmin'?'none':'';
+  if(bf) bf.style.display=role==='superadmin'?'none':'';
 }
 
 function saveBranch(edit=false){
@@ -2171,7 +2196,7 @@ function saveChild(edit=false){
       const basePrice=(SUB_PRICES[period]||SUB_PRICES.evening)[subType]||subPrice;
       const subPM=document.getElementById('c-sub-pm')?.value||'cash';
       const subReceipt=document.getElementById('c-receipt-data')?.value||'';
-      DB.addSub({id:uid(),childId,schoolId,branchId:c.branchId,period,type:subType,startDate:subStart,endDate:subEnd,basePrice,discountPct:0,price:subPrice,paidAmount:subPaid,paymentStatus:subPay,paymentMethod:subPM,receiptImage:subReceipt,isActive:true,createdAt:T0,invoiceNo});
+      DB.addSub({id:uid(),childId,schoolId,branchId:c.branchId,period,type:subType,startDate:subStart,endDate:subEnd,basePrice,discountPct:parseFloat(document.getElementById('c-disc')?.value||0),price:subPrice,paidAmount:subPaid,paymentStatus:subPay,paymentMethod:subPM,receiptImage:subReceipt,isActive:true,createdAt:T0,invoiceNo});
       const tl={'daily':'يومي','weekly':'أسبوعي','monthly':'شهري'};
       DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[subType]||subType} لـ ${name} — ${subPrice} ر.س`,addedBy:Auth.user.name});
     }
@@ -2489,15 +2514,16 @@ function saveUser(edit=false){
   const phone=document.getElementById('u-phone')?.value?.trim()||'';
   if(!name||!username){alert('الاسم واسم المستخدم مطلوبان');return}
   if(!edit&&!pass){alert('كلمة المرور مطلوبة');return}
+  const branchId=document.getElementById('u-branch')?.value||'';
   if(edit){
     const u=DB.users().find(x=>x.id===document.getElementById('u-id')?.value);
     if(!u) return;
-    u.name=name;u.username=username;u.role=role;u.schoolId=schoolId;u.phone=phone;
+    u.name=name;u.username=username;u.role=role;u.schoolId=schoolId;u.branchId=branchId||u.branchId||'';u.phone=phone;
     if(pass) u.password=pass;
     DB.updateUser(u);
   } else {
     if(DB.users().find(x=>x.username===username)){alert('اسم المستخدم مستخدم مسبقاً');return}
-    DB.addUser({id:uid(),name,username,password:pass,role,schoolId,phone});
+    DB.addUser({id:uid(),name,username,password:pass,role,schoolId,branchId,phone});
   }
   App.closeModal();
   App.go('users');
@@ -2520,7 +2546,6 @@ function setAtt(childId,status,date,schoolId){
     card.className='attendance-card '+status;
     card.querySelectorAll('button').forEach((b,i)=>{
       const statuses=['present','absent','late'];
-      b.className='btn btn-xs'+(b.style.flex?' '+['btn-success','btn-danger','btn-warning'][i]:'')+' '+(status===statuses[i]?['btn-success','btn-danger','btn-warning'][i]:'');
       b.className=`btn btn-xs ${status===statuses[i]?['btn-success','btn-danger','btn-warning'][i]:''}`;
     });
   }
@@ -2590,12 +2615,7 @@ function toggleNotifPanel(){
 }
 function markAllNotifsRead(){
   DB.markNotifsRead();
-  // تحديث الواجهة بدون إغلاق البانيل
-  const topbarEl=document.querySelector('.topbar');
-  if(topbarEl) topbarEl.outerHTML=App.topbar();
-  // أعد فتح البانيل
-  const p=document.getElementById('notif-panel');
-  if(p) p.style.display='block';
+  App.render();
 }
 
 // =========================================================
