@@ -335,9 +335,14 @@ const App = {
     ];
     return `
     <div class="sidebar">
-      <div class="sidebar-logo">
-        <h1>🌟 مدارك الطفل</h1>
+      <div class="sidebar-logo" style="text-align:center">
+        ${(()=>{const lg=localStorage.getItem('ccs_logo');return lg?`<img src="${lg}" style="width:80px;height:80px;object-fit:contain;mix-blend-mode:screen;margin-bottom:6px;display:block;margin-inline:auto">`:``;})()}
+        <h1 style="font-size:16px">🌟 مدارك الطفل</h1>
         <p>نظام إدارة متكامل</p>
+        ${Auth.isSuperAdmin()?`<label style="display:inline-block;margin-top:8px;padding:4px 10px;background:rgba(255,255,255,.15);border-radius:6px;font-size:11px;color:rgba(255,255,255,.8);cursor:pointer;font-family:'Tajawal',sans-serif">
+          📷 تغيير اللوغو
+          <input type="file" accept="image/*" style="display:none" onchange="uploadLogo(this)">
+        </label>`:''}
       </div>
       <div class="nav-section">
         ${links.map(l=>`<div class="nav-item ${App.view===l.v?'active':''}" onclick="App.go('${l.v}');closeSidebar()">${l.icon} ${l.label}</div>`).join('')}
@@ -397,8 +402,7 @@ login(){
   <div class="login-page">
     <div class="login-card">
       <div class="login-brand">
-        <img src="logo.png" alt="مدارك الطفل" class="login-brand-logo" onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='block'">
-        <div id="logo-fallback" style="display:none;font-size:52px;margin-bottom:8px">🌱</div>
+        ${(()=>{const lg=localStorage.getItem('ccs_logo');return lg?`<img src="${lg}" style="width:140px;height:140px;object-fit:contain;mix-blend-mode:screen;margin-bottom:4px">`:`<div style="font-size:54px;margin-bottom:8px">🌱</div>`})()}
         <h1>مدارك الطفل</h1>
         <p>Kid Sense — مركز رعاية وتعليم الأطفال</p>
       </div>
@@ -2210,6 +2214,34 @@ function confirmChildImport(){
   App.closeModal();
   App.go('children');
   alert(`✅ تم استيراد ${added} طفل بنجاح`);
+}
+
+function uploadLogo(input){
+  const file=input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const img=new Image();
+    img.onload=function(){
+      const canvas=document.createElement('canvas');
+      canvas.width=img.width; canvas.height=img.height;
+      const ctx=canvas.getContext('2d');
+      ctx.drawImage(img,0,0);
+      // إزالة الخلفية السوداء
+      const data=ctx.getImageData(0,0,canvas.width,canvas.height);
+      const px=data.data;
+      for(let i=0;i<px.length;i+=4){
+        const r=px[i],g=px[i+1],b=px[i+2];
+        if(r<30&&g<30&&b<30) px[i+3]=0;
+      }
+      ctx.putImageData(data,0,0);
+      const b64=canvas.toDataURL('image/png');
+      localStorage.setItem('ccs_logo',b64);
+      App.render();
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 function exportTableCSV(tableId, filename){
