@@ -164,6 +164,11 @@ tr:hover td{background:#f8fafc}
 .notif-item:hover{background:#f8fafc}
 .notif-item.unread{background:#f0fdf4}
 .notif-badge{position:absolute;top:-5px;left:-5px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;border-radius:50%;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;padding:0 3px;pointer-events:none}
+.export-label{display:inline}
+@media(max-width:768px){
+  .notif-panel{position:fixed;top:60px;left:8px;right:8px;width:auto;max-height:70vh;border-radius:12px}
+  .export-label{display:none}
+}
 </style>
 </head>
 <body>
@@ -440,7 +445,7 @@ const App = {
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <button class="btn btn-secondary btn-sm" onclick="App.go(App.view,App.params)" title="تحديث البيانات" style="padding:6px 10px;font-size:16px;line-height:1">🔄</button>
-        <button class="btn btn-success btn-sm" onclick="exportAllData()" title="تصدير جميع البيانات Excel" style="padding:6px 12px;font-size:13px">⬇️ تصدير</button>
+        <button class="btn btn-success btn-sm" onclick="exportAllData()" title="تصدير جميع البيانات Excel" style="padding:6px 12px;font-size:13px">⬇️ <span class="export-label">تصدير</span></button>
         <span style="font-size:11px;color:#94a3b8">${hm}</span>
         ${Auth.isSuperAdmin()?`
         <div style="position:relative">
