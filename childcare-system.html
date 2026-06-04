@@ -138,6 +138,23 @@ tr:hover td{background:#f8fafc}
 .pm-btn.pm-active{background:#f0fdf4;color:#0f766e;border-color:#0f766e}
 .receipt-preview{margin-top:8px;display:none}
 .receipt-preview img{max-width:100%;max-height:130px;border-radius:8px;border:1px solid #e2e8f0;object-fit:contain}
+.rpt-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.rpt-bar-title{font-size:15px;font-weight:700;color:#0f766e}
+.rpt-bar-btns{display:flex;gap:8px}
+.print-cover{display:none;text-align:center;padding:20px 0 28px;border-bottom:2px solid #0f766e;margin-bottom:20px}
+.print-cover h1{font-size:22px;font-weight:900;color:#0f766e;margin-bottom:4px}
+.print-cover p{font-size:13px;color:#64748b}
+@media print{
+  .sidebar,.sidebar-overlay,.topbar,.hamburger,.tabs,.actions-bar,.search-bar,.rpt-bar-btns,.no-print{display:none!important}
+  .main{margin-right:0!important}
+  .content{padding:10px!important}
+  body{background:#fff!important}
+  .card{box-shadow:none!important;border:1px solid #ccc!important;break-inside:avoid;margin-bottom:14px!important}
+  .stat-card{box-shadow:none!important;border:1px solid #ccc!important}
+  .print-cover{display:block!important}
+  .stats-grid{grid-template-columns:repeat(3,1fr)!important}
+  @page{margin:1.5cm;size:A4 landscape}
+}
 </style>
 </head>
 <body>
@@ -156,7 +173,9 @@ const addDays = (date, n) => {
 const diffDays = (d1, d2) => Math.round((new Date(d1) - new Date(d2)) / 86400000);
 const formatDate = d => {
   if (!d) return '—';
-  return new Date(d + 'T00:00:00').toLocaleDateString('ar-SA', {year:'numeric',month:'short',day:'numeric'});
+  const dt = new Date(d + 'T00:00:00');
+  const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  return `${dt.getDate()} ${months[dt.getMonth()]} ${dt.getFullYear()}`;
 };
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -888,11 +907,24 @@ reports(){
   const weeklyCount=subs.filter(s=>s.type==='weekly').length;
   const dailyCount=subs.filter(s=>s.type==='daily').length;
   const tab=App.params.tab||'financial';
+  const tabLabel={financial:'التقرير المالي',attendance:'تقرير الحضور',subscriptions:'تقرير الاشتراكات'};
+  const tabId={financial:'rpt-financial',attendance:'rpt-attendance',subscriptions:'rpt-subscriptions'};
   return `
-  <div class="tabs">
+  <div class="print-cover">
+    <h1>🌱 مدارك الطفل</h1>
+    <p>${tabLabel[tab]||''} — تاريخ الطباعة: ${formatDate(T0)}</p>
+  </div>
+  <div class="tabs no-print">
     <div class="tab ${tab==='financial'?'active':''}" onclick="App.go('reports',{tab:'financial'})">💰 التقرير المالي</div>
     <div class="tab ${tab==='attendance'?'active':''}" onclick="App.go('reports',{tab:'attendance'})">✅ تقرير الحضور</div>
     <div class="tab ${tab==='subscriptions'?'active':''}" onclick="App.go('reports',{tab:'subscriptions'})">📋 تقرير الاشتراكات</div>
+  </div>
+  <div class="rpt-bar no-print">
+    <span class="rpt-bar-title">${tabLabel[tab]||''}</span>
+    <div class="rpt-bar-btns">
+      <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ طباعة / PDF</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('${tabId[tab]}','${tabLabel[tab]}')">📊 Excel</button>
+    </div>
   </div>
   ${tab==='financial'?`
   <div class="stats-grid">
@@ -905,7 +937,7 @@ reports(){
   </div>
   <div class="card">
     <div class="card-title">تفاصيل المدفوعات لكل طفل</div>
-    <table>
+    <table id="rpt-financial">
       <thead><tr><th>الطفل</th>${Auth.isSuperAdmin()?'<th>المدرسة</th>':''}<th>نوع الاشتراك</th><th>المبلغ الكلي</th><th>المدفوع</th><th>المتبقي</th><th>حالة الدفع</th></tr></thead>
       <tbody>
         ${subs.map(s=>{
@@ -943,7 +975,7 @@ reports(){
   </div>
   <div class="card">
     <div class="card-title">تقرير حضور الأطفال${App.params.attFrom||App.params.attTo?` (${App.params.attFrom||'البداية'} — ${App.params.attTo||'اليوم'})`:''}</div>
-    <table>
+    <table id="rpt-attendance">
       <thead><tr><th>الطفل</th><th>الفرع / الفترة</th><th>حضور</th><th>غياب</th><th>تأخر</th><th>الأيام</th><th>النسبة</th><th>تفاصيل</th></tr></thead>
       <tbody>
         ${children.filter(c=>!(App.params.attQ)||c.name.includes(App.params.attQ||'')).map(c=>{
@@ -981,7 +1013,7 @@ reports(){
   ${tab==='subscriptions'?`
   <div class="card">
     <div class="card-title">تقرير الاشتراكات التفصيلي</div>
-    <table>
+    <table id="rpt-subscriptions">
       <thead><tr><th>الطفل</th>${Auth.isSuperAdmin()?'<th>المدرسة</th>':''}<th>النوع</th><th>البداية</th><th>النهاية</th><th>الحالة</th><th>الدفع</th></tr></thead>
       <tbody>
         ${subs.map(s=>{
@@ -1131,10 +1163,21 @@ myReports(){
   const attList=DB.attendance().filter(a=>a.schoolId===sid);
   const allSubs=DB.subscriptions();
   return `
+  <div class="print-cover">
+    <h1>🌱 مدارك الطفل</h1>
+    <p>تقرير حضور الأطفال — ${esc(Auth.user?.name||'')} — تاريخ الطباعة: ${formatDate(T0)}</p>
+  </div>
+  <div class="rpt-bar no-print">
+    <span class="rpt-bar-title">📊 تقرير حضور أطفالي</span>
+    <div class="rpt-bar-btns">
+      <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ طباعة / PDF</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('rpt-teacher','تقرير-حضور')">📊 Excel</button>
+    </div>
+  </div>
   <div class="card">
     <div class="card-title">📊 تقرير حضور أطفالي (${kids.length} طفل)</div>
     ${kids.length===0?`<div class="empty-state"><div class="es-icon">👶</div><p>لا يوجد أطفال مسندون إليك حتى الآن</p></div>`:`
-    <table>
+    <table id="rpt-teacher">
       <thead><tr><th>الطفل</th><th>الفرع / الفترة</th><th>حالة الاشتراك</th><th>حضور</th><th>غياب</th><th>تأخر</th><th>نسبة</th></tr></thead>
       <tbody>
         ${kids.map(c=>{
@@ -1917,6 +1960,23 @@ function savePay(){
   DB.updateSub(sub);
   App.closeModal();
   App.go('subscriptions');
+}
+
+function exportTableCSV(tableId, filename){
+  const table=document.getElementById(tableId);
+  if(!table){alert('لا توجد بيانات للتصدير');return}
+  const rows=[...table.querySelectorAll('tr')];
+  const csv=rows.map(row=>
+    [...row.querySelectorAll('th,td')]
+      .map(cell=>'"'+cell.innerText.trim().replace(/"/g,'""').replace(/\n/g,' ')+'"')
+      .join(',')
+  ).join('\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=(filename||'تقرير')+'.csv';
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 
 function saveTeacher(edit=false){
