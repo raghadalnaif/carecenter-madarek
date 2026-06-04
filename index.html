@@ -85,15 +85,41 @@ tr:hover td{background:#f8fafc}
 .progress-bar{height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden}
 .progress-fill{height:100%;border-radius:4px;transition:.3s}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.hamburger{display:none;background:none;border:none;font-size:24px;cursor:pointer;padding:4px 8px;color:#0f766e;line-height:1}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:98}
+.sidebar-overlay.open{display:block}
+@media(max-width:1024px){
+  .sidebar{width:220px}
+  .main{margin-right:220px}
+}
 @media(max-width:768px){
-  .sidebar{transform:translateX(100%)}
+  .sidebar{transform:translateX(110%);width:270px;z-index:200}
   .sidebar.open{transform:translateX(0)}
   .main{margin-right:0}
+  .hamburger{display:block}
   .stats-grid{grid-template-columns:repeat(2,1fr)}
   .grid-2{grid-template-columns:1fr}
+  .content{padding:14px}
+  .topbar{padding:0 14px}
+  .topbar-title{font-size:15px}
+  .card{padding:16px}
+  .modal-overlay{padding:0;align-items:flex-end}
+  .modal{border-radius:20px 20px 0 0;max-width:100%;max-height:92vh}
+  table{font-size:12px}
+  th,td{padding:8px 10px}
+  .attendance-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
 }
-.login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f766e 0%,#065f46 100%)}
-.login-card{background:#fff;border-radius:20px;padding:40px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+@media(max-width:420px){
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .topbar-user span{display:none}
+}
+.login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(150deg,#0f766e 0%,#064e3b 100%);padding:20px}
+.login-card{background:#fff;border-radius:24px;width:100%;max-width:420px;box-shadow:0 24px 64px rgba(0,0,0,.35);overflow:hidden}
+.login-brand{background:linear-gradient(135deg,#0f766e 0%,#065f46 100%);padding:36px 32px 32px;text-align:center}
+.login-brand-icon{width:72px;height:72px;background:rgba(255,255,255,.15);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:14px;border:3px solid rgba(255,255,255,.3)}
+.login-brand h1{color:#fff;font-size:28px;font-weight:900;letter-spacing:-.5px;margin-bottom:4px}
+.login-brand p{color:rgba(255,255,255,.75);font-size:14px}
+.login-form{padding:32px}
 .login-logo{text-align:center;margin-bottom:28px}
 .login-logo h1{font-size:24px;font-weight:900;color:#0f766e;margin-top:12px}
 .login-logo p{font-size:14px;color:#64748b;margin-top:4px}
@@ -277,6 +303,7 @@ const App = {
   shell(){
     return `
     <div style="display:flex">
+      <div class="sidebar-overlay" id="sb-overlay" onclick="closeSidebar()"></div>
       ${this.sidebar()}
       <div class="main">
         ${this.topbar()}
@@ -314,7 +341,7 @@ const App = {
         <p>نظام إدارة متكامل</p>
       </div>
       <div class="nav-section">
-        ${links.map(l=>`<div class="nav-item ${App.view===l.v?'active':''}" onclick="App.go('${l.v}')">${l.icon} ${l.label}</div>`).join('')}
+        ${links.map(l=>`<div class="nav-item ${App.view===l.v?'active':''}" onclick="App.go('${l.v}');closeSidebar()">${l.icon} ${l.label}</div>`).join('')}
       </div>
       <div style="margin-top:auto;padding:16px 8px;border-top:1px solid rgba(255,255,255,.15)">
         <div class="nav-item" onclick="Auth.logout()">🚪 تسجيل الخروج</div>
@@ -325,7 +352,10 @@ const App = {
     const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور'};
     return `
     <div class="topbar">
-      <div class="topbar-title">${titles[App.view]||''}</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="hamburger" onclick="toggleSidebar()">☰</button>
+        <div class="topbar-title">${titles[App.view]||''}</div>
+      </div>
       <div class="topbar-user">
         <div style="text-align:left">
           <div style="font-size:13px;font-weight:600">${esc(Auth.user.name)}</div>
@@ -353,26 +383,22 @@ login(){
   return `
   <div class="login-page">
     <div class="login-card">
-      <div class="login-logo">
-        <div style="font-size:52px">🌟</div>
+      <div class="login-brand">
+        <div class="login-brand-icon">🌱</div>
         <h1>مدارك الطفل</h1>
-        <p>نظام الإدارة المتكاملة</p>
+        <p>مركز رعاية وتعليم الأطفال</p>
       </div>
-      <div id="login-err" style="display:none" class="alert-box alert-red" style="margin-bottom:14px">اسم المستخدم أو كلمة المرور غير صحيحة</div>
-      <div class="input-group">
-        <label>اسم المستخدم</label>
-        <input class="input" id="l-user" placeholder="أدخل اسم المستخدم" onkeydown="if(event.key==='Enter')doLogin()">
-      </div>
-      <div class="input-group">
-        <label>كلمة المرور</label>
-        <input class="input" id="l-pass" type="password" placeholder="أدخل كلمة المرور" onkeydown="if(event.key==='Enter')doLogin()">
-      </div>
-      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="doLogin()">دخول</button>
-      <div style="margin-top:20px;padding:14px;background:#f8fafc;border-radius:8px;font-size:12px;color:#64748b;line-height:2.2">
-        <strong style="color:#374151">بيانات الدخول:</strong><br>
-        🏢 ادارة الفرع الرئيسي: <code style="background:#e2e8f0;padding:1px 5px;border-radius:4px">main</code> / 123456<br>
-        🏢 ادارة الفرع الثاني: <code style="background:#e2e8f0;padding:1px 5px;border-radius:4px">second</code> / 123456<br>
-        👩‍🏫 معلمة: <code style="background:#e2e8f0;padding:1px 5px;border-radius:4px">sarah</code> / 123456
+      <div class="login-form">
+        <div id="login-err" style="display:none;margin-bottom:16px" class="alert-box alert-red">⚠️ اسم المستخدم أو كلمة المرور غير صحيحة</div>
+        <div class="input-group">
+          <label>اسم المستخدم</label>
+          <input class="input" id="l-user" placeholder="أدخل اسم المستخدم" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <div class="input-group">
+          <label>كلمة المرور</label>
+          <input class="input" id="l-pass" type="password" placeholder="••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;font-size:15px;padding:12px" onclick="doLogin()">تسجيل الدخول</button>
       </div>
     </div>
   </div>`;
@@ -1825,6 +1851,23 @@ function saveAttendance(date,schoolId){
   });
   DB.saveAttendance(att);
   alert('✅ تم حفظ الحضور بنجاح');
+}
+
+// =========================================================
+//  SIDEBAR MOBILE
+// =========================================================
+function toggleSidebar(){
+  const sb=document.querySelector('.sidebar');
+  const ov=document.getElementById('sb-overlay');
+  if(!sb) return;
+  sb.classList.toggle('open');
+  if(ov) ov.classList.toggle('open');
+}
+function closeSidebar(){
+  const sb=document.querySelector('.sidebar');
+  const ov=document.getElementById('sb-overlay');
+  if(sb) sb.classList.remove('open');
+  if(ov) ov.classList.remove('open');
 }
 
 // =========================================================
