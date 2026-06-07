@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>مدارك الطفل — نظام الإدارة</title>
+<!-- BUILD: 2026-06-07-v5 -->
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -509,6 +510,7 @@ const App = {
   },
   currentView(){
     const role=Auth.user?.role;
+    console.log('[CCS] currentView: App.view=',App.view,'role=',role,'Views.activities=',typeof Views.activities);
     const guards={
       schools:()=>Auth.isSuperAdmin(),
       branches:()=>Auth.isSuperAdmin(),
@@ -522,11 +524,13 @@ const App = {
       activities:()=>Auth.isSuperAdmin(),
     };
     const guard=guards[App.view];
-    if(guard&&!guard()) return Views._forbidden();
+    if(guard&&!guard()){console.log('[CCS] GUARD BLOCKED:',App.view,'role=',role);return Views._forbidden();}
     const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities};
-    const viewFn=map[App.view]||Views.dashboard;
-    try{return viewFn();}
-    catch(e){return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
+    const viewFn=map[App.view];
+    console.log('[CCS] viewFn for',App.view,'=',viewFn?'FOUND':'UNDEFINED (fallback to dashboard)');
+    const fn=viewFn||Views.dashboard;
+    try{const html=fn();console.log('[CCS] html length=',html?.length);return html;}
+    catch(e){console.error('[CCS] ERROR in',App.view,':',e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
   },
   showModal(html){App.modal=html;App.render()},
   closeModal(){App.modal=null;App.render()},
