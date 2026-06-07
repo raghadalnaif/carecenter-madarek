@@ -353,9 +353,10 @@ const DB = {
     if(d<=7) return 'soon7';
     return 'active';
   },
-  alerts(schoolId=null){
+  alerts(schoolId=null,branchId=null){
     let subs=this.subscriptions();
     if(schoolId) subs=subs.filter(s=>s.schoolId===schoolId);
+    if(branchId) subs=subs.filter(s=>s.branchId===branchId);
     subs=subs.filter(s=>s.isActive);
     return {
       expired:subs.filter(s=>diffDays(s.endDate,T0)<0),
@@ -390,6 +391,7 @@ const Auth = {
   isSchoolAdmin(){return this.user?.role==='school_admin'},
   isTeacher(){return this.user?.role==='teacher'},
   schoolId(){return this.user?.schoolId||null},
+  branchId(){return this.isSchoolAdmin()?this.user?.branchId||null:null},
 };
 
 // =========================================================
@@ -618,10 +620,12 @@ _superDash(){
 
 _schoolDash(){
   const sid=Auth.schoolId();
-  const children=DB.children().filter(c=>c.schoolId===sid);
-  const subs=DB.subscriptions().filter(s=>s.schoolId===sid);
-  const al=DB.alerts(sid);
-  const todayAtt=DB.attendance().filter(a=>a.schoolId===sid&&a.date===T0);
+  const bid=Auth.branchId();
+  const children=DB.children().filter(c=>c.schoolId===sid&&(!bid||c.branchId===bid));
+  const childIds=new Set(children.map(c=>c.id));
+  const subs=DB.subscriptions().filter(s=>s.schoolId===sid&&(!bid||s.branchId===bid));
+  const al=DB.alerts(sid,bid);
+  const todayAtt=DB.attendance().filter(a=>a.schoolId===sid&&a.date===T0&&(!bid||childIds.has(a.childId)));
   return `
   <div class="stats-grid">
     <div class="stat-card blue"><div class="stat-val">${children.length}</div><div class="stat-lbl">👶 الأطفال المسجلون</div></div>
@@ -785,14 +789,16 @@ schools(){
 // ---------- CHILDREN ----------
 children(){
   const sid=Auth.schoolId();
+  const bid=Auth.branchId();
   const branches=DB.branches();
   let kids=DB.children();
   if(sid) kids=kids.filter(c=>c.schoolId===sid);
+  if(bid) kids=kids.filter(c=>c.branchId===bid);
   const schools=DB.schools();
   const q=(App.params.q||'').toLowerCase();
   const bFilter=App.params.branch||'all';
   if(q) kids=kids.filter(c=>c.name.includes(q)||c.parentName.includes(q)||c.parentPhone.includes(q));
-  if(bFilter!=='all') kids=kids.filter(c=>c.branchId===bFilter);
+  if(!bid&&bFilter!=='all') kids=kids.filter(c=>c.branchId===bFilter);
   const branchColors=['badge-blue','badge-green','badge-orange','badge-red'];
   return `
   <div class="actions-bar" style="flex-wrap:wrap">
@@ -802,14 +808,14 @@ children(){
       <span class="search-icon">🔍</span>
       <input class="input" placeholder="بحث بالاسم أو الوالد..." value="${esc(App.params.q||'')}" oninput="App.go('children',{q:this.value,branch:'${bFilter}'})">
     </div>
-    <div style="display:flex;gap:6px;align-items:center">
+    ${!bid?`<div style="display:flex;gap:6px;align-items:center">
       <span style="font-size:13px;font-weight:600;color:#64748b">الفرع:</span>
       <span class="chip ${bFilter==='all'?'active':''}" onclick="App.go('children',{q:'${esc(App.params.q||'')}',branch:'all'})">الكل (${DB.children().filter(c=>sid?c.schoolId===sid:true).length})</span>
       ${branches.map((b,i)=>{
         const cnt=DB.children().filter(c=>(sid?c.schoolId===sid:true)&&c.branchId===b.id).length;
         return `<span class="chip ${bFilter===b.id?'active':''}" onclick="App.go('children',{q:'${esc(App.params.q||'')}',branch:'${b.id}'})">${b.name} (${cnt})</span>`;
       }).join('')}
-    </div>
+    </div>`:''}
   </div>
   <div class="card">
     <table>
@@ -856,8 +862,10 @@ children(){
 // ---------- SUBSCRIPTIONS ----------
 subscriptions(){
   const sid=Auth.schoolId();
+  const bid=Auth.branchId();
   let subs=DB.subscriptions();
   if(sid) subs=subs.filter(s=>s.schoolId===sid);
+  if(bid) subs=subs.filter(s=>s.branchId===bid);
   const filter=App.params.filter||'all';
   const subQ=(App.params.subQ||'').trim();
   const allChildren=DB.children();
@@ -951,13 +959,19 @@ attendance(){
   if(isTeacher){
     kids=kids.filter(c=>c.branchId===u.branchId&&c.period===u.period);
   } else {
-    // الإدارة: فلترة بالفرع / فلترة بالمعلمة (فرع+فترة المعلمة)
-    const teacherFilter=App.params.teacherFilter||'';
-    if(teacherFilter){
-      const tf=DB.users().find(t=>t.id===teacherFilter);
-      if(tf) kids=kids.filter(c=>c.branchId===tf.branchId&&c.period===tf.period);
+    const bid=Auth.branchId();
+    if(bid){
+      // مديرة الفرع: فقط أطفال فرعها (صباح ومساء)
+      kids=kids.filter(c=>c.branchId===bid);
+    } else {
+      // المدير العام: فلترة بالفرع / فلترة بالمعلمة
+      const teacherFilter=App.params.teacherFilter||'';
+      if(teacherFilter){
+        const tf=DB.users().find(t=>t.id===teacherFilter);
+        if(tf) kids=kids.filter(c=>c.branchId===tf.branchId&&c.period===tf.period);
+      }
+      if(App.params.branchFilter) kids=kids.filter(c=>c.branchId===App.params.branchFilter);
     }
-    if(App.params.branchFilter) kids=kids.filter(c=>c.branchId===App.params.branchFilter);
   }
 
   const attList=DB.attendance();
@@ -1034,6 +1048,7 @@ attendance(){
 // ---------- REPORTS ----------
 reports(){
   const sid=Auth.schoolId();
+  const bid=Auth.branchId();
   let children=DB.children();
   let subs=DB.subscriptions();
   let attList=DB.attendance();
@@ -1041,6 +1056,12 @@ reports(){
     children=children.filter(c=>c.schoolId===sid);
     subs=subs.filter(s=>s.schoolId===sid);
     attList=attList.filter(a=>a.schoolId===sid);
+  }
+  if(bid){
+    const branchChildIds=new Set(children.filter(c=>c.branchId===bid).map(c=>c.id));
+    children=children.filter(c=>c.branchId===bid);
+    subs=subs.filter(s=>branchChildIds.has(s.childId));
+    attList=attList.filter(a=>branchChildIds.has(a.childId));
   }
   const totalRev=subs.reduce((a,s)=>a+s.paidAmount,0);
   const pendingRev=subs.reduce((a,s)=>a+(s.price-s.paidAmount),0);
@@ -1339,9 +1360,12 @@ teachers(){
 // ---------- WHATSAPP ----------
 whatsapp(){
   const sid=Auth.schoolId();
-  const al=DB.alerts(sid);
-  const children=DB.children();
-  const subs=DB.subscriptions();
+  const bid=Auth.branchId();
+  const al=DB.alerts(sid,bid);
+  let children=DB.children();
+  let subs=DB.subscriptions();
+  if(sid){children=children.filter(c=>c.schoolId===sid);subs=subs.filter(s=>s.schoolId===sid);}
+  if(bid){children=children.filter(c=>c.branchId===bid);subs=subs.filter(s=>s.branchId===bid);}
   const buildMsg=(sub,days)=>{
     const c=children.find(x=>x.id===sub.childId);
     if(!c) return null;
