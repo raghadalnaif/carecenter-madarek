@@ -524,7 +524,9 @@ const App = {
     const guard=guards[App.view];
     if(guard&&!guard()) return Views._forbidden();
     const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities};
-    return (map[App.view]||Views.dashboard)();
+    const viewFn=map[App.view]||Views.dashboard;
+    try{return viewFn();}
+    catch(e){return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
   },
   showModal(html){App.modal=html;App.render()},
   closeModal(){App.modal=null;App.render()},
