@@ -1295,6 +1295,7 @@ reports(){
 users(){
   const users=DB.users();
   const schools=DB.schools();
+  const branches=DB.branches();
   const roleMap={superadmin:'مدير عام',school_admin:'مديرة فرع',teacher:'معلمة'};
   return `
   <div class="section-header">
@@ -1303,20 +1304,25 @@ users(){
   </div>
   <div class="card">
     <table>
-      <thead><tr><th>الاسم</th><th>اسم المستخدم</th><th>كلمة المرور</th><th>الدور</th><th>المدرسة</th><th>الهاتف</th><th>إجراءات</th></tr></thead>
+      <thead><tr><th>الاسم</th><th>اسم المستخدم</th><th>كلمة المرور</th><th>الدور</th><th>الفرع المُعيَّن</th><th>الهاتف</th><th>إجراءات</th></tr></thead>
       <tbody>
-        ${users.map(u=>`<tr>
+        ${users.map(u=>{
+          const branch=branches.find(b=>b.id===u.branchId);
+          const branchLabel=u.role==='school_admin'
+            ? (branch?`<span class="badge badge-blue">🏢 ${esc(branch.name)}</span>`:`<span class="badge badge-red" style="cursor:pointer" onclick="Modals.editUser('${u.id}')">⚠️ لم يُحدَّد الفرع</span>`)
+            : '—';
+          return `<tr>
           <td><strong>${esc(u.name)}</strong></td>
           <td><code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:13px">${esc(u.username)}</code></td>
           <td><code style="background:#fef9c3;padding:2px 8px;border-radius:4px;font-size:13px;letter-spacing:1px">${esc(u.password||'—')}</code></td>
           <td><span class="badge ${u.role==='superadmin'?'badge-red':u.role==='school_admin'?'badge-blue':'badge-green'}">${roleMap[u.role]||u.role}</span></td>
-          <td>${u.schoolId?esc(schools.find(s=>s.id===u.schoolId)?.name||'—'):'—'}</td>
+          <td>${branchLabel}</td>
           <td>${u.phone||'—'}</td>
           <td>
             <button class="btn btn-secondary btn-xs" onclick="Modals.editUser('${u.id}')">تعديل</button>
             ${u.id!=='sa1'?`<button class="btn btn-danger btn-xs" onclick="deleteUser('${u.id}')">حذف</button>`:''}
           </td>
-        </tr>`).join('')}
+        </tr>`;}).join('')}
       </tbody>
     </table>
   </div>`;
@@ -2069,22 +2075,25 @@ const Modals = {
           <div class="input-group"><label>اسم المستخدم *</label><input class="input" id="u-username" placeholder="username"></div>
           <div class="input-group"><label>كلمة المرور *</label><input class="input" id="u-pass" placeholder="password"></div>
         </div>
-        <div class="grid-2">
-          <div class="input-group"><label>الدور *</label>
-            <select class="input" id="u-role" onchange="toggleSchoolField()">
-              <option value="school_admin">مديرة فرع</option>
-              <option value="teacher">معلمة</option>
-              <option value="superadmin">مدير عام</option>
-            </select>
-          </div>
-          <div class="input-group" id="school-field">
-            <label>المدرسة *</label>
-            <select class="input" id="u-school"><option value="">اختر مدرسة</option>${schools.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select>
-          </div>
+        <div class="input-group"><label>الدور *</label>
+          <select class="input" id="u-role" onchange="toggleSchoolField()">
+            <option value="school_admin">مديرة فرع</option>
+            <option value="teacher">معلمة</option>
+            <option value="superadmin">مدير عام</option>
+          </select>
         </div>
-        <div class="input-group" id="branch-field">
-          <label>الفرع</label>
-          <select class="input" id="u-branch"><option value="">— اختر الفرع —</option>${branches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select>
+        <div id="branch-field" style="background:#eff6ff;border:2px solid #3b82f6;border-radius:10px;padding:14px 16px;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700;color:#1d4ed8;margin-bottom:8px">🏢 الفرع المُعيَّن *</div>
+          <div style="font-size:12px;color:#3b82f6;margin-bottom:10px">اختر الفرع الذي ستديره هذه المديرة — ستظهر لها بيانات هذا الفرع فقط</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">
+            ${branches.map(b=>`<label style="display:flex;align-items:center;gap:8px;background:#fff;border:2px solid #e2e8f0;border-radius:8px;padding:10px 12px;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="if(!document.querySelector('#u-branch-${b.id}').checked)this.style.borderColor='#e2e8f0'"><input type="radio" name="u-branch-radio" id="u-branch-${b.id}" value="${b.id}" style="accent-color:#3b82f6" onchange="document.getElementById('u-branch').value=this.value;document.querySelectorAll('[name=u-branch-radio]').forEach(r=>r.closest('label').style.borderColor=r.checked?'#3b82f6':'#e2e8f0')"> ${esc(b.name)}</label>`).join('')}
+            <label style="display:flex;align-items:center;gap:8px;background:#fff;border:2px solid #e2e8f0;border-radius:8px;padding:10px 12px;cursor:pointer;font-size:13px;font-weight:600" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="if(!document.querySelector('#u-branch-none').checked)this.style.borderColor='#e2e8f0'"><input type="radio" name="u-branch-radio" id="u-branch-none" value="" style="accent-color:#3b82f6" onchange="document.getElementById('u-branch').value='';document.querySelectorAll('[name=u-branch-radio]').forEach(r=>r.closest('label').style.borderColor=r.checked?'#3b82f6':'#e2e8f0')"> بدون فرع</label>
+          </div>
+          <input type="hidden" id="u-branch" value="">
+        </div>
+        <div class="input-group" id="school-field">
+          <label>المدرسة *</label>
+          <select class="input" id="u-school"><option value="">اختر مدرسة</option>${schools.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select>
         </div>
         <div class="input-group"><label>الهاتف</label><input class="input" id="u-phone" placeholder="05xxxxxxxx"></div>
       </div>
@@ -2131,22 +2140,25 @@ const Modals = {
           <div class="input-group"><label>اسم المستخدم</label><input class="input" id="u-username" value="${esc(u.username)}"></div>
           <div class="input-group"><label>كلمة المرور الجديدة</label><input class="input" id="u-pass" placeholder="اتركه فارغاً للإبقاء"></div>
         </div>
-        <div class="grid-2">
-          <div class="input-group"><label>الدور</label>
-            <select class="input" id="u-role" onchange="toggleSchoolField()">
-              <option value="school_admin" ${u.role==='school_admin'?'selected':''}>مديرة فرع</option>
-              <option value="teacher" ${u.role==='teacher'?'selected':''}>معلمة</option>
-              <option value="superadmin" ${u.role==='superadmin'?'selected':''}>مدير عام</option>
-            </select>
-          </div>
-          <div class="input-group" id="school-field" style="${u.role==='superadmin'?'display:none':''}">
-            <label>المدرسة</label>
-            <select class="input" id="u-school">${schools.map(s=>`<option value="${s.id}" ${u.schoolId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select>
-          </div>
+        <div class="input-group"><label>الدور</label>
+          <select class="input" id="u-role" onchange="toggleSchoolField()">
+            <option value="school_admin" ${u.role==='school_admin'?'selected':''}>مديرة فرع</option>
+            <option value="teacher" ${u.role==='teacher'?'selected':''}>معلمة</option>
+            <option value="superadmin" ${u.role==='superadmin'?'selected':''}>مدير عام</option>
+          </select>
         </div>
-        <div class="input-group" id="branch-field" style="${u.role==='superadmin'?'display:none':''}">
-          <label>الفرع</label>
-          <select class="input" id="u-branch"><option value="">— اختر الفرع —</option>${branches.map(b=>`<option value="${b.id}" ${u.branchId===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}</select>
+        <div id="branch-field" style="${u.role==='superadmin'?'display:none':'background:#eff6ff;border:2px solid #3b82f6;border-radius:10px;padding:14px 16px;margin-bottom:12px'}">
+          <div style="font-size:13px;font-weight:700;color:#1d4ed8;margin-bottom:8px">🏢 الفرع المُعيَّن *</div>
+          <div style="font-size:12px;color:#3b82f6;margin-bottom:10px">اختر الفرع الذي ستديره هذه المديرة — ستظهر لها بيانات هذا الفرع فقط</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">
+            ${branches.map(b=>`<label style="display:flex;align-items:center;gap:8px;background:#fff;border:2px solid ${u.branchId===b.id?'#3b82f6':'#e2e8f0'};border-radius:8px;padding:10px 12px;cursor:pointer;font-size:13px;font-weight:600" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="if(!document.querySelector('#u-branch-${b.id}').checked)this.style.borderColor='#e2e8f0'"><input type="radio" name="u-branch-radio" id="u-branch-${b.id}" value="${b.id}" ${u.branchId===b.id?'checked':''} style="accent-color:#3b82f6" onchange="document.getElementById('u-branch').value=this.value;document.querySelectorAll('[name=u-branch-radio]').forEach(r=>r.closest('label').style.borderColor=r.checked?'#3b82f6':'#e2e8f0')"> ${esc(b.name)}</label>`).join('')}
+            <label style="display:flex;align-items:center;gap:8px;background:#fff;border:2px solid ${!u.branchId?'#3b82f6':'#e2e8f0'};border-radius:8px;padding:10px 12px;cursor:pointer;font-size:13px;font-weight:600" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="if(!document.querySelector('#u-branch-none').checked)this.style.borderColor='#e2e8f0'"><input type="radio" name="u-branch-radio" id="u-branch-none" value="" ${!u.branchId?'checked':''} style="accent-color:#3b82f6" onchange="document.getElementById('u-branch').value='';document.querySelectorAll('[name=u-branch-radio]').forEach(r=>r.closest('label').style.borderColor=r.checked?'#3b82f6':'#e2e8f0')"> بدون فرع</label>
+          </div>
+          <input type="hidden" id="u-branch" value="${esc(u.branchId||'')}">
+        </div>
+        <div class="input-group" id="school-field" style="${u.role==='superadmin'?'display:none':''}">
+          <label>المدرسة</label>
+          <select class="input" id="u-school">${schools.map(s=>`<option value="${s.id}" ${u.schoolId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select>
         </div>
         <div class="input-group"><label>الهاتف</label><input class="input" id="u-phone" value="${esc(u.phone||'')}"></div>
       </div>
@@ -2290,7 +2302,18 @@ function toggleSchoolField(){
   const sf=document.getElementById('school-field');
   const bf=document.getElementById('branch-field');
   if(sf) sf.style.display=role==='superadmin'?'none':'';
-  if(bf) bf.style.display=role==='superadmin'?'none':'';
+  if(bf){
+    if(role==='superadmin'){
+      bf.style.display='none';
+    } else {
+      bf.style.display='';
+      bf.style.background='#eff6ff';
+      bf.style.border='2px solid #3b82f6';
+      bf.style.borderRadius='10px';
+      bf.style.padding='14px 16px';
+      bf.style.marginBottom='12px';
+    }
+  }
 }
 
 function saveBranch(edit=false){
@@ -2694,10 +2717,11 @@ function saveUser(edit=false){
   if(!name||!username){alert('الاسم واسم المستخدم مطلوبان');return}
   if(!edit&&!pass){alert('كلمة المرور مطلوبة');return}
   const branchId=document.getElementById('u-branch')?.value||'';
+  if(role==='school_admin'&&!branchId){alert('⚠️ يجب تحديد الفرع لمديرة الفرع');return}
   if(edit){
     const u=DB.users().find(x=>x.id===document.getElementById('u-id')?.value);
     if(!u) return;
-    u.name=name;u.username=username;u.role=role;u.schoolId=schoolId;u.branchId=branchId||u.branchId||'';u.phone=phone;
+    u.name=name;u.username=username;u.role=role;u.schoolId=schoolId;u.branchId=branchId;u.phone=phone;
     if(pass) u.password=pass;
     DB.updateUser(u);
   } else {
