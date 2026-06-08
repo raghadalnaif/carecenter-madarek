@@ -241,6 +241,7 @@ const firebaseConfig={
 };
 let _fdb=null;
 let _lastWrite=0;
+let _fbStatus='connecting'; // 'connecting' | 'ok' | 'error'
 const _mem={};
 
 // =========================================================
@@ -254,13 +255,15 @@ const DB = {
   set(k,v){
     _mem[k]=v;
     try{localStorage.setItem('ccs_'+k,JSON.stringify(v))}catch{}
-    if(_fdb){_lastWrite=Date.now();_fdb.ref('ccs/'+k).set(v).catch(()=>{});}
+    if(_fdb){_lastWrite=Date.now();_fdb.ref('ccs/'+k).set(v).catch(e=>{console.error('[DB] Firebase write failed for key='+k+':',e.message);});}
   },
   async initFirebase(){
     try{
+      if(typeof firebase==='undefined') throw new Error('Firebase SDK not loaded — check network/CDN');
       if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
       await firebase.auth().signInAnonymously();
       _fdb=firebase.database();
+      _fbStatus='ok';
       // تحميل البيانات من RTDB
       const snap=await _fdb.ref('ccs').get();
       const fbData=snap.val();
@@ -302,7 +305,13 @@ const DB = {
           }
         }
       });
-    }catch(e){console.warn('Firebase:',e);}
+    }catch(e){
+      _fbStatus='error';
+      console.error('[Firebase] Connection failed:',e.message);
+      // أظهر بانر التحذير لو كان المستخدم مسجلاً
+      const fb=document.getElementById('fb-status-bar');
+      if(fb) fb.style.display='flex';
+    }
   },
   init(){
     // يضيف المفاتيح الناقصة في كتابة Firebase واحدة بدل N كتابة
@@ -410,6 +419,12 @@ const App = {
   render(){document.getElementById('app').innerHTML=Auth.user?this.shell():Views.login()},
   shell(){
     return `
+    <div id="fb-status-bar" style="display:${_fbStatus==='error'?'flex':'none'};background:#fef2f2;border-bottom:2px solid #fecaca;padding:8px 20px;align-items:center;gap:10px;font-size:13px;color:#991b1b;position:sticky;top:0;z-index:200">
+      <span>🔴</span>
+      <strong>تعذّر الاتصال بقاعدة البيانات (Firebase)</strong>
+      <span style="color:#b91c1c">— البيانات تُحفظ محلياً فقط ولن تظهر على أجهزة أخرى. تحقق من اتصال الإنترنت أو تواصل مع الدعم.</span>
+      <button onclick="document.getElementById('fb-status-bar').style.display='none'" style="margin-right:auto;background:none;border:none;cursor:pointer;font-size:16px;color:#991b1b">✕</button>
+    </div>
     <div style="display:flex">
       <div class="sidebar-overlay" id="sb-overlay" onclick="closeSidebar()"></div>
       ${this.sidebar()}
@@ -510,7 +525,6 @@ const App = {
   },
   currentView(){
     const role=Auth.user?.role;
-    console.log('[CCS] currentView: App.view=',App.view,'role=',role,'Views.activities=',typeof Views.activities);
     const guards={
       schools:()=>Auth.isSuperAdmin(),
       branches:()=>Auth.isSuperAdmin(),
@@ -524,13 +538,11 @@ const App = {
       activities:()=>Auth.isSuperAdmin(),
     };
     const guard=guards[App.view];
-    if(guard&&!guard()){console.log('[CCS] GUARD BLOCKED:',App.view,'role=',role);return Views._forbidden();}
+    if(guard&&!guard()) return Views._forbidden();
     const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities};
-    const viewFn=map[App.view];
-    console.log('[CCS] viewFn for',App.view,'=',viewFn?'FOUND':'UNDEFINED (fallback to dashboard)');
-    const fn=viewFn||Views.dashboard;
-    try{const html=fn();console.log('[CCS] html length=',html?.length);return html;}
-    catch(e){console.error('[CCS] ERROR in',App.view,':',e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
+    const fn=map[App.view]||Views.dashboard;
+    try{return fn();}
+    catch(e){console.error('[CCS]',App.view,e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة: ${App.view}</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
   },
   showModal(html){App.modal=html;App.render()},
   closeModal(){App.modal=null;App.render()},
