@@ -306,24 +306,25 @@ const DB = {
         }
       });
     }catch(e){
+      _fdb=null; // أهم سطر: امنع DB.init() من الكتابة على Firebase بعد فشل القراءة
       _fbStatus='error';
       console.error('[Firebase] Connection failed:',e.message);
-      // أظهر بانر التحذير لو كان المستخدم مسجلاً
       const fb=document.getElementById('fb-status-bar');
       if(fb) fb.style.display='flex';
     }
   },
   init(){
-    // يضيف المفاتيح الناقصة في كتابة Firebase واحدة بدل N كتابة
+    // يضيف المفاتيح الناقصة — فقط إن كانت Firebase متصلة بنجاح
     const missing={};
     Object.keys(SEED).forEach(k=>{
       if(this.get(k)===null){
         _mem[k]=SEED[k];
         try{localStorage.setItem('ccs_'+k,JSON.stringify(SEED[k]));}catch{}
-        missing[k]=SEED[k];
+        // لا نضيف للـ Firebase إلا إذا كان الاتصال ناجحاً (fbStatus=ok)
+        if(_fbStatus==='ok') missing[k]=SEED[k];
       }
     });
-    if(_fdb&&Object.keys(missing).length){
+    if(_fdb&&_fbStatus==='ok'&&Object.keys(missing).length){
       _lastWrite=Date.now();
       _fdb.ref('ccs').update(missing).catch(()=>{});
     }
@@ -422,7 +423,8 @@ const App = {
     <div id="fb-status-bar" style="display:${_fbStatus==='error'?'flex':'none'};background:#fef2f2;border-bottom:2px solid #fecaca;padding:8px 20px;align-items:center;gap:10px;font-size:13px;color:#991b1b;position:sticky;top:0;z-index:200">
       <span>🔴</span>
       <strong>تعذّر الاتصال بقاعدة البيانات (Firebase)</strong>
-      <span style="color:#b91c1c">— البيانات تُحفظ محلياً فقط ولن تظهر على أجهزة أخرى. تحقق من اتصال الإنترنت أو تواصل مع الدعم.</span>
+      <span style="color:#b91c1c">— البيانات تُحفظ محلياً فقط ولن تظهر على أجهزة أخرى.</span>
+      <button onclick="showDataRecovery()" style="background:#991b1b;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:inherit">🔧 تشخيص</button>
       <button onclick="document.getElementById('fb-status-bar').style.display='none'" style="margin-right:auto;background:none;border:none;cursor:pointer;font-size:16px;color:#991b1b">✕</button>
     </div>
     <div style="display:flex">
@@ -639,7 +641,11 @@ _superDash(){
         }).join('')}
       </tbody>
     </table>
-  </div>`;
+  </div>
+  ${_fbStatus==='error'?`<div class="alert-box alert-red" style="margin-top:16px">
+    🔴 <div><strong>Firebase غير متصل</strong> — البيانات المعروضة من الذاكرة المحلية فقط وقد لا تكون كاملة.
+    <button class="btn btn-xs" style="background:#991b1b;color:#fff;border:none;margin-right:8px" onclick="showDataRecovery()">🔧 تشخيص واسترداد</button></div>
+  </div>`:''}`;
 },
 
 _schoolDash(){
@@ -2841,6 +2847,45 @@ function toggleNotifPanel(){
 function markAllNotifsRead(){
   DB.markNotifsRead();
   App.render();
+}
+
+// =========================================================
+//  DATA RECOVERY TOOL
+// =========================================================
+function showDataRecovery(){
+  if(!Auth.isSuperAdmin()){alert('هذه الأداة للمدير العام فقط');return;}
+  const ls={};
+  Object.keys(localStorage).filter(k=>k.startsWith('ccs_')).forEach(k=>{
+    try{const v=JSON.parse(localStorage.getItem(k));ls[k.replace('ccs_','')]=(Array.isArray(v)?v.length:typeof v);}catch{ls[k]='parse error';}
+  });
+  const mem={};
+  ['children','subscriptions','users','branches','schools','attendance','notifications'].forEach(k=>{
+    const v=_mem[k];
+    mem[k]=Array.isArray(v)?v.length:'—';
+  });
+  App.showModal(`
+  <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-header"><h2>🔧 أداة استرداد البيانات</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="alert-box ${_fbStatus==='ok'?'alert-green':'alert-red'}" style="margin-bottom:16px">
+        ${_fbStatus==='ok'?'✅ Firebase متصل — البيانات تُزامَن تلقائياً':'🔴 Firebase غير متصل — البيانات محلية فقط'}
+      </div>
+      <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:10px">📊 عدد السجلات المحمّلة في الذاكرة (mem):</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+        ${Object.entries(mem).map(([k,v])=>`<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between"><span style="font-size:13px;color:#374151">${k}</span><span style="font-size:14px;font-weight:700;color:${v>0?'#059669':'#64748b'}">${v}</span></div>`).join('')}
+      </div>
+      <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:10px">💾 في localStorage (المتصفح):</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+        ${Object.entries(ls).map(([k,v])=>`<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between"><span style="font-size:13px;color:#374151">${k}</span><span style="font-size:14px;font-weight:700;color:${v>0?'#059669':'#64748b'}">${v}</span></div>`).join('')}
+      </div>
+      <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:14px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:6px">💡 لماذا قد تكون البيانات صفر؟</div>
+        <div style="font-size:12px;color:#78350f;line-height:1.7">إذا كان Firebase غير متصل وأظهر 0 أطفال، فالبيانات موجودة في Firebase لكن الاتصال فشل. تحقق من: <strong>Firebase Console → Authentication → Sign-in method → Anonymous → مفعّل</strong></div>
+      </div>
+      <button class="btn btn-primary" onclick="exportAllData()">⬇️ تصدير جميع البيانات Excel الآن</button>
+    </div>
+  </div></div>`);
 }
 
 // =========================================================
