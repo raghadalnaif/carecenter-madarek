@@ -1813,29 +1813,39 @@ settings(){
   let content='';
   if(tab==='prices'){
     const p=s.prices||{};
-    const m=p.morning||{daily:150,weekly:600,monthly:1800};
-    const e=p.evening||{daily:70,weekly:300,monthly:900};
+    const branches=DB.branches();
+    const defM=p.morning||{daily:150,weekly:600,monthly:1800};
+    const defE=p.evening||{daily:70,weekly:300,monthly:900};
+    const branchCards=branches.map(b=>{
+      const bp=(p.branches&&p.branches[b.id])||{};
+      const bm=bp.morning||defM;
+      const be=bp.evening||defE;
+      return `
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title" style="background:linear-gradient(135deg,#0f766e,#0d9488);color:#fff;border-radius:10px;padding:10px 16px;margin-bottom:16px">🏢 ${esc(b.name)}</div>
+        <div style="margin-bottom:16px">
+          <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:10px;padding:6px 12px;background:#eff6ff;border-radius:8px">🌅 الفترة الصباحية</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+            <div class="input-group"><label>يومي (ر.س)</label><input class="input" id="p-${b.id}-m-daily" type="number" min="0" value="${bm.daily}"></div>
+            <div class="input-group"><label>أسبوعي (ر.س)</label><input class="input" id="p-${b.id}-m-weekly" type="number" min="0" value="${bm.weekly}"></div>
+            <div class="input-group"><label>شهري (ر.س)</label><input class="input" id="p-${b.id}-m-monthly" type="number" min="0" value="${bm.monthly}"></div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:10px;padding:6px 12px;background:#fef3c7;border-radius:8px">🌙 الفترة المسائية</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+            <div class="input-group"><label>يومي (ر.س)</label><input class="input" id="p-${b.id}-e-daily" type="number" min="0" value="${be.daily}"></div>
+            <div class="input-group"><label>أسبوعي (ر.س)</label><input class="input" id="p-${b.id}-e-weekly" type="number" min="0" value="${be.weekly}"></div>
+            <div class="input-group"><label>شهري (ر.س)</label><input class="input" id="p-${b.id}-e-monthly" type="number" min="0" value="${be.monthly}"></div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
     content=`
-    <div class="card" style="max-width:640px">
-      <div class="card-title">💰 أسعار الاشتراكات</div>
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#166534">✅ هذه الأسعار تُطبَّق تلقائياً عند إنشاء كل اشتراك جديد</div>
-      <div style="margin-bottom:20px">
-        <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:12px;padding:8px 12px;background:#eff6ff;border-radius:8px">🌅 الفترة الصباحية</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-          <div class="input-group"><label>يومي (ر.س)</label><input class="input" id="p-m-daily" type="number" min="0" value="${m.daily}"></div>
-          <div class="input-group"><label>أسبوعي (ر.س)</label><input class="input" id="p-m-weekly" type="number" min="0" value="${m.weekly}"></div>
-          <div class="input-group"><label>شهري (ر.س)</label><input class="input" id="p-m-monthly" type="number" min="0" value="${m.monthly}"></div>
-        </div>
-      </div>
-      <div style="margin-bottom:24px">
-        <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:12px;padding:8px 12px;background:#fef3c7;border-radius:8px">🌙 الفترة المسائية</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-          <div class="input-group"><label>يومي (ر.س)</label><input class="input" id="p-e-daily" type="number" min="0" value="${e.daily}"></div>
-          <div class="input-group"><label>أسبوعي (ر.س)</label><input class="input" id="p-e-weekly" type="number" min="0" value="${e.weekly}"></div>
-          <div class="input-group"><label>شهري (ر.س)</label><input class="input" id="p-e-monthly" type="number" min="0" value="${e.monthly}"></div>
-        </div>
-      </div>
-      <button class="btn btn-primary" onclick="saveSettingsPrices()">💾 حفظ الأسعار</button>
+    <div style="max-width:680px">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#166534">✅ يمكن تحديد أسعار مختلفة لكل فرع — الأسعار تُطبَّق تلقائياً عند إنشاء كل اشتراك جديد</div>
+      ${branchCards}
+      <button class="btn btn-primary" onclick="saveSettingsPrices()">💾 حفظ أسعار جميع الفروع</button>
     </div>`;
   } else if(tab==='center'){
     content=`
@@ -2212,7 +2222,7 @@ const Modals = {
     const c=DB.children().find(x=>x.id===childId);
     if(!c) return;
     const period=c.period||'evening';
-    const p=getSubPrices()[period]||getSubPrices().evening;
+    const p=getSubPrices(c.branchId)[period]||getSubPrices(c.branchId).evening;
     const periodLabel=period==='morning'?'🌅 صباحية':'🌙 مسائية';
     App.showModal(`
     <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
@@ -2222,6 +2232,7 @@ const Modals = {
         <input type="hidden" id="sub-child" value="${childId}">
         <input type="hidden" id="sub-school" value="${c.schoolId}">
         <input type="hidden" id="sub-period" value="${period}">
+        <input type="hidden" id="sub-branch-id" value="${c.branchId||''}">
         <div style="background:#f0fdf4;border-radius:8px;padding:12px;margin-bottom:14px;display:flex;gap:20px;flex-wrap:wrap">
           <div><div style="font-size:11px;color:#64748b">الطفل</div><div style="font-weight:700">${esc(c.name)}</div></div>
           <div><div style="font-size:11px;color:#64748b">الفترة</div><div style="font-weight:700">${periodLabel}</div></div>
@@ -2613,7 +2624,13 @@ function doLogin(){
   else{const e=document.getElementById('login-err');if(e)e.style.display='flex'}
 }
 
-function getSubPrices(){return DB.settings().prices||{morning:{daily:150,weekly:600,monthly:1800},evening:{daily:70,weekly:300,monthly:900}};}
+function getSubPrices(branchId){
+  const cfg=DB.settings().prices||{};
+  const defM=cfg.morning||{daily:150,weekly:600,monthly:1800};
+  const defE=cfg.evening||{daily:70,weekly:300,monthly:900};
+  const bp=branchId&&cfg.branches&&cfg.branches[branchId];
+  return {morning:(bp&&bp.morning)||defM,evening:(bp&&bp.evening)||defE};
+}
 
 function calcEndDate(recalcEnd=true){
   const type=document.getElementById('sub-type')?.value;
@@ -2629,7 +2646,8 @@ function calcEndDate(recalcEnd=true){
   const priceEl=document.getElementById('sub-price');
   const paidEl=document.getElementById('sub-paid');
   const baseLabel=document.getElementById('sub-base-label');
-  const base=(getSubPrices()[period]||getSubPrices().evening)[type]||0;
+  const branchId=document.getElementById('sub-branch-id')?.value||'';
+  const base=(getSubPrices(branchId)[period]||getSubPrices(branchId).evening)[type]||0;
   const disc=parseFloat(document.getElementById('sub-disc')?.value||0);
   const final=disc>0?Math.round(base*(1-disc/100)):base;
   if(baseLabel) baseLabel.textContent=base+' ر.س';
@@ -2650,7 +2668,8 @@ function calcChildSubPrice(recalcEnd=true){
   const paidEl=document.getElementById('c-sub-paid');
   const hintEl=document.getElementById('c-base-hint');
   if(priceEl&&type){
-    const base=(getSubPrices()[period]||getSubPrices().evening)[type]||0;
+    const branchId=document.getElementById('c-branch')?.value||'';
+    const base=(getSubPrices(branchId)[period]||getSubPrices(branchId).evening)[type]||0;
     const disc=parseFloat(document.getElementById('c-disc')?.value||0);
     const final=disc>0?Math.round(base*(1-disc/100)):base;
     if(hintEl) hintEl.textContent=disc>0?`أصل: ${base} ر.س`:'';
@@ -2818,7 +2837,7 @@ function saveChild(edit=false){
       const allSubs=DB.subscriptions();
       const maxNum=allSubs.reduce((m,s)=>{const n=parseInt((s.invoiceNo||'').replace(/^[A-Za-z]+-/,''));return isNaN(n)?m:Math.max(m,n);},0);
       const invoiceNo=(DB.settings().invoicePrefix||'INV')+'-'+(maxNum+1).toString().padStart(4,'0');
-      const basePrice=(getSubPrices()[period]||getSubPrices().evening)[subType]||subPrice;
+      const basePrice=(getSubPrices(c.branchId)[period]||getSubPrices(c.branchId).evening)[subType]||subPrice;
       const subPM=document.getElementById('c-sub-pm')?.value||'cash';
       const subReceipt=document.getElementById('c-receipt-data')?.value||'';
       DB.addSub({id:uid(),childId,schoolId,branchId:c.branchId,period,type:subType,startDate:subStart,endDate:subEnd,basePrice,discountPct:parseFloat(document.getElementById('c-disc')?.value||0),price:subPrice,paidAmount:subPaid,paymentStatus:subPay,paymentMethod:subPM,receiptImage:subReceipt,isActive:true,createdAt:T0,invoiceNo});
@@ -2846,7 +2865,7 @@ function saveSub(){
   const maxNum=allSubs.reduce((m,s)=>{const n=parseInt((s.invoiceNo||'').replace(/^[A-Za-z]+-/,''));return isNaN(n)?m:Math.max(m,n);},0);
   const invoiceNo=(DB.settings().invoicePrefix||'INV')+'-'+(maxNum+1).toString().padStart(4,'0');
   const discPct=parseFloat(document.getElementById('sub-disc')?.value||0);
-  const basePrice=(getSubPrices()[period]||getSubPrices().evening)[type]||price;
+  const basePrice=(getSubPrices(child?.branchId)[period]||getSubPrices(child?.branchId).evening)[type]||price;
   const paymentMethod=document.getElementById('sub-pm')?.value||'cash';
   const receiptImage=document.getElementById('sub-receipt-data')?.value||'';
   const s={id:uid(),childId,schoolId,branchId:child?.branchId||'',period,type,startDate,endDate,basePrice,discountPct:discPct,price,paidAmount,paymentStatus,paymentMethod,receiptImage,isActive:true,createdAt:T0,invoiceNo};
@@ -2898,20 +2917,31 @@ function saveEditSub(){
 function saveSettingsPrices(){
   if(!Auth.isSuperAdmin()) return;
   const s=DB.settings();
-  s.prices={
-    morning:{
-      daily:+(document.getElementById('p-m-daily')?.value||150),
-      weekly:+(document.getElementById('p-m-weekly')?.value||600),
-      monthly:+(document.getElementById('p-m-monthly')?.value||1800),
-    },
-    evening:{
-      daily:+(document.getElementById('p-e-daily')?.value||70),
-      weekly:+(document.getElementById('p-e-weekly')?.value||300),
-      monthly:+(document.getElementById('p-e-monthly')?.value||900),
-    },
-  };
+  const branches=DB.branches();
+  if(!s.prices) s.prices={};
+  if(!s.prices.branches) s.prices.branches={};
+  branches.forEach(b=>{
+    s.prices.branches[b.id]={
+      morning:{
+        daily:+(document.getElementById(`p-${b.id}-m-daily`)?.value||150),
+        weekly:+(document.getElementById(`p-${b.id}-m-weekly`)?.value||600),
+        monthly:+(document.getElementById(`p-${b.id}-m-monthly`)?.value||1800),
+      },
+      evening:{
+        daily:+(document.getElementById(`p-${b.id}-e-daily`)?.value||70),
+        weekly:+(document.getElementById(`p-${b.id}-e-weekly`)?.value||300),
+        monthly:+(document.getElementById(`p-${b.id}-e-monthly`)?.value||900),
+      },
+    };
+  });
+  // also keep global defaults from first branch as fallback
+  if(branches.length>0){
+    const fb=s.prices.branches[branches[0].id];
+    s.prices.morning=fb.morning;
+    s.prices.evening=fb.evening;
+  }
   DB.saveSettings(s);
-  showSettingsToast('✅ تم حفظ الأسعار بنجاح');
+  showSettingsToast('✅ تم حفظ أسعار الفروع بنجاح');
 }
 
 function saveSettingsCenter(){
