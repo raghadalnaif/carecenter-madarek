@@ -715,7 +715,7 @@ _schoolDash(){
             <td><span class="badge badge-blue" style="font-size:11px">🏢 ${DB.branchName(c.branchId)}</span></td>
             <td><strong>${esc(c.name)}</strong><br><small style="color:#94a3b8">${c.grade||''}</small></td>
             <td>${esc(c.parentName)}<br><a href="tel:${c.parentPhone}" style="color:#0f766e;font-size:13px">${c.parentPhone}</a></td>
-            <td>${sub?({'daily':'يومي','weekly':'أسبوعي','monthly':'شهري'}[sub.type]||sub.type):'—'}</td>
+            <td>${sub?({'daily':'يومي','weekly':'أسبوعي','monthly':'٣٠ يوم','custom':'مخصص'}[sub.type]||sub.type):'—'}</td>
             <td>${sub?formatDate(sub.endDate):'—'}</td>
             <td>${sub?Views._payBadge(sub):'—'}</td>
             <td><span class="badge ${bc}">${bl}</span></td>
@@ -812,7 +812,7 @@ branches(){
             <td><strong>${esc(c.name)}</strong></td>
             <td>${esc(c.parentName)}</td>
             <td style="font-size:13px">${DB.schoolName(c.schoolId)}</td>
-            <td>${sub?`${{'daily':'يومي','weekly':'أسبوعي','monthly':'شهري'}[sub.type]} — ${formatDate(sub.endDate)}`:'—'}</td>
+            <td>${sub?`${{'daily':'يومي','weekly':'أسبوعي','monthly':'٣٠ يوم','custom':'مخصص'}[sub.type]} — ${formatDate(sub.endDate)}`:'—'}</td>
             <td><span class="badge ${stMap[st]}">${stLbl[st]}</span></td>
           </tr>`;
         }).join('')}
@@ -976,7 +976,7 @@ subscriptions(){
           const daysLeft=diffDays(s.endDate,T0);
           const stMap={active:'badge-green',today:'badge-yellow',soon3:'badge-orange',soon7:'badge-blue',expired:'badge-red',none:'badge-gray'};
           const stLbl={active:'نشط',today:'ينتهي اليوم',soon3:`${daysLeft} أيام`,soon7:`${daysLeft} أيام`,expired:'منتهي',none:'—'};
-          const typeMap={daily:'يومي',weekly:'أسبوعي',monthly:'شهري'};
+          const typeMap={daily:'يومي',weekly:'أسبوعي',monthly:'٣٠ يوم',custom:'مخصص'};
           const pmLabel={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'}[s.paymentMethod]||'—';
           return `<tr>
             <td>
@@ -1182,7 +1182,7 @@ reports(){
           const c=children.find(x=>x.id===s.childId)||DB.children().find(x=>x.id===s.childId);
           return `<tr>
             <td>${esc(c?.name||'—')}</td>
-            <td>${{daily:'يومي',weekly:'أسبوعي',monthly:'شهري'}[s.type]||s.type}</td>
+            <td>${{daily:'يومي',weekly:'أسبوعي',monthly:'٣٠ يوم',custom:'مخصص'}[s.type]||s.type}</td>
             <td>${s.price} ر.س</td>
             <td style="color:#10b981;font-weight:600">${s.paidAmount} ر.س</td>
             <td style="color:${s.price-s.paidAmount>0?'#ef4444':'#10b981'};font-weight:600">${s.price-s.paidAmount} ر.س</td>
@@ -1260,7 +1260,7 @@ reports(){
           const stLbl={active:'نشط',today:'ينتهي اليوم',soon3:'قريباً',soon7:'قريباً',expired:'منتهي',none:'—'};
           return `<tr>
             <td>${esc(c?.name||'—')}</td>
-            <td>${{daily:'يومي',weekly:'أسبوعي',monthly:'شهري'}[s.type]}</td>
+            <td>${{daily:'يومي',weekly:'أسبوعي',monthly:'٣٠ يوم',custom:'مخصص'}[s.type]}</td>
             <td>${formatDate(s.startDate)}</td>
             <td>${formatDate(s.endDate)}</td>
             <td>${s.price} ر.س</td>
@@ -1321,7 +1321,7 @@ reports(){
       <thead><tr><th>النوع</th><th>البداية</th><th>النهاية</th><th>المبلغ</th><th>المدفوع</th><th>المتبقي</th><th>طريقة الدفع</th><th>الحالة</th></tr></thead>
       <tbody>
         ${subs.filter(s=>s.childId===stId).sort((a,b)=>b.startDate.localeCompare(a.startDate)).map(s=>`<tr>
-          <td>${{daily:'يومي',weekly:'أسبوعي',monthly:'شهري'}[s.type]||s.type}</td>
+          <td>${{daily:'يومي',weekly:'أسبوعي',monthly:'٣٠ يوم',custom:'مخصص'}[s.type]||s.type}</td>
           <td>${formatDate(s.startDate)}</td>
           <td>${formatDate(s.endDate)}</td>
           <td>${s.price} ر.س</td>
@@ -1841,7 +1841,7 @@ settings(){
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
             <div class="input-group"><label>يومي (ر.س)</label><input class="input" id="p-${b.id}-m-daily" type="number" min="0" value="${bm.daily}"></div>
             <div class="input-group"><label>أسبوعي (ر.س)</label><input class="input" id="p-${b.id}-m-weekly" type="number" min="0" value="${bm.weekly}"></div>
-            <div class="input-group"><label>شهري (ر.س)</label><input class="input" id="p-${b.id}-m-monthly" type="number" min="0" value="${bm.monthly}"></div>
+            <div class="input-group"><label>٣٠ يوم (ر.س)</label><input class="input" id="p-${b.id}-m-monthly" type="number" min="0" value="${bm.monthly}"></div>
           </div>
         </div>
         <div>
@@ -1849,7 +1849,7 @@ settings(){
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
             <div class="input-group"><label>يومي (ر.س)</label><input class="input" id="p-${b.id}-e-daily" type="number" min="0" value="${be.daily}"></div>
             <div class="input-group"><label>أسبوعي (ر.س)</label><input class="input" id="p-${b.id}-e-weekly" type="number" min="0" value="${be.weekly}"></div>
-            <div class="input-group"><label>شهري (ر.س)</label><input class="input" id="p-${b.id}-e-monthly" type="number" min="0" value="${be.monthly}"></div>
+            <div class="input-group"><label>٣٠ يوم (ر.س)</label><input class="input" id="p-${b.id}-e-monthly" type="number" min="0" value="${be.monthly}"></div>
           </div>
         </div>
       </div>`;
@@ -2134,8 +2134,13 @@ const Modals = {
             <select class="input" id="c-sub-type" onchange="calcChildSubPrice()">
               <option value="daily">📅 يومي</option>
               <option value="weekly">📅 أسبوعي</option>
-              <option value="monthly" selected>📅 شهري</option>
+              <option value="monthly" selected>📅 ٣٠ يوم</option>
+              <option value="custom">✏️ مخصص</option>
             </select>
+            <div id="c-custom-days-wrap" style="display:none;margin-top:8px">
+              <input class="input" id="c-sub-custom-days" type="number" min="1" max="365" value="15" placeholder="عدد الأيام" oninput="calcChildSubPrice()">
+              <small style="color:#64748b;font-size:12px">السعر يُحسب تلقائياً بنسبة من سعر ٣٠ يوم</small>
+            </div>
           </div>
           <div class="input-group"><label>تاريخ البداية</label><input class="input" id="c-sub-start" type="date" value="${T0}" onchange="calcChildSubPrice()"></div>
         </div>
@@ -2257,8 +2262,13 @@ const Modals = {
           <select class="input" id="sub-type" onchange="calcEndDate()">
             <option value="daily">📅 يومي — ${p.daily} ر.س</option>
             <option value="weekly">📅 أسبوعي — ${p.weekly} ر.س</option>
-            <option value="monthly" selected>📅 شهري — ${p.monthly} ر.س</option>
+            <option value="monthly" selected>📅 ٣٠ يوم — ${p.monthly} ر.س</option>
+            <option value="custom">✏️ مخصص</option>
           </select>
+          <div id="sub-custom-days-wrap" style="display:none;margin-top:8px">
+            <input class="input" id="sub-custom-days" type="number" min="1" max="365" value="15" placeholder="عدد الأيام" oninput="calcEndDate()">
+            <small style="color:#64748b;font-size:12px">السعر يُحسب تلقائياً بنسبة من سعر ٣٠ يوم</small>
+          </div>
         </div>
         <div class="grid-2">
           <div class="input-group"><label>تاريخ البداية *</label><input class="input" id="sub-start" type="date" value="${T0}" onchange="calcEndDate()"></div>
@@ -2353,11 +2363,16 @@ const Modals = {
         </div>
         <div class="input-group">
           <label>مدة الاشتراك</label>
-          <select class="input" id="edit-sub-type">
+          <select class="input" id="edit-sub-type" onchange="(v=>{const w=document.getElementById('edit-sub-cw');if(w)w.style.display=v==='custom'?'':'none'})(this.value)">
             <option value="daily" ${s.type==='daily'?'selected':''}>📅 يومي</option>
             <option value="weekly" ${s.type==='weekly'?'selected':''}>📅 أسبوعي</option>
-            <option value="monthly" ${s.type==='monthly'?'selected':''}>📅 شهري</option>
+            <option value="monthly" ${s.type==='monthly'?'selected':''}>📅 ٣٠ يوم</option>
+            <option value="custom" ${s.type==='custom'?'selected':''}>✏️ مخصص</option>
           </select>
+          <div id="edit-sub-cw" style="display:${s.type==='custom'?'':'none'};margin-top:8px">
+            <input class="input" id="edit-sub-custom-days" type="number" min="1" max="365" value="${s.customDays||15}" placeholder="عدد الأيام">
+            <small style="color:#64748b;font-size:12px">عدد أيام الاشتراك المخصص</small>
+          </div>
         </div>
         <div class="grid-2">
           <div class="input-group"><label>تاريخ البداية *</label><input class="input" id="edit-sub-start" type="date" value="${s.startDate}"></div>
@@ -2650,17 +2665,22 @@ function calcEndDate(recalcEnd=true){
   const start=document.getElementById('sub-start')?.value;
   const end=document.getElementById('sub-end');
   const period=document.getElementById('sub-period')?.value||'evening';
+  const cdWrap=document.getElementById('sub-custom-days-wrap');
+  if(cdWrap) cdWrap.style.display=type==='custom'?'block':'none';
   if(!type||!start||!end) return;
+  const customDays=parseInt(document.getElementById('sub-custom-days')?.value||15);
   if(recalcEnd){
     if(type==='daily') end.value=start;
     else if(type==='weekly') end.value=addDays(start,7);
     else if(type==='monthly') end.value=addDays(start,30);
+    else if(type==='custom') end.value=addDays(start,customDays);
   }
   const priceEl=document.getElementById('sub-price');
   const paidEl=document.getElementById('sub-paid');
   const baseLabel=document.getElementById('sub-base-label');
   const branchId=document.getElementById('sub-branch-id')?.value||'';
-  const base=(getSubPrices(branchId)[period]||getSubPrices(branchId).evening)[type]||0;
+  const prices=getSubPrices(branchId)[period]||getSubPrices(branchId).evening;
+  const base=type==='custom'?Math.ceil((prices.monthly||0)/30*customDays):prices[type]||0;
   const disc=parseFloat(document.getElementById('sub-disc')?.value||0);
   const final=disc>0?Math.round(base*(1-disc/100)):base;
   if(baseLabel) baseLabel.textContent=base+' ر.س';
@@ -2672,20 +2692,25 @@ function calcChildSubPrice(recalcEnd=true){
   const start=document.getElementById('c-sub-start')?.value;
   const period=document.getElementById('c-period')?.value||'evening';
   const endEl=document.getElementById('c-sub-end');
+  const cdWrap=document.getElementById('c-custom-days-wrap');
+  if(cdWrap) cdWrap.style.display=type==='custom'?'block':'none';
+  const customDays=parseInt(document.getElementById('c-sub-custom-days')?.value||15);
   if(recalcEnd&&type&&start&&endEl){
     if(type==='daily') endEl.value=start;
     else if(type==='weekly') endEl.value=addDays(start,7);
-    else endEl.value=addDays(start,30);
+    else if(type==='monthly') endEl.value=addDays(start,30);
+    else if(type==='custom') endEl.value=addDays(start,customDays);
   }
   const priceEl=document.getElementById('c-sub-price');
   const paidEl=document.getElementById('c-sub-paid');
   const hintEl=document.getElementById('c-base-hint');
   if(priceEl&&type){
     const branchId=document.getElementById('c-branch')?.value||'';
-    const base=(getSubPrices(branchId)[period]||getSubPrices(branchId).evening)[type]||0;
+    const prices=getSubPrices(branchId)[period]||getSubPrices(branchId).evening;
+    const base=type==='custom'?Math.ceil((prices.monthly||0)/30*customDays):prices[type]||0;
     const disc=parseFloat(document.getElementById('c-disc')?.value||0);
     const final=disc>0?Math.round(base*(1-disc/100)):base;
-    if(hintEl) hintEl.textContent=disc>0?`أصل: ${base} ر.س`:'';
+    if(hintEl) hintEl.textContent=disc>0?`أصل: ${base} ر.س`:(type==='custom'?`${Math.ceil((prices.monthly||0)/30)} ر.س/يوم`:'');
     priceEl.value=final;
     if(paidEl) paidEl.value=final;
   }
@@ -2847,14 +2872,16 @@ function saveChild(edit=false){
     const subPay=document.getElementById('c-sub-pay')?.value||'paid';
     if(subType&&subPrice>0){
       const subEnd=document.getElementById('c-sub-end')?.value||addDays(subStart,30);
+      const subCustomDays=subType==='custom'?parseInt(document.getElementById('c-sub-custom-days')?.value||15):undefined;
       const allSubs=DB.subscriptions();
       const maxNum=allSubs.reduce((m,s)=>{const n=parseInt((s.invoiceNo||'').replace(/^[A-Za-z]+-/,''));return isNaN(n)?m:Math.max(m,n);},0);
       const invoiceNo=(DB.settings().invoicePrefix||'INV')+'-'+(maxNum+1).toString().padStart(4,'0');
-      const basePrice=(getSubPrices(c.branchId)[period]||getSubPrices(c.branchId).evening)[subType]||subPrice;
+      const cPrices=getSubPrices(c.branchId)[period]||getSubPrices(c.branchId).evening;
+      const basePrice=subType==='custom'?Math.ceil((cPrices.monthly||0)/30*(subCustomDays||15)):cPrices[subType]||subPrice;
       const subPM=document.getElementById('c-sub-pm')?.value||'cash';
       const subReceipt=document.getElementById('c-receipt-data')?.value||'';
-      DB.addSub({id:uid(),childId,schoolId,branchId:c.branchId,period,type:subType,startDate:subStart,endDate:subEnd,basePrice,discountPct:parseFloat(document.getElementById('c-disc')?.value||0),price:subPrice,paidAmount:subPaid,paymentStatus:subPay,paymentMethod:subPM,receiptImage:subReceipt,isActive:true,createdAt:T0,invoiceNo});
-      const tl={'daily':'يومي','weekly':'أسبوعي','monthly':'شهري'};
+      DB.addSub({id:uid(),childId,schoolId,branchId:c.branchId,period,type:subType,customDays:subCustomDays,startDate:subStart,endDate:subEnd,basePrice,discountPct:parseFloat(document.getElementById('c-disc')?.value||0),price:subPrice,paidAmount:subPaid,paymentStatus:subPay,paymentMethod:subPM,receiptImage:subReceipt,isActive:true,createdAt:T0,invoiceNo});
+      const tl={'daily':'يومي','weekly':'أسبوعي','monthly':'٣٠ يوم','custom':'مخصص'};
       DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[subType]||subType} لـ ${name} — ${subPrice} ر.س`,addedBy:Auth.user.name});
     }
   }
@@ -2878,12 +2905,14 @@ function saveSub(){
   const maxNum=allSubs.reduce((m,s)=>{const n=parseInt((s.invoiceNo||'').replace(/^[A-Za-z]+-/,''));return isNaN(n)?m:Math.max(m,n);},0);
   const invoiceNo=(DB.settings().invoicePrefix||'INV')+'-'+(maxNum+1).toString().padStart(4,'0');
   const discPct=parseFloat(document.getElementById('sub-disc')?.value||0);
-  const basePrice=(getSubPrices(child?.branchId)[period]||getSubPrices(child?.branchId).evening)[type]||price;
+  const customDays=type==='custom'?parseInt(document.getElementById('sub-custom-days')?.value||15):undefined;
+  const prices=getSubPrices(child?.branchId)[period]||getSubPrices(child?.branchId).evening;
+  const basePrice=type==='custom'?Math.ceil((prices.monthly||0)/30*(customDays||15)):prices[type]||price;
   const paymentMethod=document.getElementById('sub-pm')?.value||'cash';
   const receiptImage=document.getElementById('sub-receipt-data')?.value||'';
-  const s={id:uid(),childId,schoolId,branchId:child?.branchId||'',period,type,startDate,endDate,basePrice,discountPct:discPct,price,paidAmount,paymentStatus,paymentMethod,receiptImage,isActive:true,createdAt:T0,invoiceNo};
+  const s={id:uid(),childId,schoolId,branchId:child?.branchId||'',period,type,customDays,startDate,endDate,basePrice,discountPct:discPct,price,paidAmount,paymentStatus,paymentMethod,receiptImage,isActive:true,createdAt:T0,invoiceNo};
   DB.addSub(s);
-  const tl={'daily':'يومي','weekly':'أسبوعي','monthly':'شهري'};
+  const tl={'daily':'يومي','weekly':'أسبوعي','monthly':'٣٠ يوم','custom':'مخصص'};
   DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[type]||type} لـ ${child?.name||''} — ${price} ر.س`,addedBy:Auth.user.name});
   App.closeModal();
   App.go('subscriptions');
@@ -2918,8 +2947,9 @@ function saveEditSub(){
   const paymentStatus=document.getElementById('edit-sub-pay')?.value;
   const paymentMethod=document.getElementById('edit-sub-pm')?.value;
   const isActive=document.getElementById('edit-sub-active')?.value==='1';
+  const customDays=type==='custom'?parseInt(document.getElementById('edit-sub-custom-days')?.value||s.customDays||15):undefined;
   if(!startDate||!endDate||price<0){alert('يرجى تعبئة الحقول المطلوبة');return;}
-  DB.updateSub({...s,type,startDate,endDate,basePrice,discountPct:discPct,price,paidAmount,paymentStatus,paymentMethod,isActive});
+  DB.updateSub({...s,type,customDays,startDate,endDate,basePrice,discountPct:discPct,price,paidAmount,paymentStatus,paymentMethod,isActive});
   App.closeModal();
   App.go('subscriptions');
 }
@@ -3205,7 +3235,7 @@ function exportAllData(){
   const subs=(sid?DB.subscriptions().filter(s=>s.schoolId===sid):DB.subscriptions());
   const att=(sid?DB.attendance().filter(a=>a.schoolId===sid):DB.attendance());
   const periodLabel=p=>p==='morning'?'صباحي':'مسائي';
-  const subTypeLabel={'daily':'يومي','weekly':'أسبوعي','monthly':'شهري'};
+  const subTypeLabel={'daily':'يومي','weekly':'أسبوعي','monthly':'٣٠ يوم','custom':'مخصص'};
   const attStatusLabel={'present':'حاضر','absent':'غائب','late':'متأخر'};
   const wb=XLSX.utils.book_new();
 
@@ -3489,7 +3519,7 @@ async function openInvoice(subId){
   const isoTs=now.toISOString();
 
   // ── Labels ────────────────────────────────────────────────
-  const typeMap={daily:'يومي',weekly:'أسبوعي',monthly:'شهري'};
+  const typeMap={daily:'يومي',weekly:'أسبوعي',monthly:'٣٠ يوم',custom:'مخصص'};
   const tLabel=typeMap[sub.type]||sub.type;
   const pLabel=sub.period==='morning'?'صباحية':'مسائية';
   const pmLabel={cash:'نقداً',mada:'مدى',transfer:'تحويل بنكي'}[sub.paymentMethod]||'—';
