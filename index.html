@@ -7,7 +7,20 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-09-v6 -->
+<!-- BUILD: 2026-06-09-v7 -->
+<script>
+// كسر الكيش — يُعيد التحميل بـURL مختلف مرة واحدة عند كل إصدار جديد
+(function(){
+  var BUILD='v7-20260609';
+  var key='_madarak_build';
+  var stored=localStorage.getItem(key);
+  if(stored!==BUILD){
+    localStorage.setItem(key,BUILD);
+    var url=location.pathname+'?r='+BUILD;
+    if(location.search.indexOf('r=')===-1){location.replace(url);}
+  }
+})();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
