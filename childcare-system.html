@@ -227,6 +227,7 @@ const SEED = {
   attendance: [],
   notifications: [],
   weekly_activities: [],
+  sales: [],
   settings: {prices:{morning:{daily:150,weekly:600,monthly:1800},evening:{daily:70,weekly:300,monthly:900}},invoicePrefix:'INV',alertDays:{warn:7,urgent:3},waTemplate:'مرحباً {name}، اشتراك طفلك ينتهي بتاريخ {date}. يرجى التواصل للتجديد. مع تحيات مدارك الطفل 🌟',vatRate:15,vatInclusive:true},
 };
 
@@ -373,6 +374,9 @@ const DB = {
     return s?{...def,...s,prices:{...def.prices,...(s.prices||{})},alertDays:{...def.alertDays,...(s.alertDays||{})}}:def;
   },
   saveSettings(s){this.save('settings',s);},
+  sales(){return this.get('sales')||[]},
+  addSale(s){const a=this.sales();a.push(s);this.save('sales',a)},
+  deleteSale(id){this.save('sales',this.sales().filter(x=>x.id!==id))},
   weeklyActivities(){return this.get('weekly_activities')||[]},
   toggleWeeklyActivity(act){
     const list=this.weeklyActivities();
@@ -477,6 +481,7 @@ const App = {
       {v:'reports',icon:'📊',label:'التقارير'},
       {v:'users',icon:'👥',label:'المستخدمون'},
       {v:'activities',icon:'🎯',label:'دليل الأنشطة'},
+      {v:'sales',icon:'🛍️',label:'المبيعات'},
       {v:'settings',icon:'⚙️',label:'الإعدادات'},
     ] : u.role==='school_admin' ? [
       {v:'dashboard',icon:'🏠',label:'الرئيسية'},
@@ -487,6 +492,7 @@ const App = {
       {v:'teachers',icon:'👩‍🏫',label:'المعلمات'},
       {v:'whatsapp',icon:'💬',label:'رسائل واتساب'},
       {v:'activities',icon:'🎯',label:'الأنشطة الأسبوعية'},
+      {v:'sales',icon:'🛍️',label:'المبيعات'},
     ] : [
       {v:'attendance',icon:'✅',label:'تسجيل الحضور'},
       {v:'my_reports',icon:'📊',label:'تقارير الحضور'},
@@ -507,7 +513,7 @@ const App = {
     </div>`;
   },
   topbar(){
-    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات'};
+    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات'};
     const now=new Date();
     const hm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
     const unread=DB.unreadCount();
@@ -568,11 +574,12 @@ const App = {
       teachers:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
       my_reports:()=>role==='teacher',
       activities:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
+      sales:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       settings:()=>Auth.isSuperAdmin(),
     };
     const guard=guards[App.view];
     if(guard&&!guard()) return Views._forbidden();
-    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,settings:Views.settings};
+    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,settings:Views.settings};
     const fn=map[App.view]||Views.dashboard;
     try{return fn();}
     catch(e){console.error('[CCS]',App.view,e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة: ${App.view}</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
@@ -1990,6 +1997,65 @@ settings(){
   </div>`;
 },
 
+// ---------- SALES ----------
+sales(){
+  if(!Auth.isSuperAdmin()&&!Auth.isSchoolAdmin()) return Views._forbidden();
+  const sid=Auth.isSuperAdmin()?null:Auth.schoolId();
+  const bid=Auth.branchId();
+  let allSales=DB.sales();
+  if(sid) allSales=allSales.filter(s=>s.schoolId===sid);
+  if(bid) allSales=allSales.filter(s=>s.branchId===bid);
+  const todaySales=allSales.filter(s=>s.date===T0);
+  const totalToday=todaySales.reduce((a,s)=>a+(s.price||0),0);
+  const totalAll=allSales.reduce((a,s)=>a+(s.price||0),0);
+  const itemLabel={'exit_card':'🪪 بطاقة خروج','uniform':'👕 زي رسمي','other':'📦 أخرى'};
+  const pmLabel={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
+  const rows=[...allSales].reverse().map(s=>{
+    const child=DB.children().find(c=>c.id===s.childId);
+    const who=child?esc(child.name):esc(s.parentName||'—');
+    const whoSub=child&&child.parentName?`<br><small style="color:#94a3b8">${esc(child.parentName)}</small>`:'';
+    return `<tr>
+      <td>${formatDate(s.date)}</td>
+      <td>${who}${whoSub}</td>
+      <td>
+        <span class="badge badge-blue">${itemLabel[s.itemType]||s.itemType}</span>
+        ${s.itemName?`<br><small style="color:#374151">${esc(s.itemName)}</small>`:''}
+      </td>
+      <td style="font-weight:700;color:#059669">${(s.price||0).toLocaleString()} ر.س</td>
+      <td>${pmLabel[s.paymentMethod]||'—'}</td>
+      ${Auth.isSuperAdmin()?`<td><small style="color:#64748b">${DB.branchName(s.branchId)}</small></td>`:''}
+      <td>${s.notes?`<small style="color:#64748b">${esc(s.notes)}</small>`:'—'}</td>
+      <td><button class="btn btn-xs" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5" onclick="deleteSale('${s.id}')">🗑️</button></td>
+    </tr>`;
+  }).join('');
+  return `
+  <div class="section-header">
+    <h2>🛍️ المبيعات</h2>
+    <button class="btn btn-primary" onclick="Modals.addSale()">+ إضافة مبيعة</button>
+  </div>
+  <div class="stats-grid" style="margin-bottom:20px">
+    <div class="stat-card green"><div class="stat-val">${totalToday.toLocaleString()} ر.س</div><div class="stat-lbl">💰 مبيعات اليوم</div></div>
+    <div class="stat-card blue"><div class="stat-val">${todaySales.length}</div><div class="stat-lbl">📦 سجلات اليوم</div></div>
+    <div class="stat-card green"><div class="stat-val">${totalAll.toLocaleString()} ر.س</div><div class="stat-lbl">💵 إجمالي المبيعات</div></div>
+    <div class="stat-card blue"><div class="stat-val">${allSales.length}</div><div class="stat-lbl">📋 إجمالي السجلات</div></div>
+  </div>
+  ${allSales.length===0?`
+    <div class="empty-state"><div class="es-icon">🛍️</div><p>لا توجد مبيعات مسجلة بعد</p>
+    <button class="btn btn-primary" onclick="Modals.addSale()">+ إضافة أول مبيعة</button></div>
+  `:`
+  <div class="card">
+    <table>
+      <thead><tr>
+        <th>التاريخ</th><th>الطفل / ولي الأمر</th><th>المنتج</th>
+        <th>السعر</th><th>الدفع</th>
+        ${Auth.isSuperAdmin()?'<th>الفرع</th>':''}
+        <th>ملاحظات</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`}`;
+},
+
 };// end Views
 
 // =========================================================
@@ -2417,6 +2483,52 @@ const Modals = {
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" onclick="saveEditSub()">💾 حفظ التعديلات</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+
+  addSale(){
+    const children=DB.children().filter(c=>{
+      if(Auth.isSuperAdmin()) return true;
+      return c.schoolId===Auth.schoolId()&&(!Auth.branchId()||c.branchId===Auth.branchId());
+    });
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal">
+      <div class="modal-header"><h2>🛍️ إضافة مبيعة</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label>المنتج *</label>
+          <select class="input" id="sale-item-type" onchange="toggleSaleItem()">
+            <option value="exit_card">🪪 بطاقة خروج الطالب</option>
+            <option value="uniform">👕 الزي الرسمي للطفل</option>
+            <option value="other">📦 أخرى</option>
+          </select>
+        </div>
+        <div id="sale-other-wrap" style="display:none">
+          <div class="input-group"><label>اسم المنتج / الخدمة *</label><input class="input" id="sale-item-name" placeholder="مثال: حقيبة مدرسية، كتاب نشاط ..."></div>
+        </div>
+        <div class="input-group">
+          <label>الطفل (اختياري)</label>
+          <select class="input" id="sale-child" onchange="fillSaleParent()">
+            <option value="">— اختر طفلاً أو اترك فارغاً —</option>
+            ${children.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="input-group"><label>ولي الأمر / اسم المشتري</label><input class="input" id="sale-parent-name" placeholder="يُملأ تلقائياً عند اختيار طفل"></div>
+        <div class="input-group">
+          <label>السعر (ر.س) *</label>
+          <input class="input" id="sale-price" type="number" min="0" step="1" placeholder="0" style="font-size:18px;font-weight:700">
+        </div>
+        <div class="input-group">
+          <label>💰 طريقة الدفع</label>
+          ${pmButtons('sale-pm')}
+        </div>
+        <div class="input-group"><label>ملاحظات</label><input class="input" id="sale-notes" placeholder="أي ملاحظات إضافية..."></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveSale()">💾 حفظ المبيعة</button>
         <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
       </div>
     </div></div>`);
@@ -3038,6 +3150,44 @@ function saveSettingsInvoice(){
   s.vatInclusive=document.getElementById('vat-inclusive')?.value!=='0';
   DB.saveSettings(s);
   showSettingsToast('✅ تم حفظ إعدادات الفواتير والتنبيهات');
+}
+
+// =========================================================
+//  SALES HANDLERS
+// =========================================================
+function toggleSaleItem(){
+  const type=document.getElementById('sale-item-type')?.value;
+  const wrap=document.getElementById('sale-other-wrap');
+  if(wrap) wrap.style.display=type==='other'?'':'none';
+}
+function fillSaleParent(){
+  const childId=document.getElementById('sale-child')?.value;
+  const el=document.getElementById('sale-parent-name');
+  if(!childId||!el) return;
+  const child=DB.children().find(c=>c.id===childId);
+  if(child) el.value=child.parentName||'';
+}
+function saveSale(){
+  const itemType=document.getElementById('sale-item-type')?.value;
+  const itemName=document.getElementById('sale-item-name')?.value?.trim()||'';
+  const childId=document.getElementById('sale-child')?.value||'';
+  const parentName=document.getElementById('sale-parent-name')?.value?.trim()||'';
+  const price=parseFloat(document.getElementById('sale-price')?.value||0);
+  const paymentMethod=document.getElementById('sale-pm')?.value||'cash';
+  const notes=document.getElementById('sale-notes')?.value?.trim()||'';
+  if(itemType==='other'&&!itemName){alert('يرجى إدخال اسم المنتج');return;}
+  if(!price||price<=0){alert('يرجى إدخال السعر');return;}
+  const child=DB.children().find(c=>c.id===childId);
+  const schoolId=child?.schoolId||Auth.schoolId()||DB.schools()[0]?.id||'';
+  const branchId=child?.branchId||Auth.branchId()||'';
+  DB.addSale({id:uid(),date:T0,childId:childId||null,parentName:parentName||child?.parentName||'',itemType,itemName:itemType==='other'?itemName:'',price,paymentMethod,notes,schoolId,branchId,createdAt:new Date().toISOString(),addedBy:Auth.user.name});
+  App.closeModal();
+  App.go('sales');
+}
+function deleteSale(id){
+  if(!confirm('هل تريد حذف هذه المبيعة؟')) return;
+  DB.deleteSale(id);
+  App.go('sales');
 }
 
 function showSettingsToast(msg){
