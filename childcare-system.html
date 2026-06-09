@@ -3,8 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-07-v5 -->
+<!-- BUILD: 2026-06-09-v8 -->
+<script>
+// كسر الكيش — يُعيد التحميل بـURL مختلف مرة واحدة عند كل إصدار جديد
+(function(){
+  var BUILD='v8-20260609';
+  var key='_madarak_build';
+  var stored=localStorage.getItem(key);
+  if(stored!==BUILD){
+    localStorage.setItem(key,BUILD);
+    var url=location.pathname+'?r='+BUILD;
+    if(location.search.indexOf('r=')===-1){location.replace(url);}
+  }
+})();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -15,17 +31,17 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Tajawal',sans-serif;background:#f1f5f9;color:#1e293b;direction:rtl}
 :root{--primary:#0f766e;--primary-dark:#0d6560;--primary-light:#ccfbf1;--danger:#ef4444;--warning:#f59e0b;--success:#10b981;--info:#3b82f6}
-.sidebar{width:240px;background:linear-gradient(160deg,#0f766e 0%,#065f46 100%);height:100vh;overflow:hidden;position:fixed;right:0;top:0;z-index:100;display:flex;flex-direction:column;transition:.3s}
-.sidebar-logo{padding:20px;border-bottom:1px solid rgba(255,255,255,.15);flex-shrink:0}
-.sidebar-logo h1{color:#fff;font-size:17px;font-weight:700;line-height:1.4}
-.sidebar-logo p{color:rgba(255,255,255,.6);font-size:12px;margin-top:4px}
-.nav-section{padding:10px 8px;flex:1;overflow-y:auto;min-height:0}
-.nav-section::-webkit-scrollbar{width:4px}.nav-section::-webkit-scrollbar-track{background:transparent}.nav-section::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:4px}
-.nav-label{color:rgba(255,255,255,.4);font-size:11px;font-weight:600;padding:0 12px;margin-bottom:6px;letter-spacing:.5px}
-.nav-item{display:flex;align-items:center;gap:10px;padding:9px 14px;color:rgba(255,255,255,.75);cursor:pointer;border-radius:8px;margin:1px 0;transition:.2s;font-size:14px;font-weight:500}
+.sidebar{width:220px;background:linear-gradient(160deg,#0f766e 0%,#065f46 100%);height:100vh;overflow:hidden;position:fixed;right:0;top:0;z-index:100;display:flex;flex-direction:column;transition:.3s}
+.sidebar-logo{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.15);flex-shrink:0;text-align:center}
+.sidebar-logo h1{color:#fff;font-size:14px;font-weight:700;line-height:1.3}
+.sidebar-logo p{color:rgba(255,255,255,.6);font-size:11px;margin-top:2px}
+.nav-section{padding:4px 6px;flex:1;overflow-y:auto;min-height:0}
+.nav-section::-webkit-scrollbar{width:3px}.nav-section::-webkit-scrollbar-track{background:transparent}.nav-section::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:4px}
+.nav-label{color:rgba(255,255,255,.4);font-size:10px;font-weight:600;padding:0 10px;margin-bottom:4px;letter-spacing:.5px}
+.nav-item{display:flex;align-items:center;gap:8px;padding:7px 10px;color:rgba(255,255,255,.75);cursor:pointer;border-radius:7px;margin:0;transition:.2s;font-size:13px;font-weight:500}
 .nav-item:hover,.nav-item.active{background:rgba(255,255,255,.15);color:#fff}
 .nav-item .ni{width:18px;height:18px;flex-shrink:0}
-.main{margin-right:240px;min-height:100vh;display:flex;flex-direction:column}
+.main{margin-right:220px;min-height:100vh;display:flex;flex-direction:column}
 .topbar{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
 .topbar-title{font-size:18px;font-weight:700;color:#0f766e}
 .topbar-user{display:flex;align-items:center;gap:10px;cursor:pointer}
@@ -260,7 +276,15 @@ const DB = {
   set(k,v){
     _mem[k]=v;
     try{localStorage.setItem('ccs_'+k,JSON.stringify(v))}catch{}
-    if(_fdb){_lastWrite=Date.now();_fdb.ref('ccs/'+k).set(v).catch(e=>{console.error('[DB] Firebase write failed for key='+k+':',e.message);});}
+    if(_fdb&&_fbStatus==='ok'){
+      _lastWrite=Date.now();
+      // إعادة المحاولة مرة واحدة عند الفشل لضمان وصول البيانات لـFirebase
+      _fdb.ref('ccs/'+k).set(v).catch(()=>{
+        setTimeout(()=>{
+          if(_fdb&&_fbStatus==='ok') _fdb.ref('ccs/'+k).set(_mem[k]).catch(e=>console.error('[DB] Retry failed for key='+k+':',e.message));
+        },2000);
+      });
+    }
   },
   async initFirebase(){
     try{
@@ -286,7 +310,8 @@ const DB = {
       }
       // مستمع التحديثات الفورية
       _fdb.ref('ccs').on('value',snap=>{
-        if(Date.now()-_lastWrite<3000) return;
+        // تجاهل إذا كانت الكتابة حديثة (أقل من 5 ثوانٍ) لمنع التعارض
+        if(Date.now()-_lastWrite<5000) return;
         const d=snap.val();
         if(!d) return;
         let changed=false;
@@ -299,14 +324,16 @@ const DB = {
             const fresh=DB.users().find(u=>u.id===Auth.user.id);
             if(fresh){Auth.user=fresh;sessionStorage.setItem('ccs_user',JSON.stringify(fresh));}
           }
-          if(!App.modal){
+          // لا تُعِد الرسم إذا كان المستخدم يعدّل بيانات في صفحة الإعدادات
+          if(!App.modal&&App.view!=='settings'){
             const el=document.getElementById('content');
             if(!el) return;
             // حفظ قيم حقول البحث/الفلترة قبل إعادة الرسم وإعادتها بعده
             const saved={};
             el.querySelectorAll('input[id],select[id]').forEach(inp=>{saved[inp.id]=inp.value;});
             el.innerHTML=App.currentView();
-            Object.entries(saved).forEach(([id,val])=>{const f=document.getElementById(id);if(f&&f.value===''&&val)f.value=val;});
+            // استعادة القيم التي عدّلها المستخدم (وليس فقط الفارغة)
+            Object.entries(saved).forEach(([id,val])=>{const f=document.getElementById(id);if(f&&val!==undefined)f.value=val;});
           }
         }
       });
@@ -501,14 +528,14 @@ const App = {
     return `
     <div class="sidebar">
       <div class="sidebar-logo" style="text-align:center">
-        <img src="logo.png" alt="" style="width:58px;height:58px;object-fit:contain;display:block;margin:0 auto 6px" onerror="this.style.display='none'">
+        <img src="logo.png" alt="" style="width:40px;height:40px;object-fit:contain;display:block;margin:0 auto 4px" onerror="this.style.display='none'">
         <h1 style="font-size:16px">مدارك الطفل</h1>
         <p>نظام إدارة متكامل</p>
       </div>
       <div class="nav-section">
         ${links.map(l=>`<div class="nav-item ${App.view===l.v?'active':''}" onclick="App.go('${l.v}');closeSidebar()">${l.icon} ${l.label}</div>`).join('')}
       </div>
-      <div style="flex-shrink:0;padding:12px 8px;border-top:1px solid rgba(255,255,255,.15)">
+      <div style="flex-shrink:0;padding:6px 6px;border-top:1px solid rgba(255,255,255,.15)">
         <div class="nav-item" onclick="Auth.logout()">🚪 تسجيل الخروج</div>
       </div>
     </div>`;
@@ -3097,6 +3124,7 @@ function saveSettingsPrices(){
     s.prices.evening=fb.evening;
   }
   DB.saveSettings(s);
+  _lastWrite=Date.now(); // تأكيد منع المستمع من الكتابة فوق الإعدادات المحفوظة
   showSettingsToast('✅ تم حفظ أسعار الفروع بنجاح');
 }
 
@@ -3111,6 +3139,7 @@ function saveSettingsCenter(){
   school.vatNumber=document.getElementById('sc-vat')?.value?.trim()||school.vatNumber;
   school.address=document.getElementById('sc-address')?.value?.trim()||school.address;
   DB.updateSchool(school);
+  _lastWrite=Date.now();
   showSettingsToast('✅ تم حفظ معلومات المركز بنجاح');
 }
 
@@ -3150,6 +3179,7 @@ function saveSettingsInvoice(){
   s.vatRate=+(document.getElementById('vat-rate')?.value||15);
   s.vatInclusive=document.getElementById('vat-inclusive')?.value!=='0';
   DB.saveSettings(s);
+  _lastWrite=Date.now();
   showSettingsToast('✅ تم حفظ إعدادات الفواتير والتنبيهات');
 }
 
