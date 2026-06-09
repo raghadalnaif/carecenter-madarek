@@ -5,3 +5,18 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# منع كيش HTML — يضمن وصول التحديثات الجديدة فوراً
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Pragma = "no-cache"
+    Expires = "0"
+
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Pragma = "no-cache"
+    Expires = "0"

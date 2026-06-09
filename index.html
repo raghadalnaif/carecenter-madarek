@@ -260,7 +260,15 @@ const DB = {
   set(k,v){
     _mem[k]=v;
     try{localStorage.setItem('ccs_'+k,JSON.stringify(v))}catch{}
-    if(_fdb){_lastWrite=Date.now();_fdb.ref('ccs/'+k).set(v).catch(e=>{console.error('[DB] Firebase write failed for key='+k+':',e.message);});}
+    if(_fdb&&_fbStatus==='ok'){
+      _lastWrite=Date.now();
+      // إعادة المحاولة مرة واحدة عند الفشل لضمان وصول البيانات لـFirebase
+      _fdb.ref('ccs/'+k).set(v).catch(()=>{
+        setTimeout(()=>{
+          if(_fdb&&_fbStatus==='ok') _fdb.ref('ccs/'+k).set(_mem[k]).catch(e=>console.error('[DB] Retry failed for key='+k+':',e.message));
+        },2000);
+      });
+    }
   },
   async initFirebase(){
     try{
@@ -286,7 +294,8 @@ const DB = {
       }
       // مستمع التحديثات الفورية
       _fdb.ref('ccs').on('value',snap=>{
-        if(Date.now()-_lastWrite<3000) return;
+        // تجاهل إذا كانت الكتابة حديثة (أقل من 5 ثوانٍ) لمنع التعارض
+        if(Date.now()-_lastWrite<5000) return;
         const d=snap.val();
         if(!d) return;
         let changed=false;
@@ -299,14 +308,16 @@ const DB = {
             const fresh=DB.users().find(u=>u.id===Auth.user.id);
             if(fresh){Auth.user=fresh;sessionStorage.setItem('ccs_user',JSON.stringify(fresh));}
           }
-          if(!App.modal){
+          // لا تُعِد الرسم إذا كان المستخدم يعدّل بيانات في صفحة الإعدادات
+          if(!App.modal&&App.view!=='settings'){
             const el=document.getElementById('content');
             if(!el) return;
             // حفظ قيم حقول البحث/الفلترة قبل إعادة الرسم وإعادتها بعده
             const saved={};
             el.querySelectorAll('input[id],select[id]').forEach(inp=>{saved[inp.id]=inp.value;});
             el.innerHTML=App.currentView();
-            Object.entries(saved).forEach(([id,val])=>{const f=document.getElementById(id);if(f&&f.value===''&&val)f.value=val;});
+            // استعادة القيم التي عدّلها المستخدم (وليس فقط الفارغة)
+            Object.entries(saved).forEach(([id,val])=>{const f=document.getElementById(id);if(f&&val!==undefined)f.value=val;});
           }
         }
       });
@@ -3097,6 +3108,7 @@ function saveSettingsPrices(){
     s.prices.evening=fb.evening;
   }
   DB.saveSettings(s);
+  _lastWrite=Date.now(); // تأكيد منع المستمع من الكتابة فوق الإعدادات المحفوظة
   showSettingsToast('✅ تم حفظ أسعار الفروع بنجاح');
 }
 
@@ -3111,6 +3123,7 @@ function saveSettingsCenter(){
   school.vatNumber=document.getElementById('sc-vat')?.value?.trim()||school.vatNumber;
   school.address=document.getElementById('sc-address')?.value?.trim()||school.address;
   DB.updateSchool(school);
+  _lastWrite=Date.now();
   showSettingsToast('✅ تم حفظ معلومات المركز بنجاح');
 }
 
@@ -3150,6 +3163,7 @@ function saveSettingsInvoice(){
   s.vatRate=+(document.getElementById('vat-rate')?.value||15);
   s.vatInclusive=document.getElementById('vat-inclusive')?.value!=='0';
   DB.saveSettings(s);
+  _lastWrite=Date.now();
   showSettingsToast('✅ تم حفظ إعدادات الفواتير والتنبيهات');
 }
 
