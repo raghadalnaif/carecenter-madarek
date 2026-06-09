@@ -15,7 +15,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Tajawal',sans-serif;background:#f1f5f9;color:#1e293b;direction:rtl}
 :root{--primary:#0f766e;--primary-dark:#0d6560;--primary-light:#ccfbf1;--danger:#ef4444;--warning:#f59e0b;--success:#10b981;--info:#3b82f6}
-.sidebar{width:240px;background:linear-gradient(160deg,#0f766e 0%,#065f46 100%);min-height:100vh;position:fixed;right:0;top:0;z-index:100;display:flex;flex-direction:column;transition:.3s}
+.sidebar{width:240px;background:linear-gradient(160deg,#0f766e 0%,#065f46 100%);height:100vh;overflow-y:auto;position:fixed;right:0;top:0;z-index:100;display:flex;flex-direction:column;transition:.3s}
 .sidebar-logo{padding:24px 20px;border-bottom:1px solid rgba(255,255,255,.15)}
 .sidebar-logo h1{color:#fff;font-size:18px;font-weight:700;line-height:1.4}
 .sidebar-logo p{color:rgba(255,255,255,.6);font-size:12px;margin-top:4px}
@@ -331,6 +331,16 @@ const DB = {
       _lastWrite=Date.now();
       _fdb.ref('ccs').update(missing).catch(()=>{});
     }
+    // ضمان سلامة دور المدير العام — إصلاح إذا تغيّر في Firebase
+    const usrs=_mem['users'];
+    if(Array.isArray(usrs)){
+      let roleFixed=false;
+      usrs.forEach(u=>{if(u.id==='sa1'&&u.role!=='superadmin'){u.role='superadmin';roleFixed=true;}});
+      if(roleFixed){
+        try{localStorage.setItem('ccs_users',JSON.stringify(usrs));}catch{}
+        if(_fdb&&_fbStatus==='ok'){_lastWrite=Date.now();_fdb.ref('ccs/users').set(usrs).catch(()=>{});}
+      }
+    }
   },
   users(){return this.get('users')||[]},
   schools(){return this.get('schools')||[]},
@@ -497,7 +507,7 @@ const App = {
     </div>`;
   },
   topbar(){
-    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة'};
+    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات'};
     const now=new Date();
     const hm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
     const unread=DB.unreadCount();
@@ -540,7 +550,7 @@ const App = {
             <div style="font-size:13px;font-weight:600">${esc(Auth.user.name)}</div>
             <div style="font-size:11px;color:#64748b">${Auth.user.role==='superadmin'?'مدير عام':Auth.user.role==='school_admin'?'مديرة فرع':'معلمة'}</div>
           </div>
-          <div class="avatar">${Auth.user.name.charAt(0)}</div>
+          <div class="avatar">${(Auth.user.name||'م').charAt(0)}</div>
         </div>
       </div>
     </div>`;
@@ -618,6 +628,9 @@ _superDash(){
   const totalRevenue=subs.reduce((a,s)=>a+s.paidAmount,0);
   const pendingRevenue=subs.reduce((a,s)=>a+(s.price-s.paidAmount),0);
   return `
+  <div style="margin-bottom:16px;display:flex;justify-content:flex-end">
+    <button class="btn" onclick="App.go('settings')" style="background:linear-gradient(135deg,#0f766e,#0d9488);color:#fff;font-size:14px;font-weight:700;padding:10px 20px;border:none;border-radius:10px;cursor:pointer;font-family:inherit">⚙️ لوحة التحكم</button>
+  </div>
   <div class="stats-grid">
     <div class="stat-card green"><div class="stat-val">${schools.length}</div><div class="stat-lbl">🏫 المدارس المشتركة</div></div>
     <div class="stat-card blue"><div class="stat-val">${children.length}</div><div class="stat-lbl">👶 إجمالي الأطفال</div></div>
