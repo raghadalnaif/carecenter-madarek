@@ -10,7 +10,7 @@
 <!-- BUILD: 2026-06-10-v10 -->
 <script>
 (function(){
-  var BUILD='v10-20260610';
+  var BUILD='v11-20260610';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   if(stored!==BUILD){
@@ -30,7 +30,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Tajawal',sans-serif;background:#f1f5f9;color:#1e293b;direction:rtl}
 :root{--primary:#0f766e;--primary-dark:#0d6560;--primary-light:#ccfbf1;--danger:#ef4444;--warning:#f59e0b;--success:#10b981;--info:#3b82f6}
-.sidebar{width:220px;background:linear-gradient(160deg,#0f766e 0%,#065f46 100%);height:100vh;overflow:hidden;position:fixed;right:0;top:0;z-index:100;display:flex;flex-direction:column;transition:.3s}
+.sidebar{width:200px;background:linear-gradient(160deg,#0f766e 0%,#065f46 100%);height:100vh;overflow:hidden;position:fixed;right:0;top:0;z-index:100;display:flex;flex-direction:column;transition:.3s}
 .sidebar-logo{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.15);flex-shrink:0;text-align:center}
 .sidebar-logo h1{color:#fff;font-size:14px;font-weight:700;line-height:1.3}
 .sidebar-logo p{color:rgba(255,255,255,.6);font-size:11px;margin-top:2px}
@@ -40,12 +40,12 @@ body{font-family:'Tajawal',sans-serif;background:#f1f5f9;color:#1e293b;direction
 .nav-item{display:flex;align-items:center;gap:8px;padding:7px 10px;color:rgba(255,255,255,.75);cursor:pointer;border-radius:7px;margin:0;transition:.2s;font-size:13px;font-weight:500}
 .nav-item:hover,.nav-item.active{background:rgba(255,255,255,.15);color:#fff}
 .nav-item .ni{width:18px;height:18px;flex-shrink:0}
-.main{margin-right:220px;min-height:100vh;display:flex;flex-direction:column}
+.main{margin-right:200px;min-height:100vh;display:flex;flex-direction:column}
 .topbar{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
 .topbar-title{font-size:18px;font-weight:700;color:#0f766e}
 .topbar-user{display:flex;align-items:center;gap:10px;cursor:pointer}
 .avatar{width:36px;height:36px;background:#0f766e;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px}
-.content{padding:24px;flex:1}
+.content{padding:20px;flex:1;overflow-x:auto}
 .card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.08);padding:24px;margin-bottom:20px}
 .card-title{font-size:16px;font-weight:700;color:#1e293b;margin-bottom:16px;display:flex;align-items:center;gap:8px}
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px}
@@ -75,7 +75,8 @@ body{font-family:'Tajawal',sans-serif;background:#f1f5f9;color:#1e293b;direction
 .btn-wa{background:#25d366;color:#fff;font-size:13px;padding:7px 14px}.btn-wa:hover{background:#22c55e}
 .btn-sm{padding:6px 12px;font-size:13px}
 .btn-xs{padding:4px 10px;font-size:12px}
-table{width:100%;border-collapse:collapse}
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -2px;padding:0 2px}
+table{width:100%;border-collapse:collapse;min-width:600px}
 th{background:#f8fafc;padding:11px 14px;text-align:right;font-weight:700;color:#475569;font-size:13px;border-bottom:2px solid #e2e8f0}
 td{padding:11px 14px;border-bottom:1px solid #f1f5f9;font-size:14px;vertical-align:middle}
 tr:hover td{background:#f8fafc}
@@ -115,8 +116,8 @@ details[open]>summary span:last-child{transform:rotate(180deg)}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:98}
 .sidebar-overlay.open{display:block}
 @media(max-width:1024px){
-  .sidebar{width:220px}
-  .main{margin-right:220px}
+  .sidebar{width:200px}
+  .main{margin-right:200px}
 }
 @media(max-width:768px){
   .sidebar{transform:translateX(110%);width:270px;z-index:200}
@@ -929,7 +930,7 @@ children(){
       <span class="chip ${pFilter==='evening'?'active':''}" onclick="App.go('children',{q:'${_fp.q}',branch:'${bFilter}',period:'evening'})">🌙 مسائي</span>
     </div>`:''}
   </div>`:''}
-  <div class="card">
+  <div class="card"><div class="table-wrap">
     <table id="kids-table">
       <thead><tr>${Auth.isSuperAdmin()?'<th>المدرسة</th>':''}<th>الفرع / الفترة</th><th>اسم الطفل</th><th>المعلمة</th><th>ولي الأمر</th><th>الهاتف</th><th>الاشتراك الحالي</th><th>حالة الدفع</th><th>إجراءات</th></tr></thead>
       <tbody>
@@ -969,7 +970,7 @@ children(){
         }).join(''):`<tr><td colspan="9"><div class="empty-state"><div class="es-icon">👶</div><p>لا يوجد أطفال في هذا الفرع</p></div></td></tr>`}
       </tbody>
     </table>
-  </div>`;
+  </div></div>`;
 },
 
 // ---------- SUBSCRIPTIONS ----------
@@ -1037,7 +1038,7 @@ subscriptions(){
     </div>`:''}
   </div>`:''}
   ${studentSummary}
-  <div class="card">
+  <div class="card"><div class="table-wrap">
     <table id="subs-table">
       <thead><tr><th>الطفل</th><th>النوع</th><th>يبدأ</th><th>ينتهي</th><th>المبلغ</th><th>طريقة الدفع</th><th>حالة الدفع</th><th>الحالة</th><th>إجراءات</th></tr></thead>
       <tbody>
@@ -1073,7 +1074,7 @@ subscriptions(){
         }).join(''):`<tr><td colspan="9"><div class="empty-state"><div class="es-icon">📋</div><p>لا توجد نتائج</p></div></td></tr>`}
       </tbody>
     </table>
-  </div>`;
+  </div></div>`;
 },
 
 // ---------- ATTENDANCE ----------
@@ -1277,7 +1278,7 @@ reports(){
   </div>
   <div class="card">
     <div class="card-title">تفاصيل المدفوعات لكل طفل</div>
-    <table id="rpt-financial">
+    <div class="table-wrap"><table id="rpt-financial">
       <thead><tr><th>الطفل</th><th>نوع الاشتراك</th><th>المبلغ الكلي</th><th>المدفوع</th><th>المتبقي</th><th>حالة الدفع</th></tr></thead>
       <tbody>
         ${subs.map(s=>{
@@ -1292,7 +1293,7 @@ reports(){
           </tr>`;
         }).join('')}
       </tbody>
-    </table>
+    </table></div>
   </div>`:''}
 
   ${tab==='attendance'?`
@@ -1315,7 +1316,7 @@ reports(){
   </div>
   <div class="card">
     <div class="card-title">تقرير حضور الأطفال${App.params.attFrom||App.params.attTo?` (${formatDate(App.params.attFrom)||'البداية'} — ${formatDate(App.params.attTo)||'اليوم'})`:''}</div>
-    <table id="rpt-attendance">
+    <div class="table-wrap"><table id="rpt-attendance">
       <thead><tr><th>الطفل</th><th>الفرع / الفترة</th><th>حضور</th><th>غياب</th><th>تأخر</th><th>الأيام</th><th>النسبة</th><th>آخر غياب</th></tr></thead>
       <tbody>
         ${children.filter(c=>!App.params.attQ||c.name.includes(App.params.attQ)).map(c=>{
@@ -1346,13 +1347,13 @@ reports(){
           </tr>`;
         }).join('')}
       </tbody>
-    </table>
+    </table></div>
   </div>`:''}
 
   ${tab==='subscriptions'&&isSA?`
   <div class="card">
     <div class="card-title">تقرير الاشتراكات التفصيلي</div>
-    <table id="rpt-subscriptions">
+    <div class="table-wrap"><table id="rpt-subscriptions">
       <thead><tr><th>الطفل</th><th>النوع</th><th>البداية</th><th>النهاية</th><th>المبلغ</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead>
       <tbody>
         ${subs.map(s=>{
@@ -1372,7 +1373,7 @@ reports(){
           </tr>`;
         }).join('')}
       </tbody>
-    </table>
+    </table></div>
   </div>`:''}
 
   ${tab==='student'?`
@@ -1419,7 +1420,7 @@ reports(){
   </div>
   <div class="card">
     <div class="card-title">📋 سجل الاشتراكات</div>
-    <table id="rpt-student">
+    <div class="table-wrap"><table id="rpt-student">
       <thead><tr><th>النوع</th><th>البداية</th><th>النهاية</th><th>المبلغ</th><th>المدفوع</th><th>المتبقي</th><th>طريقة الدفع</th><th>الحالة</th></tr></thead>
       <tbody>
         ${subs.filter(s=>s.childId===stId).sort((a,b)=>b.startDate.localeCompare(a.startDate)).map(s=>`<tr>
@@ -1433,11 +1434,11 @@ reports(){
           <td>${Views._payBadge(s)}</td>
         </tr>`).join('')}
       </tbody>
-    </table>
+    </table></div>
   </div>
   <div class="card" style="margin-top:16px">
     <div class="card-title">✅ سجل الحضور</div>
-    <table>
+    <div class="table-wrap"><table>
       <thead><tr><th>التاريخ</th><th>الحالة</th></tr></thead>
       <tbody>
         ${attList.filter(a=>a.childId===stId).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30).map(a=>`<tr>
@@ -1445,7 +1446,7 @@ reports(){
           <td><span class="badge ${a.status==='present'?'badge-green':a.status==='absent'?'badge-red':'badge-yellow'}">${{present:'حاضر',absent:'غائب',late:'متأخر'}[a.status]||a.status}</span></td>
         </tr>`).join('')||'<tr><td colspan="2"><div class="empty-state" style="padding:20px"><p>لا يوجد سجل حضور</p></div></td></tr>'}
       </tbody>
-    </table>
+    </table></div>
     <div style="margin-top:8px;font-size:12px;color:#94a3b8;no-print">يعرض آخر 30 سجل</div>
   </div>
   <div class="no-print" style="margin-top:12px;display:flex;gap:8px">
@@ -1607,7 +1608,7 @@ myReports(){
   <div class="card">
     <div class="card-title">📊 تقرير حضور أطفالي (${kids.length} طفل)</div>
     ${kids.length===0?`<div class="empty-state"><div class="es-icon">👶</div><p>لا يوجد أطفال مسندون إليك حتى الآن</p></div>`:`
-    <table id="rpt-teacher">
+    <div class="table-wrap"><table id="rpt-teacher">
       <thead><tr><th>الطفل</th><th>الفرع / الفترة</th><th>حالة الاشتراك</th><th>حضور</th><th>غياب</th><th>تأخر</th><th>نسبة</th></tr></thead>
       <tbody>
         ${kids.map(c=>{
@@ -1638,7 +1639,7 @@ myReports(){
           </tr>`;
         }).join('')}
       </tbody>
-    </table>`}
+    </table></div>`}
   </div>`;
 },
 
@@ -1979,7 +1980,7 @@ accounting(){
   </div>
   <div class="card">
     <div class="card-title">🧾 فواتير الاشتراكات (${filtered.length})</div>
-    <table id="acc-table">
+    <div class="table-wrap"><table id="acc-table">
       <thead><tr><th>رقم الفاتورة</th><th>الطفل</th><th>ولي الأمر</th><th>الفرع</th><th>الفترة</th><th>نوع الاشتراك</th><th>من</th><th>إلى</th><th>المبلغ</th><th>المدفوع</th><th>المتبقي</th><th>طريقة الدفع</th><th>الحالة</th><th>فاتورة</th></tr></thead>
       <tbody>
         ${filtered.length?filtered.map(s=>{
@@ -2003,7 +2004,7 @@ accounting(){
           </tr>`;
         }).join(''):`<tr><td colspan="14"><div class="empty-state"><div class="es-icon">🧾</div><p>لا توجد فواتير</p></div></td></tr>`}
       </tbody>
-    </table>
+    </table></div>
   </div>`;
 },
 
