@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-10-v24 -->
+<!-- BUILD: 2026-06-10-v25 -->
 <script>
 (function(){
-  var BUILD='v24-20260610-4';
+  var BUILD='v25-20260610-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -191,9 +191,9 @@ details[open]>summary span:last-child{transform:rotate(180deg)}
   @page{margin:1.5cm;size:A4 landscape}
 }
 .notif-panel{position:absolute;top:48px;left:0;width:340px;max-height:480px;overflow-y:auto;background:#fff;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.2);z-index:500;border:1px solid #e2e8f0;direction:rtl}
-.notif-item{padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;gap:10px;transition:.15s}
-.notif-item:hover{background:#f8fafc}
-.notif-item.unread{background:#f0fdf4}
+.notif-item{padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;gap:10px;transition:.15s;position:relative}
+.notif-item:hover{filter:brightness(0.97)}
+.notif-item.unread::before{content:'';position:absolute;top:8px;left:8px;width:7px;height:7px;border-radius:50%;background:#ef4444;box-shadow:0 0 0 2px #fff}
 .notif-badge{position:absolute;top:-5px;left:-5px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;border-radius:50%;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;padding:0 3px;pointer-events:none}
 .export-label{display:inline}
 @media(max-width:768px){
@@ -430,6 +430,30 @@ const DB = {
   childNotes(){return this.get('childNotes')||[]},
   addChildNote(n){const a=this.childNotes();a.unshift({...n,id:uid(),at:new Date().toISOString()});if(a.length>5000)a.splice(5000);this.save('childNotes',a)},
   deleteChildNote(id){this.save('childNotes',this.childNotes().filter(x=>x.id!==id))},
+  // رسائل داخلية ثنائية الاتجاه
+  internalMessages(){return this.get('internalMessages')||[]},
+  addInternalMessage(m){const a=this.internalMessages();a.unshift({...m,id:uid(),at:new Date().toISOString(),readBy:[m.fromId||'']});if(a.length>2000)a.splice(2000);this.save('internalMessages',a)},
+  markInternalRead(messageIds,userId){
+    if(!Array.isArray(messageIds)||!userId) return;
+    const a=this.internalMessages();
+    let changed=false;
+    a.forEach(m=>{
+      if(messageIds.includes(m.id)&&!(m.readBy||[]).includes(userId)){
+        m.readBy=[...(m.readBy||[]),userId];changed=true;
+      }
+    });
+    if(changed) this.save('internalMessages',a);
+  },
+  deleteInternalMessage(id){this.save('internalMessages',this.internalMessages().filter(x=>x.id!==id))},
+  unreadInternalCount(userId,role,branchId){
+    if(!userId) return 0;
+    return this.internalMessages().filter(m=>{
+      if((m.readBy||[]).includes(userId)) return false;
+      if(role==='superadmin') return m.toRole==='superadmin'||m.toUserId==='all_superadmins';
+      if(role==='school_admin') return m.toBranchId===branchId||m.toUserId===userId;
+      return false;
+    }).length;
+  },
   saveAttendance(list){this.save('attendance',list)},
   notifications(){return this.get('notifications')||[]},
   addNotification(n){
@@ -566,6 +590,7 @@ const App = {
       {v:'accounting',icon:'🧾',label:'المحاسبة'},
       {v:'tasks',icon:'📌',label:'مهام اليوم'},
       {v:'cashClosing',icon:'💰',label:'تقفيل الصندوق'},
+      {v:'messages',icon:'💬',label:'الرسائل الداخلية'},
       {v:'auditLog',icon:'🔍',label:'سجل النشاط'},
       {v:'settings',icon:'⚙️',label:'الإعدادات'},
     ] : u.role==='school_admin' ? [
@@ -576,6 +601,7 @@ const App = {
       {v:'branchTasks',icon:'🔴',label:'مهام التحصيل'},
       {v:'cashClosing',icon:'💰',label:'تقفيل الصندوق'},
       {v:'childNotes',icon:'📝',label:'ملاحظات الأطفال'},
+      {v:'messages',icon:'💬',label:'الرسائل الداخلية'},
       {v:'expenses',icon:'💸',label:'مصروفات الفرع'},
       {v:'branchReport',icon:'📈',label:'تقرير الفرع'},
       {v:'reports',icon:'📊',label:'التقارير'},
@@ -603,7 +629,7 @@ const App = {
     </div>`;
   },
   topbar(){
-    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات',accounting:'🧾 المحاسبة',branchReport:'📈 تقرير الفرع الشهري',childNotes:'📝 ملاحظات الأطفال',expenses:'💸 مصروفات الفرع'};
+    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات',accounting:'🧾 المحاسبة',branchReport:'📈 تقرير الفرع الشهري',childNotes:'📝 ملاحظات الأطفال',expenses:'💸 مصروفات الفرع',messages:'💬 الرسائل الداخلية',auditLog:'🔍 سجل النشاط'};
     const now=new Date();
     const hm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
     const unread=DB.unreadCount();
@@ -624,9 +650,9 @@ const App = {
     const branches=DB.branches();
     // لون لكل فرع (للتمييز البصري)
     const branchColor=(bid)=>{
-      if(!bid) return {bg:'#f1f5f9',fg:'#475569'};
+      if(!bid) return {bg:'#f1f5f9',fg:'#475569',tint:'#f8fafc'};
       const idx=branches.findIndex(b=>b.id===bid);
-      const colors=[{bg:'#dbeafe',fg:'#1e40af'},{bg:'#dcfce7',fg:'#166534'},{bg:'#fef3c7',fg:'#92400e'},{bg:'#fce7f3',fg:'#9f1239'}];
+      const colors=[{bg:'#dbeafe',fg:'#1e40af',tint:'#eff6ff'},{bg:'#dcfce7',fg:'#166534',tint:'#f0fdf4'},{bg:'#fef3c7',fg:'#92400e',tint:'#fffbeb'},{bg:'#fce7f3',fg:'#9f1239',tint:'#fdf2f8'}];
       return colors[idx>=0?idx%colors.length:0];
     };
     const periodLbl={morning:'🌅 صباحي',evening:'🌙 مسائي'};
@@ -668,9 +694,9 @@ const App = {
             notifs.slice(0,30).map(n=>{
               const c=branchColor(n.branchId);
               const bName=n.branchId?DB.branchName(n.branchId):'';
-              const sideBar=n.branchId?`border-right:4px solid ${c.fg};`:'';
+              const styleAttr=n.branchId?`background:${c.tint};border-right:5px solid ${c.fg};`:'background:#fff;';
               return `
-              <div class="notif-item ${n.isRead?'':'unread'}" style="${sideBar}">
+              <div class="notif-item ${n.isRead?'':'unread'}" style="${styleAttr}">
                 <span style="font-size:20px;flex-shrink:0">${typeIcon[n.type]||'🔔'}</span>
                 <div style="flex:1;min-width:0">
                   <div style="font-size:13px;font-weight:600;color:#1e293b">${esc(n.title)}</div>
@@ -719,11 +745,12 @@ const App = {
       auditLog:()=>Auth.isSuperAdmin(),
       branchReport:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       childNotes:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
+      messages:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
       settings:()=>Auth.isSuperAdmin(),
     };
     const guard=guards[App.view];
     if(guard&&!guard()) return Views._forbidden();
-    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,childNotes:Views.childNotes,settings:Views.settings};
+    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,childNotes:Views.childNotes,messages:Views.messages,settings:Views.settings};
     const fn=map[App.view]||Views.dashboard;
     try{return fn();}
     catch(e){console.error('[CCS]',App.view,e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة: ${App.view}</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
@@ -2760,6 +2787,85 @@ statement(){
 // ---------- AUDIT LOG (super admin only) ----------
 auditLog(){
   if(!Auth.isSuperAdmin()) return Views._forbidden();
+  const alTab=App.params.alTab||'log';
+  const branches=DB.branches();
+  const branchColorAL=(bid)=>{
+    if(!bid) return {bg:'#f1f5f9',fg:'#475569',tint:'#f8fafc'};
+    const idx=branches.findIndex(b=>b.id===bid);
+    const cols=[{bg:'#dbeafe',fg:'#1e40af',tint:'#eff6ff'},{bg:'#dcfce7',fg:'#166534',tint:'#f0fdf4'},{bg:'#fef3c7',fg:'#92400e',tint:'#fffbeb'},{bg:'#fce7f3',fg:'#9f1239',tint:'#fdf2f8'}];
+    return cols[idx>=0?idx%cols.length:0];
+  };
+  const allNotifs=DB.notifications();
+  const unreadN=allNotifs.filter(n=>!n.isRead).length;
+  const tabBar=`<div style="display:flex;gap:8px;margin-bottom:16px">
+    <button onclick="App.go('auditLog',{alTab:'log'})" style="background:${alTab==='log'?'#0f766e':'#fff'};color:${alTab==='log'?'#fff':'#374151'};border:2px solid ${alTab==='log'?'#0f766e':'#e2e8f0'};border-radius:10px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🔍 سجل النشاط</button>
+    <button onclick="App.go('auditLog',{alTab:'notifs'})" style="background:${alTab==='notifs'?'#0f766e':'#fff'};color:${alTab==='notifs'?'#fff':'#374151'};border:2px solid ${alTab==='notifs'?'#0f766e':'#e2e8f0'};border-radius:10px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🔔 التنبيهات${unreadN>0?` <span style="background:#ef4444;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;margin-right:4px">${unreadN}</span>`:''}
+    </button>
+  </div>`;
+
+  if(alTab==='notifs'){
+    const nfBranch=App.params.nfBranch||'all';
+    const nfType=App.params.nfType||'all';
+    const nfDate=App.params.nfDate||'';
+    let notifs=allNotifs;
+    if(nfBranch!=='all') notifs=notifs.filter(n=>n.branchId===nfBranch);
+    if(nfType!=='all') notifs=notifs.filter(n=>n.type===nfType);
+    if(nfDate) notifs=notifs.filter(n=>(n.createdAt||'').startsWith(nfDate));
+    const typeLabel={new_child:'👶 طفل جديد',new_sub:'📋 اشتراك جديد',first_att:'🌟 أول حضور'};
+    const periodLabel={morning:'صباحي',evening:'مسائي'};
+    return `${tabBar}
+    <div class="card no-print" style="padding:14px;margin-bottom:16px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div class="input-group" style="margin:0;min-width:160px">
+          <label style="font-size:12px">🏢 الفرع</label>
+          <select class="input" onchange="App.go('auditLog',{...App.params,nfBranch:this.value})">
+            <option value="all">جميع الفروع</option>
+            ${branches.map(b=>`<option value="${b.id}" ${nfBranch===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="input-group" style="margin:0;min-width:150px">
+          <label style="font-size:12px">🏷️ النوع</label>
+          <select class="input" onchange="App.go('auditLog',{...App.params,nfType:this.value})">
+            <option value="all">الكل (${allNotifs.length})</option>
+            <option value="new_child" ${nfType==='new_child'?'selected':''}>👶 طفل جديد</option>
+            <option value="new_sub" ${nfType==='new_sub'?'selected':''}>📋 اشتراك جديد</option>
+            <option value="first_att" ${nfType==='first_att'?'selected':''}>🌟 أول حضور</option>
+          </select>
+        </div>
+        <div class="input-group" style="margin:0;min-width:150px">
+          <label style="font-size:12px">📅 تاريخ</label>
+          <input class="input" type="date" value="${nfDate}" onchange="App.go('auditLog',{...App.params,nfDate:this.value})">
+        </div>
+        ${unreadN>0?`<button class="btn btn-secondary btn-sm" onclick="DB.markNotifsRead();App.refresh()">✓ تعليم الكل كمقروء</button>`:''}
+        ${(nfBranch!=='all'||nfType!=='all'||nfDate)?`<button class="btn btn-secondary btn-sm" onclick="App.go('auditLog',{alTab:'notifs'})">✕ مسح</button>`:''}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">🔔 التنبيهات — ${notifs.length} تنبيه</div>
+      ${notifs.length?notifs.slice(0,300).map(n=>{
+        const c=branchColorAL(n.branchId);
+        const branchName=branches.find(b=>b.id===n.branchId)?.name||n.branchId||'—';
+        const dt=n.createdAt?new Date(n.createdAt):null;
+        const dateStr=dt?dt.toLocaleDateString('ar-SA',{day:'2-digit',month:'2-digit',year:'numeric'}):'—';
+        const timeStr=dt?dt.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}):'';
+        return `<div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;background:${n.isRead?c.tint:'#fff'};border-right:4px solid ${c.fg};display:flex;gap:12px;align-items:flex-start;position:relative">
+          ${!n.isRead?'<span style="position:absolute;top:10px;left:10px;width:7px;height:7px;border-radius:50%;background:#ef4444;display:block"></span>':''}
+          <div style="flex:1">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+              <span style="font-size:13px;font-weight:700;color:#1e293b">${esc(n.title||'—')}</span>
+              <span style="background:${c.bg};color:${c.fg};font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px">🏢 ${esc(branchName.split(' - ')[0]||branchName)}</span>
+              ${n.period?`<span style="background:${n.period==='morning'?'#fffbeb':'#f5f3ff'};color:${n.period==='morning'?'#92400e':'#5b21b6'};font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px">${n.period==='morning'?'🌅':'🌙'} ${periodLabel[n.period]||n.period}</span>`:''}
+              <span style="font-size:11px;color:#94a3b8">${typeLabel[n.type]||esc(n.type||'')}</span>
+            </div>
+            <div style="font-size:13px;color:#374151">${esc(n.body||'—')}</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:4px">${dateStr} ${timeStr} — بواسطة: ${esc(n.addedBy||'—')}</div>
+          </div>
+        </div>`;
+      }).join('')
+      :`<div class="empty-state"><div class="es-icon">🔔</div><p>لا توجد تنبيهات بهذه المعايير</p></div>`}
+    </div>`;
+  }
+
   const log=DB.auditLog();
   const filterAction=App.params.alAction||'all';
   const filterDate=App.params.alDate||'';
@@ -2774,7 +2880,7 @@ auditLog(){
     'إضافة مستخدم':'#0f766e','تعديل مستخدم':'#0f766e','إضافة مصروف':'#f59e0b',
     'تعديل مصروف':'#f59e0b','حذف مصروف':'#ef4444'
   };
-  return `
+  return `${tabBar}
   <div class="card no-print" style="padding:14px;margin-bottom:16px">
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
       <div class="input-group" style="margin:0;flex:1;min-width:180px">
@@ -2792,7 +2898,7 @@ auditLog(){
         <label style="font-size:12px">📅 تاريخ</label>
         <input class="input" type="date" value="${filterDate}" onchange="App.go('auditLog',{...App.params,alDate:this.value})">
       </div>
-      ${(filterAction!=='all'||filterDate||searchQ)?`<button class="btn btn-secondary btn-sm" onclick="App.go('auditLog')">✕ مسح</button>`:''}
+      ${(filterAction!=='all'||filterDate||searchQ)?`<button class="btn btn-secondary btn-sm" onclick="App.go('auditLog',{alTab:'log'})">✕ مسح</button>`:''}
     </div>
   </div>
   <div class="card">
@@ -3002,6 +3108,114 @@ childNotes(){
       </tbody>
     </table></div>`}
   </div>`;
+},
+
+// ---------- INTERNAL MESSAGES ----------
+messages(){
+  if(!Auth.isSchoolAdmin()&&!Auth.isSuperAdmin()) return Views._forbidden();
+  const me=Auth.user;
+  const isSA=Auth.isSuperAdmin();
+  const myBid=Auth.branchId();
+  const allMsgs=DB.internalMessages();
+  const branches=DB.branches();
+  const visible=allMsgs.filter(m=>{
+    if(isSA) return m.toRole==='superadmin'||m.fromRole==='superadmin';
+    if(Auth.isSchoolAdmin()) return m.fromBranchId===myBid||m.toBranchId===myBid||m.toUserId===me.id||m.fromUserId===me.id;
+    return false;
+  });
+  const activeThread=App.params.thread||(isSA?(branches[0]?.id||''):'sa');
+  let threadMsgs;
+  if(isSA){
+    threadMsgs=visible.filter(m=>m.fromBranchId===activeThread||m.toBranchId===activeThread);
+  } else {
+    threadMsgs=visible;
+  }
+  threadMsgs=[...threadMsgs].sort((a,b)=>(a.at||'').localeCompare(b.at||''));
+  const toMark=threadMsgs.filter(m=>!(m.readBy||[]).includes(me.id)).map(m=>m.id);
+  if(toMark.length) setTimeout(()=>DB.markInternalRead(toMark,me.id),300);
+
+  const branchColor=(bid)=>{
+    if(!bid) return {bg:'#f1f5f9',fg:'#475569',light:'#fff'};
+    const idx=branches.findIndex(b=>b.id===bid);
+    const cols=[{bg:'#dbeafe',fg:'#1e40af',light:'#eff6ff'},{bg:'#dcfce7',fg:'#166534',light:'#f0fdf4'},{bg:'#fef3c7',fg:'#92400e',light:'#fffbeb'},{bg:'#fce7f3',fg:'#9f1239',light:'#fdf2f8'}];
+    return cols[idx>=0?idx%cols.length:0];
+  };
+
+  let sidebar='';
+  if(isSA){
+    sidebar=branches.map(b=>{
+      const c=branchColor(b.id);
+      const bMsgs=visible.filter(m=>m.fromBranchId===b.id||m.toBranchId===b.id);
+      const unread=bMsgs.filter(m=>!(m.readBy||[]).includes(me.id)).length;
+      const last=bMsgs.sort((a,b)=>(b.at||'').localeCompare(a.at||''))[0];
+      const lastPreview=last?(last.message||'').slice(0,40):'';
+      return `<div onclick="App.go('messages',{thread:'${b.id}'})" style="cursor:pointer;padding:14px;border-bottom:1px solid #e2e8f0;background:${activeThread===b.id?c.light:'#fff'};border-right:4px solid ${activeThread===b.id?c.fg:'transparent'}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <strong style="color:${c.fg};font-size:14px">🏢 ${esc(b.name.split(' - ')[0]||b.name)}</strong>
+          ${unread>0?`<span style="background:#ef4444;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">${unread}</span>`:''}
+        </div>
+        <div style="font-size:11px;color:#64748b;line-height:1.4">${esc(lastPreview)||'لا توجد رسائل بعد'}</div>
+        ${last?`<div style="font-size:10px;color:#94a3b8;margin-top:3px">${formatRelTime(last.at)}</div>`:''}
+      </div>`;
+    }).join('');
+  }
+
+  const activeBranchInfo=isSA?branches.find(b=>b.id===activeThread):branches.find(b=>b.id===myBid);
+  const activeColor=branchColor(activeBranchInfo?.id);
+  const headerLabel=isSA?(activeBranchInfo?`💬 محادثة مع مديرة ${esc(activeBranchInfo.name)}`:'💬 اختر فرعاً'):'💬 محادثة مع المدير العام';
+  const subHint=isSA?'الرسائل هنا داخلية بينك ومديرة الفرع فقط — لا تُرسل عبر واتساب':'الرسائل هنا داخلية بينك والمدير العام فقط — لا تُرسل عبر واتساب';
+
+  return `
+  <div class="card no-print" style="padding:14px;margin-bottom:14px;background:linear-gradient(135deg,#0f766e,#065f46);color:#fff">
+    <div style="font-size:18px;font-weight:800">💬 الرسائل الداخلية</div>
+    <p style="opacity:.9;font-size:13px;margin-top:4px">قناة تواصل مباشرة وآمنة بين المدير العام ومديرات الفروع — للملاحظات الإدارية والاستفسارات اليومية</p>
+  </div>
+
+  <div style="display:grid;grid-template-columns:${isSA?'320px 1fr':'1fr'};gap:14px;align-items:start">
+    ${isSA?`<div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:12px 14px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:13px;font-weight:700;color:#1e293b">📥 المحادثات حسب الفرع</div>
+      ${sidebar||'<div style="padding:32px;text-align:center;color:#94a3b8">لا توجد فروع</div>'}
+    </div>`:''}
+
+    <div class="card" style="padding:0;display:flex;flex-direction:column;min-height:500px">
+      <div style="padding:14px 16px;background:${activeColor.light};border-bottom:1px solid ${activeColor.fg}33">
+        <div style="font-size:14px;font-weight:700;color:${activeColor.fg}">${headerLabel}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px">${subHint}</div>
+      </div>
+      <div id="msg-list" style="flex:1;padding:16px;overflow-y:auto;max-height:520px;background:#fafafa;display:flex;flex-direction:column;gap:10px">
+        ${threadMsgs.length===0?`<div style="text-align:center;color:#94a3b8;padding:60px 20px;font-size:14px">
+          <div style="font-size:42px;margin-bottom:10px">💬</div>
+          <div>لا توجد رسائل بعد</div>
+          <div style="font-size:12px;margin-top:6px">ابدأ المحادثة بكتابة رسالة في الأسفل</div>
+        </div>`:threadMsgs.map(m=>{
+          const mine=m.fromUserId===me.id;
+          const fromBranch=branches.find(b=>b.id===m.fromBranchId);
+          const c=branchColor(m.fromBranchId);
+          const bgColor=mine?'#0f766e':(m.fromRole==='superadmin'?'#f5f3ff':c.light);
+          const fgColor=mine?'#fff':'#1e293b';
+          const borderC=mine?'#0f766e':(m.fromRole==='superadmin'?'#a78bfa':c.fg);
+          return `<div style="display:flex;${mine?'justify-content:flex-end':'justify-content:flex-start'}">
+            <div style="max-width:75%;background:${bgColor};color:${fgColor};border:1px solid ${borderC}33;border-radius:14px;padding:10px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11px;${mine?'color:rgba(255,255,255,.85)':'color:#64748b'};font-weight:700">
+                ${m.fromRole==='superadmin'?'👔':'🏢'} ${esc(m.fromName||'—')}
+                ${fromBranch&&!mine&&m.fromRole!=='superadmin'?`<span style="background:${c.bg};color:${c.fg};padding:1px 6px;border-radius:6px;font-size:10px">${esc(fromBranch.name.split(' - ')[0]||fromBranch.name)}</span>`:''}
+              </div>
+              <div style="font-size:13px;line-height:1.6;white-space:pre-wrap">${esc(m.message)}</div>
+              <div style="font-size:10px;${mine?'color:rgba(255,255,255,.7)':'color:#94a3b8'};margin-top:5px;text-align:left">
+                ${formatRelTime(m.at)} ${mine&&(m.readBy||[]).length>1?'· ✓✓ مقروء':mine?'· ✓ مُرسَلة':''}
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      ${(isSA&&!activeBranchInfo)?'':`<div style="padding:12px 14px;border-top:1px solid #e2e8f0;background:#fff;display:flex;gap:8px">
+        <textarea id="msg-input" class="input" rows="2" placeholder="اكتب رسالتك هنا..." style="flex:1;resize:none;font-family:inherit"></textarea>
+        <button class="btn btn-primary" onclick="sendInternalMessage('${isSA?activeThread:''}')">📤 إرسال</button>
+      </div>`}
+    </div>
+  </div>
+  <img src="__none__" style="display:none" onerror="(function(){const ml=document.getElementById('msg-list');if(ml) ml.scrollTop=ml.scrollHeight;})()">
+  `;
 },
 
 // ---------- SETTINGS (super admin only) ----------
@@ -5428,6 +5642,38 @@ function deleteChildNote(noteId){
   if(!confirm('هل تريد حذف هذه الملاحظة؟')) return;
   DB.deleteChildNote(noteId);
   toast('تم حذف الملاحظة');
+  App.refresh();
+}
+
+// إرسال رسالة داخلية
+function sendInternalMessage(targetBranchId){
+  const me=Auth.user;
+  if(!me) return;
+  const text=document.getElementById('msg-input')?.value?.trim();
+  if(!text){toast('اكتب رسالة أولاً','error');return;}
+  const isSA=Auth.isSuperAdmin();
+  let msg;
+  if(isSA){
+    if(!targetBranchId){toast('اختر فرعاً أولاً','error');return;}
+    const branchAdmin=DB.users().find(u=>u.role==='school_admin'&&u.branchId===targetBranchId);
+    msg={
+      fromUserId:me.id,fromName:me.name,fromRole:'superadmin',fromBranchId:null,
+      toUserId:branchAdmin?.id||null,toRole:'school_admin',toBranchId:targetBranchId,
+      message:text,
+    };
+  } else {
+    msg={
+      fromUserId:me.id,fromName:me.name,fromRole:'school_admin',fromBranchId:me.branchId,
+      toUserId:'all_superadmins',toRole:'superadmin',toBranchId:null,
+      message:text,
+    };
+  }
+  msg.fromId=me.id;
+  DB.addInternalMessage(msg);
+  DB.addAuditLog({action:'رسالة داخلية',entity:'رسائل',entityId:msg.fromUserId,details:`من ${me.name} إلى ${isSA?DB.branchName(targetBranchId):'المدير العام'}: ${text.slice(0,80)}${text.length>80?'...':''}`,by:me.name});
+  const inp=document.getElementById('msg-input');
+  if(inp) inp.value='';
+  toast('✅ تم إرسال الرسالة');
   App.refresh();
 }
 
