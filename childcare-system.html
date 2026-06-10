@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-10-v10 -->
+<!-- BUILD: 2026-06-10-v21 -->
 <script>
 (function(){
-  var BUILD='v20-20260610';
+  var BUILD='v21-20260610';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   if(stored!==BUILD){
@@ -418,6 +418,10 @@ const DB = {
   // تقفيل الصندوق اليومي (Daily Cash Closing)
   cashClosings(){return this.get('cashClosings')||[]},
   addCashClosing(c){const a=this.cashClosings();a.unshift({...c,id:uid(),at:new Date().toISOString()});if(a.length>730)a.splice(730);this.save('cashClosings',a)},
+  // ملاحظات الأطفال اليومية
+  childNotes(){return this.get('childNotes')||[]},
+  addChildNote(n){const a=this.childNotes();a.unshift({...n,id:uid(),at:new Date().toISOString()});if(a.length>5000)a.splice(5000);this.save('childNotes',a)},
+  deleteChildNote(id){this.save('childNotes',this.childNotes().filter(x=>x.id!==id))},
   saveAttendance(list){this.save('attendance',list)},
   notifications(){return this.get('notifications')||[]},
   addNotification(n){
@@ -562,6 +566,9 @@ const App = {
       {v:'attendance',icon:'✅',label:'الحضور'},
       {v:'branchTasks',icon:'🔴',label:'مهام التحصيل'},
       {v:'cashClosing',icon:'💰',label:'تقفيل الصندوق'},
+      {v:'childNotes',icon:'📝',label:'ملاحظات الأطفال'},
+      {v:'expenses',icon:'💸',label:'مصروفات الفرع'},
+      {v:'branchReport',icon:'📈',label:'تقرير الفرع'},
       {v:'reports',icon:'📊',label:'التقارير'},
       {v:'teachers',icon:'👩‍🏫',label:'المعلمات'},
       {v:'whatsapp',icon:'💬',label:'رسائل واتساب'},
@@ -587,7 +594,7 @@ const App = {
     </div>`;
   },
   topbar(){
-    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات',accounting:'🧾 المحاسبة'};
+    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات',accounting:'🧾 المحاسبة',branchReport:'📈 تقرير الفرع الشهري',childNotes:'📝 ملاحظات الأطفال',expenses:'💸 مصروفات الفرع'};
     const now=new Date();
     const hm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
     const unread=DB.unreadCount();
@@ -650,18 +657,19 @@ const App = {
       activities:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       sales:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       accounting:()=>Auth.isSuperAdmin(),
-      expenses:()=>Auth.isSuperAdmin(),
+      expenses:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       tasks:()=>Auth.isSuperAdmin(),
       branchTasks:()=>Auth.isSchoolAdmin(),
       cashClosing:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
       statement:()=>Auth.isSuperAdmin(),
       auditLog:()=>Auth.isSuperAdmin(),
-      branchReport:()=>Auth.isSuperAdmin(),
+      branchReport:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
+      childNotes:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
       settings:()=>Auth.isSuperAdmin(),
     };
     const guard=guards[App.view];
     if(guard&&!guard()) return Views._forbidden();
-    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,settings:Views.settings};
+    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,childNotes:Views.childNotes,settings:Views.settings};
     const fn=map[App.view]||Views.dashboard;
     try{return fn();}
     catch(e){console.error('[CCS]',App.view,e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة: ${App.view}</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
@@ -1272,6 +1280,7 @@ attendance(){
       </div>
       ${a?`<div style="font-size:11px;margin-top:6px;color:#64748b">دخول: ${a.checkIn||'—'} · خروج: ${a.checkOut||'—'}</div>`:''}
       ${status==='absent'&&c.parentPhone?`<button class="btn btn-wa btn-xs" style="width:100%;margin-top:6px;justify-content:center" onclick="notifyAbsentParent('${c.id}','${date}')">💬 إبلاغ ولي الأمر بالغياب</button>`:''}
+      <button class="btn btn-secondary btn-xs" style="width:100%;margin-top:4px;justify-content:center;font-size:11px" onclick="openChildNoteModal('${c.id}','${date}')">📝 إضافة ملاحظة</button>
     </div>`;
   };
 
@@ -2206,14 +2215,15 @@ accounting(){
   })()}`;
 },
 
-// ---------- EXPENSES (super admin only) ----------
+// ---------- EXPENSES ----------
 expenses(){
-  if(!Auth.isSuperAdmin()) return Views._forbidden();
+  if(!Auth.isSuperAdmin()&&!Auth.isSchoolAdmin()) return Views._forbidden();
+  const bid=Auth.branchId();
   const exps=DB.expenses();
   const branches=DB.branches();
   const fMonth=App.params.expMonth||T0.slice(0,7); // YYYY-MM
   const fCat=App.params.expCat||'all';
-  const fBranch=App.params.expBranch||'all';
+  const fBranch=bid||(App.params.expBranch||'all');
   const catLbl={salary:'👩‍🏫 رواتب',rent:'🏢 إيجار',utilities:'💡 فواتير (كهرباء/ماء/نت)',supplies:'📦 مستلزمات',maintenance:'🔧 صيانة',transport:'🚗 مواصلات',marketing:'📢 تسويق',food:'🍽️ مأكولات',other:'📋 أخرى'};
   const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',cheque:'📃 شيك'};
   let filtered=exps;
@@ -2227,10 +2237,10 @@ expenses(){
   const byCat={};
   filtered.forEach(e=>{byCat[e.category]=(byCat[e.category]||0)+(+e.amount||0);});
   const topCat=Object.entries(byCat).sort((a,b)=>b[1]-a[1])[0];
-  // إيرادات نفس الشهر (الدفعات المستلمة)
-  const monthSubs=DB.subscriptions().filter(s=>(s.createdAt||s.startDate||'').startsWith(fMonth));
+  // إيرادات نفس الشهر (الدفعات المستلمة) — مع فلترة الفرع إن وجد
+  const monthSubs=DB.subscriptions().filter(s=>(s.createdAt||s.startDate||'').startsWith(fMonth)&&(fBranch==='all'||s.branchId===fBranch));
   const monthRevenue=monthSubs.reduce((a,s)=>a+(+s.paidAmount||0),0);
-  const monthSales=DB.sales().filter(s=>(s.date||'').startsWith(fMonth)).reduce((a,s)=>a+(+s.price||0),0);
+  const monthSales=DB.sales().filter(s=>(s.date||'').startsWith(fMonth)&&(fBranch==='all'||!s.branchId||s.branchId===fBranch)).reduce((a,s)=>a+(+s.price||0),0);
   const totalIncome=monthRevenue+monthSales;
   const netProfit=totalIncome-monthTotal;
 
@@ -2254,16 +2264,16 @@ expenses(){
           ${Object.entries(catLbl).map(([k,l])=>`<option value="${k}" ${fCat===k?'selected':''}>${l}</option>`).join('')}
         </select>
       </div>
-      <div class="input-group" style="margin:0;min-width:140px">
+      ${!bid?`<div class="input-group" style="margin:0;min-width:140px">
         <label style="font-size:12px">🏢 الفرع</label>
         <select class="input" onchange="expSet('expBranch',this.value)">
           <option value="all">الكل</option>
           ${branches.map(b=>`<option value="${b.id}" ${fBranch===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}
         </select>
-      </div>
+      </div>`:`<div class="input-group" style="margin:0"><label style="font-size:12px">🏢 الفرع</label><div class="input" style="background:#f8fafc;color:#0f766e;font-weight:700">${esc(DB.branchName(bid))}</div></div>`}
       <button class="btn btn-primary btn-sm" onclick="Modals.addExpense()">+ تسجيل مصروف</button>
       <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('exp-table','مصروفات-'+'${fMonth}')">📊 CSV</button>
-      ${(fCat!=='all'||fBranch!=='all')?`<button class="btn btn-secondary btn-sm" onclick="App.go('expenses',{expMonth:'${fMonth}'})">✕ مسح</button>`:''}
+      ${(fCat!=='all'||(!bid&&fBranch!=='all'))?`<button class="btn btn-secondary btn-sm" onclick="App.go('expenses',{expMonth:'${fMonth}'})">✕ مسح</button>`:''}
     </div>
   </div>
   <div class="card">
@@ -2446,6 +2456,17 @@ branchTasks(){
       <tbody>${pending.map(s=>renderRow(s,`<span style="color:#f59e0b;font-weight:700">${(s.price-s.paidAmount).toLocaleString()} ر.س</span>`)).join('')}</tbody>
     </table></div>`:`<div class="empty-state"><div class="es-icon">✅</div><p>لا يوجد معلّقون</p></div>`}
   </div>
+
+  ${expiringSoon.length?`
+  <div class="card no-print" style="padding:14px;background:#eff6ff;border:1px solid #bfdbfe;margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#1e40af">🔔 تذكيرات التجديد التلقائية</div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">${expiringSoon.length} اشتراك تنتهي خلال 7 أيام — أرسلي تذكيرات التجديد الآن بضغطة زر</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="sendRenewalReminders()">🔔 إرسال التذكيرات (${expiringSoon.length})</button>
+    </div>
+  </div>`:''}
 
   <div class="card" style="border-right:6px solid #3b82f6">
     <div class="card-title" style="color:#1e40af">⏰ تنتهي خلال 7 أيام (${expiringSoon.length})</div>
@@ -2743,11 +2764,12 @@ auditLog(){
   </div>`;
 },
 
-// ---------- BRANCH MONTHLY REPORT (super admin only) ----------
+// ---------- BRANCH MONTHLY REPORT ----------
 branchReport(){
-  if(!Auth.isSuperAdmin()) return Views._forbidden();
+  if(!Auth.isSuperAdmin()&&!Auth.isSchoolAdmin()) return Views._forbidden();
+  const bid=Auth.branchId();
   const fMonth=App.params.brMonth||T0.slice(0,7);
-  const fBranch=App.params.brBranch||'all';
+  const fBranch=bid||(App.params.brBranch||'all');
   const branches=DB.branches();
   const subs=DB.subscriptions();
   const exps=DB.expenses();
@@ -2783,13 +2805,13 @@ branchReport(){
         <label style="font-size:12px">📅 الشهر</label>
         <input class="input" type="month" value="${fMonth}" onchange="App.go('branchReport',{...App.params,brMonth:this.value})">
       </div>
-      <div class="input-group" style="margin:0;min-width:180px">
+      ${!bid?`<div class="input-group" style="margin:0;min-width:180px">
         <label style="font-size:12px">🏢 الفرع</label>
         <select class="input" onchange="App.go('branchReport',{...App.params,brBranch:this.value})">
           <option value="all">جميع الفروع</option>
           ${branches.map(b=>`<option value="${b.id}" ${fBranch===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}
         </select>
-      </div>
+      </div>`:`<div class="input-group" style="margin:0"><label style="font-size:12px">🏢 الفرع</label><div class="input" style="background:#f8fafc;color:#0f766e;font-weight:700">${esc(DB.branchName(bid))}</div></div>`}
       <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ طباعة</button>
       <button class="btn btn-primary btn-sm" onclick="printBranchReport('${fMonth}','${fBranch}')">📄 تصدير PDF</button>
     </div>
@@ -2842,6 +2864,90 @@ branchReport(){
       </tbody>
     </table></div>`:''}
   </div>`).join('')}`;
+},
+
+// ---------- CHILD NOTES ----------
+childNotes(){
+  if(!Auth.isSchoolAdmin()&&!Auth.isSuperAdmin()) return Views._forbidden();
+  const sid=Auth.schoolId();
+  const bid=Auth.branchId();
+  const allNotes=DB.childNotes().filter(n=>(!sid||n.schoolId===sid)&&(!bid||n.branchId===bid));
+  const children=DB.children().filter(c=>(!sid||c.schoolId===sid)&&(!bid||c.branchId===bid));
+  const fDate=App.params.cnDate||'';
+  const fType=App.params.cnType||'all';
+  const fChild=App.params.cnChild||'';
+  let filtered=allNotes;
+  if(fDate) filtered=filtered.filter(n=>n.date===fDate);
+  if(fType!=='all') filtered=filtered.filter(n=>n.type===fType);
+  if(fChild) filtered=filtered.filter(n=>n.childId===fChild);
+  const typeLbl={parent:'📤 لولي الأمر',internal:'🔒 داخلية'};
+  const todayCount=allNotes.filter(n=>n.date===T0).length;
+  const parentCount=allNotes.filter(n=>n.type==='parent').length;
+  return `
+  <div class="card no-print" style="padding:14px;margin-bottom:14px;background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-size:18px;font-weight:800">📝 ملاحظات الأطفال اليومية</div>
+        <p style="opacity:.9;font-size:13px;margin-top:4px">سجّلي ملاحظات لكل طفل — للإدارة أو لإرسالها لولي الأمر عبر واتساب</p>
+      </div>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4)" onclick="openChildNoteModal('','${T0}')">+ إضافة ملاحظة</button>
+    </div>
+  </div>
+
+  <div class="stats-grid" style="margin-bottom:16px">
+    <div class="stat-card blue"><div class="stat-val">${allNotes.length}</div><div class="stat-lbl">📝 إجمالي الملاحظات</div></div>
+    <div class="stat-card green"><div class="stat-val">${todayCount}</div><div class="stat-lbl">📅 ملاحظات اليوم</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${parentCount}</div><div class="stat-lbl">📤 مُرسَلة لأولياء الأمور</div></div>
+    <div class="stat-card blue"><div class="stat-val">${allNotes.length-parentCount}</div><div class="stat-lbl">🔒 ملاحظات داخلية</div></div>
+  </div>
+
+  <div class="card" style="padding:14px;margin-bottom:14px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="input-group" style="margin:0;min-width:150px">
+        <label style="font-size:12px">📅 التاريخ</label>
+        <input class="input" type="date" value="${fDate}" onchange="App.go('childNotes',{...App.params,cnDate:this.value})">
+      </div>
+      <div class="input-group" style="margin:0;min-width:150px">
+        <label style="font-size:12px">🔖 النوع</label>
+        <select class="input" onchange="App.go('childNotes',{...App.params,cnType:this.value})">
+          <option value="all" ${fType==='all'?'selected':''}>الكل</option>
+          <option value="parent" ${fType==='parent'?'selected':''}>📤 لولي الأمر</option>
+          <option value="internal" ${fType==='internal'?'selected':''}>🔒 داخلية</option>
+        </select>
+      </div>
+      <div class="input-group" style="margin:0;min-width:160px">
+        <label style="font-size:12px">👶 الطفل</label>
+        <select class="input" onchange="App.go('childNotes',{...App.params,cnChild:this.value})">
+          <option value="">كل الأطفال</option>
+          ${children.map(c=>`<option value="${c.id}" ${fChild===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}
+        </select>
+      </div>
+      ${(fDate||fType!=='all'||fChild)?`<button class="btn btn-secondary btn-sm" onclick="App.go('childNotes')">✕ مسح الفلاتر</button>`:''}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📋 الملاحظات المسجّلة (${filtered.length})</div>
+    ${filtered.length===0?`<div class="empty-state"><div class="es-icon">📝</div><p>لا توجد ملاحظات${fDate?' لهذا اليوم':fChild?' لهذا الطفل':''}</p><button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="openChildNoteModal('${fChild}','${fDate||T0}')">+ إضافة أول ملاحظة</button></div>`:`
+    <div class="table-wrap"><table>
+      <thead><tr><th>التاريخ</th><th>الطفل</th><th>الملاحظة</th><th>النوع</th><th>بواسطة</th><th>إجراء</th></tr></thead>
+      <tbody>${filtered.map(n=>{
+        const c=children.find(x=>x.id===n.childId);
+        return `<tr>
+          <td style="white-space:nowrap;font-size:13px">${formatDate(n.date)}</td>
+          <td><strong>${esc(c?.name||'—')}</strong><br><small style="color:#64748b">${esc(c?.parentName||'')}</small></td>
+          <td style="max-width:260px;font-size:13px;line-height:1.5">${esc(n.note)}</td>
+          <td><span class="badge ${n.type==='parent'?'badge-green':'badge-blue'}">${typeLbl[n.type]||n.type}</span></td>
+          <td style="font-size:12px;color:#64748b">${esc(n.by||'—')}</td>
+          <td style="white-space:nowrap">
+            ${n.type==='parent'&&c?.parentPhone?`<button class="btn btn-success btn-xs" onclick="sendNoteToParent('${n.id}')">💬 واتساب</button>`:''}
+            <button class="btn btn-danger btn-xs" onclick="deleteChildNote('${n.id}')">🗑️</button>
+          </td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table></div>`}
+  </div>`;
 },
 
 // ---------- SETTINGS (super admin only) ----------
@@ -5197,6 +5303,100 @@ function saveCashClosing(date,branchId,expCash,expMada,expTransfer){
   DB.addAuditLog({action:'تقفيل صندوق',entity:'صندوق',entityId:date,details:`فرع: ${branchId==='all'?'الكل':DB.branchName(branchId)} | المتوقع: ${expCash} | الفعلي: ${actualCash} | الفرق: ${diff}${notes?' | '+notes:''}`,by:Auth.user?.name||'—'});
   toast('🔒 تم تقفيل اليوم بنجاح');
   App.refresh();
+}
+
+// ملاحظات الأطفال — فتح نافذة إضافة
+function openChildNoteModal(childId,date){
+  const sid=Auth.schoolId();
+  const bid=Auth.branchId();
+  const children=DB.children().filter(c=>(!sid||c.schoolId===sid)&&(!bid||c.branchId===bid));
+  App.showModal(`
+  <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header"><h2>📝 إضافة ملاحظة</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="input-group">
+        <label>👶 الطفل</label>
+        <select class="input" id="note-child-id">
+          ${!childId?'<option value="">— اختر طفل —</option>':''}
+          ${children.map(c=>`<option value="${c.id}" ${c.id===childId?'selected':''}>${esc(c.name)} — ${esc(c.parentName||'')}</option>`).join('')}
+        </select>
+      </div>
+      <div class="input-group">
+        <label>📅 التاريخ</label>
+        <input class="input" id="note-date" type="date" value="${date||T0}" max="${T0}">
+      </div>
+      <div class="input-group">
+        <label>🔖 النوع</label>
+        <div style="display:flex;gap:16px;margin-top:6px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px"><input type="radio" name="note-type" value="parent" checked> 📤 ترسل لولي الأمر</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px"><input type="radio" name="note-type" value="internal"> 🔒 داخلية للإدارة</label>
+        </div>
+      </div>
+      <div class="input-group">
+        <label>✏️ الملاحظة</label>
+        <textarea class="input" id="note-text" rows="4" placeholder="اكتبي ملاحظتك هنا..." style="resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveChildNote()">💾 حفظ الملاحظة</button>
+    </div>
+  </div></div>`);
+}
+
+function saveChildNote(){
+  const childId=document.getElementById('note-child-id')?.value;
+  const date=document.getElementById('note-date')?.value;
+  const note=document.getElementById('note-text')?.value?.trim();
+  const type=document.querySelector('input[name="note-type"]:checked')?.value||'parent';
+  if(!childId){toast('اختر طفلاً أولاً','error');return;}
+  if(!note){toast('اكتبي الملاحظة أولاً','error');return;}
+  const c=DB.children().find(x=>x.id===childId);
+  if(!c){toast('الطفل غير موجود','error');return;}
+  DB.addChildNote({childId,date:date||T0,schoolId:c.schoolId,branchId:c.branchId,note,type,by:Auth.user?.name||'—',byId:Auth.user?.id||''});
+  toast('✅ تم حفظ الملاحظة');
+  App.closeModal();
+  if(App.view==='childNotes') App.refresh();
+}
+
+function sendNoteToParent(noteId){
+  const n=DB.childNotes().find(x=>x.id===noteId);
+  if(!n){toast('الملاحظة غير موجودة','error');return;}
+  const c=DB.children().find(x=>x.id===n.childId);
+  if(!c?.parentPhone){toast('لا يوجد رقم لولي الأمر','error');return;}
+  const msg=`السلام عليكم ${c.parentName||''}،\nملاحظة بشأن طفلكم ${c.name} ليوم ${formatDate(n.date)}:\n${n.note}`;
+  const phone=c.parentPhone.replace(/^\+?/,'').replace(/^0/,'966');
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,'_blank');
+}
+
+function deleteChildNote(noteId){
+  if(!confirm('هل تريد حذف هذه الملاحظة؟')) return;
+  DB.deleteChildNote(noteId);
+  toast('تم حذف الملاحظة');
+  App.refresh();
+}
+
+// تذكيرات التجديد التلقائية
+function sendRenewalReminders(){
+  const sid=Auth.schoolId();
+  const bid=Auth.branchId();
+  const subs=DB.subscriptions().filter(s=>(!sid||s.schoolId===sid)&&(!bid||s.branchId===bid));
+  const children=DB.children().filter(c=>(!sid||c.schoolId===sid)&&(!bid||c.branchId===bid));
+  const in7=addDays(T0,7);
+  const expiring=subs.filter(s=>s.isActive&&s.endDate>=T0&&s.endDate<=in7);
+  if(!expiring.length){toast('لا توجد اشتراكات قريبة الانتهاء','error');return;}
+  const tpl=DB.settings().waTemplate||'السلام عليكم {parentName}، نُذكّركم بأن اشتراك طفلكم {name} سينتهي بتاريخ {date}. يرجى التواصل للتجديد. شكراً.';
+  let count=0;
+  for(const s of expiring){
+    const c=children.find(x=>x.id===s.childId);
+    if(!c?.parentPhone) continue;
+    const msg=tpl.replace(/{parentName}/g,c.parentName||'').replace(/{name}/g,c.name||'').replace(/{date}/g,formatDate(s.endDate)).replace(/{remaining}/g,(s.price-s.paidAmount).toString());
+    const phone=c.parentPhone.replace(/^\+?/,'').replace(/^0/,'966');
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,'_blank');
+    count++;
+  }
+  toast(`✅ تم فتح ${count} رسالة واتساب لتذكيرات التجديد`);
 }
 
 // =========================================================
