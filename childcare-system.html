@@ -10,7 +10,7 @@
 <!-- BUILD: 2026-06-10-v10 -->
 <script>
 (function(){
-  var BUILD='v15-20260610';
+  var BUILD='v16-20260610';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   if(stored!==BUILD){
@@ -402,6 +402,16 @@ const DB = {
   deleteChild(id){this.save('children',this.children().filter(x=>x.id!==id))},
   addSub(s){const a=this.subscriptions();a.push(s);this.save('subscriptions',a)},
   updateSub(s){const a=this.subscriptions();const i=a.findIndex(x=>x.id===s.id);if(i>=0)a[i]=s;else a.push(s);this.save('subscriptions',a)},
+  deleteSub(id){this.save('subscriptions',this.subscriptions().filter(x=>x.id!==id))},
+  // المصروفات
+  expenses(){return this.get('expenses')||[]},
+  addExpense(e){const a=this.expenses();a.push(e);this.save('expenses',a)},
+  updateExpense(e){const a=this.expenses();const i=a.findIndex(x=>x.id===e.id);if(i>=0)a[i]=e;else a.push(e);this.save('expenses',a)},
+  deleteExpense(id){this.save('expenses',this.expenses().filter(x=>x.id!==id))},
+  // سجل الدفعات لكل اشتراك (تاريخ كل دفعة جزئية)
+  payments(){return this.get('payments')||[]},
+  addPayment(p){const a=this.payments();a.push(p);this.save('payments',a)},
+  paymentsForSub(subId){return this.payments().filter(p=>p.subId===subId).sort((a,b)=>(b.date||'').localeCompare(a.date||''))},
   saveAttendance(list){this.save('attendance',list)},
   notifications(){return this.get('notifications')||[]},
   addNotification(n){
@@ -532,7 +542,9 @@ const App = {
       {v:'users',icon:'👥',label:'المستخدمون'},
       {v:'activities',icon:'🎯',label:'دليل الأنشطة'},
       {v:'sales',icon:'🛍️',label:'المبيعات'},
+      {v:'expenses',icon:'💸',label:'المصروفات'},
       {v:'accounting',icon:'🧾',label:'المحاسبة'},
+      {v:'tasks',icon:'📌',label:'مهام اليوم'},
       {v:'settings',icon:'⚙️',label:'الإعدادات'},
     ] : u.role==='school_admin' ? [
       {v:'dashboard',icon:'🏠',label:'الرئيسية'},
@@ -627,11 +639,14 @@ const App = {
       activities:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       sales:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       accounting:()=>Auth.isSuperAdmin(),
+      expenses:()=>Auth.isSuperAdmin(),
+      tasks:()=>Auth.isSuperAdmin(),
+      statement:()=>Auth.isSuperAdmin(),
       settings:()=>Auth.isSuperAdmin(),
     };
     const guard=guards[App.view];
     if(guard&&!guard()) return Views._forbidden();
-    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,settings:Views.settings};
+    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,expenses:Views.expenses,tasks:Views.tasks,statement:Views.statement,settings:Views.settings};
     const fn=map[App.view]||Views.dashboard;
     try{return fn();}
     catch(e){console.error('[CCS]',App.view,e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة: ${App.view}</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
@@ -704,10 +719,40 @@ _superDash(){
   const al=DB.alerts();
   const totalRevenue=subs.reduce((a,s)=>a+s.paidAmount,0);
   const pendingRevenue=subs.reduce((a,s)=>a+(s.price-s.paidAmount),0);
+
+  // ملخّص الربح والمصروفات للشهر الحالي
+  const monthKey=T0.slice(0,7);
+  const monthSubs=subs.filter(s=>(s.createdAt||s.startDate||'').startsWith(monthKey));
+  const monthRevenue=monthSubs.reduce((a,s)=>a+(+s.paidAmount||0),0);
+  const monthSales=DB.sales().filter(s=>(s.date||'').startsWith(monthKey)).reduce((a,s)=>a+(+s.price||0),0);
+  const monthExpenses=DB.expenses().filter(e=>(e.date||'').startsWith(monthKey)).reduce((a,e)=>a+(+e.amount||0),0);
+  const monthIncome=monthRevenue+monthSales;
+  const monthNet=monthIncome-monthExpenses;
+
+  // عداد المهام
+  const defaulterCnt=subs.filter(s=>Views._paymentState(s)==='defaulter').length;
+  const pendingCnt=subs.filter(s=>Views._paymentState(s)==='pending').length;
+  const expiringCnt=subs.filter(s=>s.isActive&&s.endDate>=T0&&s.endDate<=addDays(T0,7)).length;
+
   return `
-  <div style="margin-bottom:16px;display:flex;justify-content:flex-end">
+  <div style="margin-bottom:16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+    <button class="btn" onclick="App.go('tasks')" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;font-size:14px;font-weight:700;padding:10px 20px;border:none;border-radius:10px;cursor:pointer;font-family:inherit">📌 مهام اليوم (${defaulterCnt+pendingCnt+expiringCnt})</button>
     <button class="btn" onclick="App.go('settings')" style="background:linear-gradient(135deg,#0f766e,#0d9488);color:#fff;font-size:14px;font-weight:700;padding:10px 20px;border:none;border-radius:10px;cursor:pointer;font-family:inherit">⚙️ لوحة التحكم</button>
   </div>
+
+  <div class="card" style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);color:#fff;border:0;margin-bottom:16px">
+    <div style="font-size:14px;opacity:.8;margin-bottom:8px">📊 ملخّص الشهر الحالي (${monthKey})</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px">
+      <div><div style="font-size:11px;opacity:.7">📈 إيرادات</div><div style="font-size:22px;font-weight:800;color:#10b981">${monthIncome.toLocaleString()} ر.س</div></div>
+      <div><div style="font-size:11px;opacity:.7">📉 مصروفات</div><div style="font-size:22px;font-weight:800;color:#ef4444">${monthExpenses.toLocaleString()} ر.س</div></div>
+      <div><div style="font-size:11px;opacity:.7">${monthNet>=0?'💎 صافي الربح':'⚠️ خسارة'}</div><div style="font-size:24px;font-weight:900;color:${monthNet>=0?'#10b981':'#ef4444'}">${monthNet.toLocaleString()} ر.س</div></div>
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">
+        <button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2)" onclick="App.go('expenses')">💸 المصروفات</button>
+        <button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2)" onclick="App.go('accounting')">🧾 المحاسبة</button>
+      </div>
+    </div>
+  </div>
+
   <div class="stats-grid">
     <div class="stat-card green"><div class="stat-val">${schools.length}</div><div class="stat-lbl">🏫 المدارس المشتركة</div></div>
     <div class="stat-card blue"><div class="stat-val">${children.length}</div><div class="stat-lbl">👶 إجمالي الأطفال</div></div>
@@ -1030,6 +1075,7 @@ children(){
             <td style="white-space:nowrap">
               <button class="btn btn-secondary btn-xs" onclick="Modals.editChild('${c.id}')">تعديل</button>
               <button class="btn btn-primary btn-xs" onclick="Modals.addSub('${c.id}')">اشتراك</button>
+              ${Auth.isSuperAdmin()?`<button class="btn btn-xs" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe" onclick="App.go('statement',{childId:'${c.id}'})" title="كشف حساب">📄</button>`:''}
               ${Auth.isSuperAdmin()?`<button class="btn btn-danger btn-xs" onclick="deleteChild('${c.id}','${esc(c.name)}')">حذف</button>`:''}
             </td>
           </tr>`;
@@ -2099,6 +2145,253 @@ accounting(){
   </div>`;
 },
 
+// ---------- EXPENSES (super admin only) ----------
+expenses(){
+  if(!Auth.isSuperAdmin()) return Views._forbidden();
+  const exps=DB.expenses();
+  const branches=DB.branches();
+  const fMonth=App.params.expMonth||T0.slice(0,7); // YYYY-MM
+  const fCat=App.params.expCat||'all';
+  const fBranch=App.params.expBranch||'all';
+  const catLbl={salary:'👩‍🏫 رواتب',rent:'🏢 إيجار',utilities:'💡 فواتير (كهرباء/ماء/نت)',supplies:'📦 مستلزمات',maintenance:'🔧 صيانة',transport:'🚗 مواصلات',marketing:'📢 تسويق',food:'🍽️ مأكولات',other:'📋 أخرى'};
+  const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',cheque:'📃 شيك'};
+  let filtered=exps;
+  if(fMonth) filtered=filtered.filter(e=>(e.date||'').startsWith(fMonth));
+  if(fCat!=='all') filtered=filtered.filter(e=>e.category===fCat);
+  if(fBranch!=='all') filtered=filtered.filter(e=>e.branchId===fBranch);
+  filtered.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  // إحصائيات الشهر
+  const monthTotal=filtered.reduce((a,e)=>a+(+e.amount||0),0);
+  const byCat={};
+  filtered.forEach(e=>{byCat[e.category]=(byCat[e.category]||0)+(+e.amount||0);});
+  const topCat=Object.entries(byCat).sort((a,b)=>b[1]-a[1])[0];
+  // إيرادات نفس الشهر (الدفعات المستلمة)
+  const monthSubs=DB.subscriptions().filter(s=>(s.createdAt||s.startDate||'').startsWith(fMonth));
+  const monthRevenue=monthSubs.reduce((a,s)=>a+(+s.paidAmount||0),0);
+  const monthSales=DB.sales().filter(s=>(s.date||'').startsWith(fMonth)).reduce((a,s)=>a+(+s.price||0),0);
+  const totalIncome=monthRevenue+monthSales;
+  const netProfit=totalIncome-monthTotal;
+
+  return `
+  <div class="stats-grid">
+    <div class="stat-card green"><div class="stat-val">${totalIncome.toLocaleString()}</div><div class="stat-lbl">📈 إيرادات الشهر (ر.س)</div></div>
+    <div class="stat-card red"><div class="stat-val">${monthTotal.toLocaleString()}</div><div class="stat-lbl">📉 مصروفات الشهر (ر.س)</div></div>
+    <div class="stat-card ${netProfit>=0?'blue':'red'}"><div class="stat-val">${netProfit.toLocaleString()}</div><div class="stat-lbl">${netProfit>=0?'💎 صافي الربح':'⚠️ خسارة'} (ر.س)</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${topCat?catLbl[topCat[0]]?.split(' ')[1]||'—':'—'}</div><div class="stat-lbl">${topCat?'أعلى بند ('+topCat[1].toLocaleString()+' ر.س)':'لا يوجد'}</div></div>
+  </div>
+  <div class="card no-print" style="padding:14px;margin-bottom:16px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="input-group" style="margin:0;min-width:160px">
+        <label style="font-size:12px">📅 الشهر</label>
+        <input class="input" type="month" value="${fMonth}" onchange="expSet('expMonth',this.value)">
+      </div>
+      <div class="input-group" style="margin:0;min-width:160px">
+        <label style="font-size:12px">🏷️ الفئة</label>
+        <select class="input" onchange="expSet('expCat',this.value)">
+          <option value="all">الكل</option>
+          ${Object.entries(catLbl).map(([k,l])=>`<option value="${k}" ${fCat===k?'selected':''}>${l}</option>`).join('')}
+        </select>
+      </div>
+      <div class="input-group" style="margin:0;min-width:140px">
+        <label style="font-size:12px">🏢 الفرع</label>
+        <select class="input" onchange="expSet('expBranch',this.value)">
+          <option value="all">الكل</option>
+          ${branches.map(b=>`<option value="${b.id}" ${fBranch===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="Modals.addExpense()">+ تسجيل مصروف</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('exp-table','مصروفات-'+'${fMonth}')">📊 CSV</button>
+      ${(fCat!=='all'||fBranch!=='all')?`<button class="btn btn-secondary btn-sm" onclick="App.go('expenses',{expMonth:'${fMonth}'})">✕ مسح</button>`:''}
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">💸 مصروفات ${fMonth} (${filtered.length})</div>
+    <div class="table-wrap"><table id="exp-table">
+      <thead><tr><th>التاريخ</th><th>الفئة</th><th>الوصف</th><th>الفرع</th><th>المبلغ</th><th>طريقة الدفع</th><th>أضافها</th><th>إجراءات</th></tr></thead>
+      <tbody>
+        ${filtered.length?filtered.map(e=>`<tr>
+          <td style="font-size:13px">${formatDate(e.date)}</td>
+          <td>${catLbl[e.category]||e.category||'—'}</td>
+          <td>${esc(e.description||'—')}</td>
+          <td>${e.branchId?`<span class="badge badge-blue" style="font-size:10px">${DB.branchName(e.branchId)}</span>`:'<span style="color:#94a3b8">—</span>'}</td>
+          <td style="color:#ef4444;font-weight:700">${(+e.amount||0).toLocaleString()} ر.س</td>
+          <td style="font-size:12px">${pmLbl[e.paymentMethod]||'—'}</td>
+          <td style="font-size:12px;color:#64748b">${esc(e.addedBy||'—')}</td>
+          <td>
+            <button class="btn btn-secondary btn-xs" onclick="Modals.editExpense('${e.id}')">✏️</button>
+            <button class="btn btn-danger btn-xs" onclick="deleteExpense('${e.id}')">🗑</button>
+          </td>
+        </tr>`).join(''):`<tr><td colspan="8"><div class="empty-state"><div class="es-icon">💸</div><p>لا توجد مصروفات لهذا الشهر</p></div></td></tr>`}
+      </tbody>
+    </table></div>
+  </div>`;
+},
+
+// ---------- DAILY TASKS (super admin only) ----------
+tasks(){
+  if(!Auth.isSuperAdmin()) return Views._forbidden();
+  const subs=DB.subscriptions();
+  const children=DB.children();
+  const today=T0;
+  const in7=addDays(today,7);
+
+  const defaulters=subs.filter(s=>Views._paymentState(s)==='defaulter')
+    .sort((a,b)=>(a.endDate||'').localeCompare(b.endDate||''));
+  const pending=subs.filter(s=>Views._paymentState(s)==='pending')
+    .sort((a,b)=>(a.endDate||'').localeCompare(b.endDate||''));
+  const expiringSoon=subs.filter(s=>s.isActive&&s.endDate>=today&&s.endDate<=in7)
+    .sort((a,b)=>(a.endDate||'').localeCompare(b.endDate||''));
+  const expiringToday=subs.filter(s=>s.endDate===today&&s.isActive);
+
+  const renderRow=(s,extra)=>{
+    const c=children.find(x=>x.id===s.childId);
+    const remaining=s.price-s.paidAmount;
+    return `<tr>
+      <td><strong>${esc(c?.name||'—')}</strong><br><small style="color:#64748b">${esc(c?.parentName||'')}</small></td>
+      <td><a href="tel:${c?.parentPhone||''}" style="color:#0f766e;font-weight:600">${c?.parentPhone||'—'}</a></td>
+      <td>${formatDate(s.endDate)}</td>
+      <td>${extra}</td>
+      <td style="white-space:nowrap">
+        ${c?.parentPhone?`<a href="https://wa.me/${c.parentPhone.replace(/^\+?/,'').replace(/^0/,'966')}?text=${encodeURIComponent('السلام عليكم، '+(c.parentName||'')+' بخصوص اشتراك '+(c.name||'')+'...')}" target="_blank" class="btn btn-success btn-xs">💬 واتساب</a>`:''}
+        ${remaining>0?`<button class="btn btn-primary btn-xs" onclick="Modals.pay('${s.id}')">💰 سداد</button>`:''}
+        <button class="btn btn-secondary btn-xs" onclick="App.go('statement',{childId:'${s.childId}'})">📄 كشف</button>
+      </td>
+    </tr>`;
+  };
+
+  return `
+  <div class="stats-grid">
+    <div class="stat-card red"><div class="stat-val">${defaulters.length}</div><div class="stat-lbl">🔴 متعثرون — تحصيل فوري</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${pending.length}</div><div class="stat-lbl">🟠 معلّقون — متابعة سداد</div></div>
+    <div class="stat-card orange" style="border-color:#f59e0b"><div class="stat-val">${expiringSoon.length}</div><div class="stat-lbl">⏰ تنتهي خلال 7 أيام</div></div>
+    <div class="stat-card blue"><div class="stat-val">${expiringToday.length}</div><div class="stat-lbl">📅 تنتهي اليوم</div></div>
+  </div>
+
+  <div class="card" style="border-right:6px solid #ef4444">
+    <div class="card-title" style="color:#991b1b">🔴 متعثرون بالسداد (${defaulters.length})</div>
+    <p style="font-size:13px;color:#64748b;margin:-8px 0 14px">اشتراكات منتهية + عليها متبقي. ضرورة التحصيل فوراً.</p>
+    ${defaulters.length?`<div class="table-wrap"><table>
+      <thead><tr><th>الطفل / ولي الأمر</th><th>الهاتف</th><th>انتهى في</th><th>المتبقي</th><th>إجراء</th></tr></thead>
+      <tbody>${defaulters.map(s=>renderRow(s,`<span style="color:#ef4444;font-weight:700">${(s.price-s.paidAmount).toLocaleString()} ر.س</span>`)).join('')}</tbody>
+    </table></div>`:`<div class="empty-state"><div class="es-icon">✅</div><p>لا يوجد متعثرون — ممتاز!</p></div>`}
+  </div>
+
+  <div class="card" style="border-right:6px solid #f59e0b">
+    <div class="card-title" style="color:#92400e">🟠 معلّقون (${pending.length})</div>
+    <p style="font-size:13px;color:#64748b;margin:-8px 0 14px">اشتراكات نشطة + عليها متبقي. متابعة دورية مطلوبة.</p>
+    ${pending.length?`<div class="table-wrap"><table>
+      <thead><tr><th>الطفل / ولي الأمر</th><th>الهاتف</th><th>ينتهي في</th><th>المتبقي</th><th>إجراء</th></tr></thead>
+      <tbody>${pending.map(s=>renderRow(s,`<span style="color:#f59e0b;font-weight:700">${(s.price-s.paidAmount).toLocaleString()} ر.س</span>`)).join('')}</tbody>
+    </table></div>`:`<div class="empty-state"><div class="es-icon">✅</div><p>لا يوجد معلّقون</p></div>`}
+  </div>
+
+  <div class="card" style="border-right:6px solid #3b82f6">
+    <div class="card-title" style="color:#1e40af">⏰ اشتراكات تنتهي خلال 7 أيام (${expiringSoon.length})</div>
+    <p style="font-size:13px;color:#64748b;margin:-8px 0 14px">تواصل مبكر للتجديد قبل الانتهاء.</p>
+    ${expiringSoon.length?`<div class="table-wrap"><table>
+      <thead><tr><th>الطفل / ولي الأمر</th><th>الهاتف</th><th>ينتهي في</th><th>المتبقي للانتهاء</th><th>إجراء</th></tr></thead>
+      <tbody>${expiringSoon.map(s=>{const d=diffDays(s.endDate,today);return renderRow(s,`<span class="badge badge-orange" style="font-size:11px">خلال ${d} يوم</span>`);}).join('')}</tbody>
+    </table></div>`:`<div class="empty-state"><div class="es-icon">✅</div><p>لا توجد اشتراكات قريبة الانتهاء</p></div>`}
+  </div>`;
+},
+
+// ---------- CHILD STATEMENT (super admin only) ----------
+statement(){
+  if(!Auth.isSuperAdmin()) return Views._forbidden();
+  const childId=App.params.childId;
+  const children=DB.children();
+  if(!childId){
+    return `<div class="card">
+      <div class="card-title">📄 كشف حساب طفل</div>
+      <p style="color:#64748b;margin-bottom:14px">اختاري الطفل لعرض كشف حسابه الكامل (الاشتراكات، الدفعات، المبيعات، الحضور).</p>
+      <input class="input" placeholder="🔍 ابحث باسم الطفل..." oninput="statementSearch(this.value)">
+      <div id="stm-results" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
+        ${children.slice(0,12).map(c=>`<button class="btn btn-secondary btn-sm" onclick="App.go('statement',{childId:'${c.id}'})">${esc(c.name)}</button>`).join('')}
+      </div>
+    </div>`;
+  }
+  const c=children.find(x=>x.id===childId);
+  if(!c) return `<div class="card"><p>الطفل غير موجود.</p><button class="btn btn-primary" onclick="App.go('statement')">رجوع</button></div>`;
+  const subs=DB.subscriptions().filter(s=>s.childId===childId).sort((a,b)=>(b.startDate||'').localeCompare(a.startDate||''));
+  const sales=DB.sales().filter(s=>s.childId===childId).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const att=DB.attendance().filter(a=>a.childId===childId);
+  const totalCharged=subs.reduce((a,s)=>a+(+s.price||0),0)+sales.reduce((a,s)=>a+(+s.price||0),0);
+  const totalPaid=subs.reduce((a,s)=>a+(+s.paidAmount||0),0)+sales.reduce((a,s)=>a+(+s.price||0),0); // sales تدفع كاملة
+  const balance=totalCharged-totalPaid;
+  const presentDays=att.filter(a=>a.status==='present').length;
+  const absentDays=att.filter(a=>a.status==='absent').length;
+  const lateDays=att.filter(a=>a.status==='late').length;
+  const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
+  const typeLbl={daily:'يومي',weekly:'أسبوعي',monthly:'٣٠ يوم',custom:'مخصص'};
+
+  return `
+  <div class="card no-print" style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <button class="btn btn-secondary btn-sm" onclick="App.go('statement')">← رجوع للبحث</button>
+    <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ طباعة الكشف</button>
+    <div style="flex:1"></div>
+    <span style="font-size:13px;color:#64748b">تاريخ الطباعة: ${formatDate(T0)}</span>
+  </div>
+
+  <div class="card" style="background:linear-gradient(135deg,#0f766e 0%,#065f46 100%);color:#fff;border:0">
+    <h2 style="margin:0 0 6px;font-size:22px;font-weight:800">📄 كشف حساب — ${esc(c.name)}</h2>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px;opacity:.95">
+      <span>👤 ولي الأمر: <strong>${esc(c.parentName||'')}</strong></span>
+      <span>📞 ${esc(c.parentPhone||'')}</span>
+      <span>🏢 ${DB.branchName(c.branchId)}</span>
+      <span>${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'}</span>
+      <span>📅 منذ: ${formatDate(c.joinDate)}</span>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card blue"><div class="stat-val">${totalCharged.toLocaleString()}</div><div class="stat-lbl">📋 إجمالي المستحق (ر.س)</div></div>
+    <div class="stat-card green"><div class="stat-val">${totalPaid.toLocaleString()}</div><div class="stat-lbl">✅ إجمالي المدفوع (ر.س)</div></div>
+    <div class="stat-card ${balance>0?'red':'green'}"><div class="stat-val">${balance.toLocaleString()}</div><div class="stat-lbl">${balance>0?'⚠️ المتبقي':'✅ الرصيد'} (ر.س)</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${presentDays}</div><div class="stat-lbl">📅 أيام حضور (غياب: ${absentDays}، تأخر: ${lateDays})</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📋 الاشتراكات (${subs.length})</div>
+    ${subs.length?`<div class="table-wrap"><table>
+      <thead><tr><th>الفاتورة</th><th>النوع</th><th>من</th><th>إلى</th><th>المبلغ</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead>
+      <tbody>${subs.map(s=>{
+        const r=s.price-s.paidAmount;
+        const ps=Views._paymentState(s);
+        return `<tr>
+          <td style="font-size:12px;font-weight:700;color:#0f766e">${esc(s.invoiceNo||'—')}</td>
+          <td>${typeLbl[s.type]||s.type}</td>
+          <td style="font-size:12px">${formatDate(s.startDate)}</td>
+          <td style="font-size:12px">${formatDate(s.endDate)}</td>
+          <td style="font-weight:700">${s.price} ر.س</td>
+          <td style="color:#10b981">${s.paidAmount} ر.س</td>
+          <td style="color:${r>0?'#ef4444':'#10b981'};font-weight:700">${r} ر.س</td>
+          <td>${ps==='defaulter'?Views._defaulterBadge():ps==='pending'?Views._pendingBadge():Views._payBadge(s)}</td>
+        </tr>`;}).join('')}</tbody>
+    </table></div>`:`<p style="color:#94a3b8">لا توجد اشتراكات</p>`}
+  </div>
+
+  ${sales.length?`<div class="card">
+    <div class="card-title">🛍️ مبيعات إضافية (${sales.length})</div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>التاريخ</th><th>المنتج</th><th>السعر</th><th>طريقة الدفع</th></tr></thead>
+      <tbody>${sales.map(s=>{
+        const items={exit_card:'بطاقة خروج',uniform:'الزي الرسمي',other:s.itemName||'أخرى'};
+        return `<tr>
+          <td>${formatDate(s.date)}</td>
+          <td>${esc(items[s.itemType]||s.itemName||'—')}</td>
+          <td style="font-weight:700">${s.price} ر.س</td>
+          <td>${pmLbl[s.paymentMethod]||'—'}</td>
+        </tr>`;}).join('')}</tbody>
+    </table></div>
+  </div>`:''}
+
+  ${balance>0?`<div class="alert-box alert-red no-print" style="margin-top:14px">
+    ⚠️ على ولي الأمر متبقي ${balance.toLocaleString()} ر.س — يُنصح بالتواصل للتحصيل.
+    ${c.parentPhone?`<a href="https://wa.me/${c.parentPhone.replace(/^\+?/,'').replace(/^0/,'966')}?text=${encodeURIComponent('السلام عليكم '+(c.parentName||'')+'، نذكّركم بمتبقي '+(balance)+' ر.س على اشتراك '+(c.name||'')+'. شكراً لتعاونكم.')}" target="_blank" class="btn btn-success btn-sm" style="margin-right:10px">💬 إرسال تذكير واتساب</a>`:''}
+  </div>`:''}`;
+},
+
 // ---------- SETTINGS (super admin only) ----------
 settings(){
   if(!Auth.isSuperAdmin()) return Views._forbidden();
@@ -2818,6 +3111,61 @@ const Modals = {
     </div></div>`);
   },
 
+  addExpense(){
+    Modals._renderExpenseModal({});
+  },
+  editExpense(id){
+    const e=DB.expenses().find(x=>x.id===id);
+    if(!e) return;
+    Modals._renderExpenseModal(e);
+  },
+  _renderExpenseModal(e){
+    const branches=DB.branches();
+    const isEdit=!!e.id;
+    const cats={salary:'👩‍🏫 رواتب',rent:'🏢 إيجار',utilities:'💡 فواتير (كهرباء/ماء/نت)',supplies:'📦 مستلزمات',maintenance:'🔧 صيانة',transport:'🚗 مواصلات',marketing:'📢 تسويق',food:'🍽️ مأكولات',other:'📋 أخرى'};
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal">
+      <div class="modal-header"><h2>${isEdit?'✏️ تعديل مصروف':'💸 تسجيل مصروف'}</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        ${isEdit?`<input type="hidden" id="exp-id" value="${e.id}">`:''}
+        <div class="grid-2">
+          <div class="input-group"><label>📅 التاريخ *</label><input class="input" id="exp-date" type="date" value="${e.date||T0}"></div>
+          <div class="input-group"><label>💰 المبلغ (ر.س) *</label><input class="input" id="exp-amount" type="number" min="0" step="0.01" value="${e.amount||''}" placeholder="0" style="font-size:18px;font-weight:700"></div>
+        </div>
+        <div class="input-group">
+          <label>🏷️ الفئة *</label>
+          <select class="input" id="exp-cat">
+            ${Object.entries(cats).map(([k,l])=>`<option value="${k}" ${e.category===k?'selected':''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="input-group"><label>📝 الوصف</label><textarea class="input" id="exp-desc" rows="2" placeholder="تفاصيل المصروف...">${esc(e.description||'')}</textarea></div>
+        <div class="grid-2">
+          <div class="input-group">
+            <label>🏢 الفرع (اختياري)</label>
+            <select class="input" id="exp-branch">
+              <option value="">— عام (كل الفروع) —</option>
+              ${branches.map(b=>`<option value="${b.id}" ${e.branchId===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="input-group">
+            <label>💳 طريقة الدفع</label>
+            <select class="input" id="exp-pm">
+              <option value="cash" ${e.paymentMethod==='cash'?'selected':''}>💵 كاش</option>
+              <option value="mada" ${e.paymentMethod==='mada'?'selected':''}>💳 مدى</option>
+              <option value="transfer" ${e.paymentMethod==='transfer'?'selected':''}>🏦 حوالة</option>
+              <option value="cheque" ${e.paymentMethod==='cheque'?'selected':''}>📃 شيك</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveExpense(${isEdit?'true':'false'})">💾 ${isEdit?'حفظ التعديلات':'تسجيل المصروف'}</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+
   addTeacher(){
     const sid=Auth.schoolId();
     const bid=Auth.user?.branchId||'';
@@ -3519,6 +3867,52 @@ function showSettingsToast(msg){
 function accSet(key,value){
   App.go('accounting',{...App.params,[key]:value});
 }
+// Helper لصفحة المصروفات
+function expSet(key,value){
+  App.go('expenses',{...App.params,[key]:value});
+}
+
+// =========================================================
+//  EXPENSE HANDLERS
+// =========================================================
+function saveExpense(isEdit){
+  if(!Auth.isSuperAdmin()){toast('صلاحية المدير العام فقط','error');return;}
+  const date=document.getElementById('exp-date')?.value;
+  const amount=parseFloat(document.getElementById('exp-amount')?.value||0);
+  const category=document.getElementById('exp-cat')?.value;
+  const description=document.getElementById('exp-desc')?.value?.trim()||'';
+  const branchId=document.getElementById('exp-branch')?.value||'';
+  const paymentMethod=document.getElementById('exp-pm')?.value||'cash';
+  if(!date||!amount||amount<=0){alert('التاريخ والمبلغ مطلوبان');return;}
+  if(isEdit){
+    const id=document.getElementById('exp-id')?.value;
+    const orig=DB.expenses().find(x=>x.id===id);
+    if(!orig){toast('المصروف غير موجود','error');App.closeModal();return;}
+    DB.updateExpense({...orig,date,amount,category,description,branchId,paymentMethod});
+  } else {
+    DB.addExpense({id:uid(),date,amount,category,description,branchId,paymentMethod,addedBy:Auth.user?.name||'',createdAt:new Date().toISOString()});
+  }
+  toast(isEdit?'✅ تم حفظ التعديلات':'✅ تم تسجيل المصروف');
+  App.closeModal();
+  if(App.view==='expenses') App.refresh(); else App.go('expenses');
+}
+
+function deleteExpense(id){
+  if(!Auth.isSuperAdmin()) return;
+  if(!confirm('هل تريد حذف هذا المصروف؟')) return;
+  DB.deleteExpense(id);
+  toast('✅ تم الحذف');
+  App.refresh();
+}
+
+// بحث في كشف الحساب
+function statementSearch(q){
+  const el=document.getElementById('stm-results');
+  if(!el) return;
+  const term=(q||'').trim().toLowerCase();
+  const matches=DB.children().filter(c=>!term||c.name.toLowerCase().includes(term)||c.parentName.toLowerCase().includes(term)||(c.parentPhone||'').includes(term)).slice(0,30);
+  el.innerHTML=matches.length?matches.map(c=>`<button class="btn btn-secondary btn-sm" onclick="App.go('statement',{childId:'${c.id}'})">${esc(c.name)} <small style="opacity:.7;margin-right:6px">— ${esc(c.parentName||'')}</small></button>`).join(''):'<p style="color:#94a3b8;font-size:13px">لا توجد نتائج</p>';
+}
 
 // Toast عالمي يظهر في أي صفحة بعد الحفظ
 function toast(msg,kind='success'){
@@ -3810,6 +4204,22 @@ function exportAllData(){
       };
     }));
     XLSX.utils.book_append_sheet(wb,wsSales,'المبيعات');
+  }
+
+  // ورقة المصروفات
+  const expenses=DB.expenses();
+  if(expenses.length){
+    const catNames={salary:'رواتب',rent:'إيجار',utilities:'فواتير',supplies:'مستلزمات',maintenance:'صيانة',transport:'مواصلات',marketing:'تسويق',food:'مأكولات',other:'أخرى'};
+    const wsExp=XLSX.utils.json_to_sheet(expenses.map(e=>({
+      'التاريخ':e.date||'',
+      'الفئة':catNames[e.category]||e.category||'',
+      'الوصف':e.description||'',
+      'المبلغ':+e.amount||0,
+      'طريقة الدفع':pmLabel[e.paymentMethod]||'',
+      'الفرع':e.branchId?DB.branchName(e.branchId):'عام',
+      'أضافها':e.addedBy||'',
+    })));
+    XLSX.utils.book_append_sheet(wb,wsExp,'المصروفات');
   }
 
   const date=new Date().toISOString().split('T')[0];
