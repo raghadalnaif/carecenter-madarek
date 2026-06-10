@@ -10,7 +10,7 @@
 <!-- BUILD: 2026-06-10-v10 -->
 <script>
 (function(){
-  var BUILD='v16-20260610';
+  var BUILD='v17-20260610';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   if(stored!==BUILD){
@@ -412,6 +412,9 @@ const DB = {
   payments(){return this.get('payments')||[]},
   addPayment(p){const a=this.payments();a.push(p);this.save('payments',a)},
   paymentsForSub(subId){return this.payments().filter(p=>p.subId===subId).sort((a,b)=>(b.date||'').localeCompare(a.date||''))},
+  // سجل التدقيق (Audit Log)
+  auditLog(){return this.get('auditLog')||[]},
+  addAuditLog(entry){const a=this.auditLog();a.unshift({...entry,id:uid(),at:new Date().toISOString()});if(a.length>500)a.splice(500);this.save('auditLog',a)},
   saveAttendance(list){this.save('attendance',list)},
   notifications(){return this.get('notifications')||[]},
   addNotification(n){
@@ -545,6 +548,7 @@ const App = {
       {v:'expenses',icon:'💸',label:'المصروفات'},
       {v:'accounting',icon:'🧾',label:'المحاسبة'},
       {v:'tasks',icon:'📌',label:'مهام اليوم'},
+      {v:'auditLog',icon:'🔍',label:'سجل النشاط'},
       {v:'settings',icon:'⚙️',label:'الإعدادات'},
     ] : u.role==='school_admin' ? [
       {v:'dashboard',icon:'🏠',label:'الرئيسية'},
@@ -642,11 +646,12 @@ const App = {
       expenses:()=>Auth.isSuperAdmin(),
       tasks:()=>Auth.isSuperAdmin(),
       statement:()=>Auth.isSuperAdmin(),
+      auditLog:()=>Auth.isSuperAdmin(),
       settings:()=>Auth.isSuperAdmin(),
     };
     const guard=guards[App.view];
     if(guard&&!guard()) return Views._forbidden();
-    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,expenses:Views.expenses,tasks:Views.tasks,statement:Views.statement,settings:Views.settings};
+    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,expenses:Views.expenses,tasks:Views.tasks,statement:Views.statement,auditLog:Views.auditLog,settings:Views.settings};
     const fn=map[App.view]||Views.dashboard;
     try{return fn();}
     catch(e){console.error('[CCS]',App.view,e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة: ${App.view}</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
@@ -2137,12 +2142,51 @@ accounting(){
             <td style="color:${remaining>0?'#ef4444':'#10b981'};font-weight:600">${remaining} ر.س</td>
             <td style="font-size:12px">${pmLbl[s.paymentMethod]||'—'}</td>
             <td>${Views._payBadge(s)}</td>
-            <td><button class="btn btn-xs" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0" onclick="openInvoice('${s.id}')">🧾</button></td>
+            <td style="white-space:nowrap">
+              <button class="btn btn-xs" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0" onclick="openInvoice('${s.id}')" title="فاتورة">🧾</button>
+              <button class="btn btn-xs" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;margin-right:4px" onclick="Modals.payHistory('${s.id}')" title="سجل الدفعات">📋</button>
+              ${s.paymentStatus!=='paid'?`<button class="btn btn-xs" style="background:#f0fdf4;color:#10b981;border:1px solid #bbf7d0;margin-right:4px" onclick="Modals.pay('${s.id}')" title="تسجيل دفعة">💰</button>`:''}
+            </td>
           </tr>`;
         }).join(''):`<tr><td colspan="14"><div class="empty-state"><div class="es-icon">🧾</div><p>لا توجد فواتير بهذه المعايير</p></div></td></tr>`}
       </tbody>
     </table></div>
-  </div>`;
+  </div>
+
+  ${(()=>{
+    // تقرير الديون المعمّرة (Aging Report)
+    const defs=subs.filter(s=>Views._paymentState(s)==='defaulter');
+    if(!defs.length) return '';
+    const buckets=[{label:'أقل من 30 يوم',min:0,max:30,color:'#f59e0b',bg:'#fef9c3'},{label:'30 – 60 يوم',min:30,max:60,color:'#ef4444',bg:'#fee2e2'},{label:'60 – 90 يوم',min:60,max:90,color:'#991b1b',bg:'#fecaca'},{label:'أكثر من 90 يوم',min:90,max:99999,color:'#7f1d1d',bg:'#fca5a5'}];
+    const bData=buckets.map(b=>{
+      const list=defs.filter(s=>{const d=diffDays(T0,s.endDate);return d>b.min&&d<=b.max;});
+      return {...b,count:list.length,amount:list.reduce((a,s)=>a+(s.price-s.paidAmount),0)};
+    });
+    const totalDef=defs.reduce((a,s)=>a+(s.price-s.paidAmount),0);
+    return `<div class="card" style="border-right:6px solid #7f1d1d">
+      <div class="card-title" style="color:#7f1d1d">⏳ تقرير الديون المعمّرة (Aging Report)</div>
+      <p style="font-size:13px;color:#64748b;margin:-8px 0 16px">تصنيف المتعثرين حسب عمر الدين منذ انتهاء الاشتراك.</p>
+      <div class="stats-grid" style="margin-bottom:16px">
+        ${bData.map(b=>`<div class="stat-card" style="border-color:${b.color}">
+          <div class="stat-val" style="color:${b.color};font-size:22px">${b.count}</div>
+          <div class="stat-lbl">${b.label}</div>
+          <div style="margin-top:6px;font-size:12px;color:#64748b">${b.amount.toLocaleString()} ر.س</div>
+        </div>`).join('')}
+      </div>
+      <div style="background:#f8fafc;border-radius:8px;padding:14px">
+        ${bData.map(b=>b.count?`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="width:140px;font-size:13px;font-weight:600;color:${b.color}">${b.label}</div>
+          <div style="flex:1;background:#e2e8f0;border-radius:6px;height:10px;overflow:hidden">
+            <div style="background:${b.color};height:100%;width:${totalDef?Math.round(b.amount/totalDef*100):0}%;border-radius:6px;transition:.5s"></div>
+          </div>
+          <div style="width:100px;text-align:left;font-size:12px;color:#475569">${b.amount.toLocaleString()} ر.س (${b.count})</div>
+        </div>`:'').join('')}
+        <div style="border-top:1px solid #e2e8f0;padding-top:10px;margin-top:4px;display:flex;justify-content:space-between;font-weight:700;font-size:14px">
+          <span>إجمالي الديون المعمّرة</span><span style="color:#7f1d1d">${totalDef.toLocaleString()} ر.س</span>
+        </div>
+      </div>
+    </div>`;
+  })()}`;
 },
 
 // ---------- EXPENSES (super admin only) ----------
@@ -2268,6 +2312,20 @@ tasks(){
     <div class="stat-card blue"><div class="stat-val">${expiringToday.length}</div><div class="stat-lbl">📅 تنتهي اليوم</div></div>
   </div>
 
+  ${(defaulters.length||pending.length)?`
+  <div class="card no-print" style="padding:14px;background:#f0fdf4;border:1px solid #bbf7d0">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#166534">💬 إرسال تذكيرات واتساب جماعية</div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">إرسال رسالة تذكير لجميع المتعثرين أو المعلّقين دفعةً واحدة</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${defaulters.length?`<button class="btn btn-danger btn-sm" onclick="Modals.bulkWhatsApp('defaulters')">🔴 تذكيرات المتعثرين (${defaulters.length})</button>`:''}
+        ${pending.length?`<button class="btn btn-warning btn-sm" onclick="Modals.bulkWhatsApp('pending')">🟠 تذكيرات المعلّقين (${pending.length})</button>`:''}
+      </div>
+    </div>
+  </div>`:''}
+
   <div class="card" style="border-right:6px solid #ef4444">
     <div class="card-title" style="color:#991b1b">🔴 متعثرون بالسداد (${defaulters.length})</div>
     <p style="font-size:13px;color:#64748b;margin:-8px 0 14px">اشتراكات منتهية + عليها متبقي. ضرورة التحصيل فوراً.</p>
@@ -2390,6 +2448,67 @@ statement(){
     ⚠️ على ولي الأمر متبقي ${balance.toLocaleString()} ر.س — يُنصح بالتواصل للتحصيل.
     ${c.parentPhone?`<a href="https://wa.me/${c.parentPhone.replace(/^\+?/,'').replace(/^0/,'966')}?text=${encodeURIComponent('السلام عليكم '+(c.parentName||'')+'، نذكّركم بمتبقي '+(balance)+' ر.س على اشتراك '+(c.name||'')+'. شكراً لتعاونكم.')}" target="_blank" class="btn btn-success btn-sm" style="margin-right:10px">💬 إرسال تذكير واتساب</a>`:''}
   </div>`:''}`;
+},
+
+// ---------- AUDIT LOG (super admin only) ----------
+auditLog(){
+  if(!Auth.isSuperAdmin()) return Views._forbidden();
+  const log=DB.auditLog();
+  const filterAction=App.params.alAction||'all';
+  const filterDate=App.params.alDate||'';
+  const searchQ=(App.params.alQ||'').toLowerCase();
+  const actionTypes=[...new Set(log.map(e=>e.action))];
+  let filtered=log;
+  if(filterAction!=='all') filtered=filtered.filter(e=>e.action===filterAction);
+  if(filterDate) filtered=filtered.filter(e=>(e.at||'').startsWith(filterDate));
+  if(searchQ) filtered=filtered.filter(e=>(e.details||'').toLowerCase().includes(searchQ)||(e.by||'').toLowerCase().includes(searchQ)||(e.entity||'').toLowerCase().includes(searchQ));
+  const actionColor={
+    'دفعة مُسجَّلة':'#10b981','تعديل اشتراك':'#3b82f6','حذف طفل':'#ef4444',
+    'إضافة مستخدم':'#0f766e','تعديل مستخدم':'#0f766e','إضافة مصروف':'#f59e0b',
+    'تعديل مصروف':'#f59e0b','حذف مصروف':'#ef4444'
+  };
+  return `
+  <div class="card no-print" style="padding:14px;margin-bottom:16px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="input-group" style="margin:0;flex:1;min-width:180px">
+        <label style="font-size:12px">🔍 بحث</label>
+        <input class="input" placeholder="بحث في التفاصيل أو المستخدم..." value="${esc(App.params.alQ||'')}" oninput="App.go('auditLog',{...App.params,alQ:this.value})">
+      </div>
+      <div class="input-group" style="margin:0;min-width:140px">
+        <label style="font-size:12px">🏷️ نوع الإجراء</label>
+        <select class="input" onchange="App.go('auditLog',{...App.params,alAction:this.value})">
+          <option value="all">الكل (${log.length})</option>
+          ${actionTypes.map(a=>`<option value="${esc(a)}" ${filterAction===a?'selected':''}>${esc(a)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="input-group" style="margin:0;min-width:150px">
+        <label style="font-size:12px">📅 تاريخ</label>
+        <input class="input" type="date" value="${filterDate}" onchange="App.go('auditLog',{...App.params,alDate:this.value})">
+      </div>
+      ${(filterAction!=='all'||filterDate||searchQ)?`<button class="btn btn-secondary btn-sm" onclick="App.go('auditLog')">✕ مسح</button>`:''}
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">🔍 سجل النشاط — ${filtered.length} إجراء</div>
+    ${filtered.length?`<div class="table-wrap"><table>
+      <thead><tr><th>التاريخ والوقت</th><th>الإجراء</th><th>الكيان</th><th>التفاصيل</th><th>بواسطة</th></tr></thead>
+      <tbody>${filtered.slice(0,200).map(e=>{
+        const dt=e.at?new Date(e.at):null;
+        const dateStr=dt?dt.toLocaleDateString('ar-SA',{day:'2-digit',month:'2-digit',year:'numeric'}):'—';
+        const timeStr=dt?dt.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}):'';
+        const color=actionColor[e.action]||'#64748b';
+        return `<tr>
+          <td style="font-size:12px;white-space:nowrap">${dateStr}<br><span style="color:#94a3b8">${timeStr}</span></td>
+          <td><span class="badge" style="background:${color}20;color:${color};border:1px solid ${color}40;font-size:11px">${esc(e.action||'—')}</span></td>
+          <td style="font-size:12px;color:#475569">${esc(e.entity||'—')}</td>
+          <td style="font-size:13px;max-width:280px">${esc(e.details||'—')}</td>
+          <td style="font-size:12px;color:#64748b;white-space:nowrap">${esc(e.by||'—')}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>
+    ${filtered.length>200?`<p style="font-size:12px;color:#94a3b8;text-align:center;margin-top:10px">عرض أول 200 سجل فقط — استخدم الفلاتر لتضييق النتائج</p>`:''}`
+    :`<div class="empty-state"><div class="es-icon">🔍</div><p>لا توجد سجلات بهذه المعايير</p></div>`}
+  </div>`;
 },
 
 // ---------- SETTINGS (super admin only) ----------
@@ -2971,6 +3090,18 @@ const Modals = {
         </div>
         <div class="input-group"><label>مبلغ الدفعة (ر.س) *</label><input class="input" id="pay-amount" type="number" value="${remaining}" max="${remaining}" placeholder="0"></div>
         <div class="input-group">
+          <label>طريقة الدفع</label>
+          <select class="input" id="pay-method">
+            <option value="cash">💵 كاش</option>
+            <option value="mada">💳 مدى</option>
+            <option value="transfer">🏦 حوالة</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>ملاحظة (اختياري)</label>
+          <input class="input" id="pay-note" placeholder="مثال: دفعة أولى...">
+        </div>
+        <div class="input-group">
           <label>حالة الدفع بعد الدفعة</label>
           <select class="input" id="pay-status">
             <option value="paid">مدفوع بالكامل</option>
@@ -2980,7 +3111,94 @@ const Modals = {
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" onclick="savePay()">تأكيد الدفع</button>
+        <button class="btn btn-secondary btn-sm" onclick="Modals.payHistory('${subId}')">📋 سجل الدفعات</button>
         <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+
+  payHistory(subId){
+    const s=DB.subscriptions().find(x=>x.id===subId);
+    if(!s) return;
+    const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
+    const payments=DB.paymentsForSub(subId);
+    const totalPaid=payments.reduce((a,p)=>a+(+p.amount||0),0);
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-header"><h2>📋 سجل دفعات — ${esc(DB.childName(s.childId))}</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <div style="background:#f0fdf4;border-radius:8px;padding:12px;margin-bottom:16px;display:flex;gap:16px;flex-wrap:wrap">
+          <div><div style="font-size:11px;color:#64748b">الفاتورة</div><div style="font-weight:700">${esc(s.invoiceNo||'—')}</div></div>
+          <div><div style="font-size:11px;color:#64748b">الإجمالي</div><div style="font-weight:700">${s.price} ر.س</div></div>
+          <div><div style="font-size:11px;color:#64748b">محصَّل (من السجل)</div><div style="font-weight:700;color:#10b981">${totalPaid} ر.س</div></div>
+          <div><div style="font-size:11px;color:#64748b">المدفوع (الكلي)</div><div style="font-weight:700;color:#10b981">${s.paidAmount} ر.س</div></div>
+          <div><div style="font-size:11px;color:#64748b">المتبقي</div><div style="font-weight:700;color:#ef4444">${s.price-s.paidAmount} ر.س</div></div>
+        </div>
+        ${payments.length?`
+        <div class="table-wrap"><table>
+          <thead><tr><th>التاريخ</th><th>المبلغ</th><th>طريقة الدفع</th><th>ملاحظة</th><th>أضافها</th></tr></thead>
+          <tbody>${payments.map(p=>`<tr>
+            <td style="font-size:13px">${formatDate(p.date)}</td>
+            <td style="font-weight:700;color:#10b981">${(+p.amount||0).toLocaleString()} ر.س</td>
+            <td style="font-size:12px">${pmLbl[p.paymentMethod]||p.paymentMethod||'—'}</td>
+            <td style="font-size:12px;color:#64748b">${esc(p.note||'—')}</td>
+            <td style="font-size:12px;color:#64748b">${esc(p.addedBy||'—')}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>`
+        :`<div class="empty-state"><div class="es-icon">📋</div><p>لا توجد دفعات مسجّلة لهذا الاشتراك بعد</p><p style="font-size:12px;color:#94a3b8;margin-top:4px">الدفعات تُسجَّل تلقائياً عند استخدام زر "تسجيل دفعة"</p></div>`}
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary btn-sm" onclick="Modals.pay('${subId}')">💰 تسجيل دفعة</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إغلاق</button>
+      </div>
+    </div></div>`);
+  },
+
+  bulkWhatsApp(type){
+    const subs=DB.subscriptions();
+    const children=DB.children();
+    let list=[];
+    let title='';
+    let msgTemplate='';
+    if(type==='defaulters'){
+      list=subs.filter(s=>Views._paymentState(s)==='defaulter');
+      title='🔴 تذكيرات المتعثرين بالسداد';
+      msgTemplate=(c,s)=>`السلام عليكم ${c.parentName||''}،\nنود تذكيركم بأن اشتراك طفلكم ${c.name||''} قد انتهى بتاريخ ${formatDate(s.endDate)} وعليه مبلغ متبقي ${s.price-s.paidAmount} ر.س.\nيرجى التواصل معنا لتسوية المبلغ. شكراً.`;
+    } else {
+      list=subs.filter(s=>Views._paymentState(s)==='pending');
+      title='🟠 تذكيرات المعلّقين';
+      msgTemplate=(c,s)=>`السلام عليكم ${c.parentName||''}،\nنود تذكيركم بوجود مبلغ متبقي ${s.price-s.paidAmount} ر.س على اشتراك طفلكم ${c.name||''} (ينتهي ${formatDate(s.endDate)}).\nيرجى التواصل لإتمام السداد. شكراً.`;
+    }
+    const rows=list.map(s=>{
+      const c=children.find(x=>x.id===s.childId)||{};
+      const phone=(c.parentPhone||'').replace(/^\+?/,'').replace(/^0/,'966');
+      const msg=msgTemplate(c,s);
+      const url=phone?`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`:'';
+      return {c,s,url,phone};
+    });
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal" style="max-width:660px">
+      <div class="modal-header"><h2>${title} (${rows.length})</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <div style="background:#fef9c3;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#92400e">
+          ⚠️ كل رابط يفتح واتساب ويملأ الرسالة تلقائياً. اضغط إرسال في واتساب لكل شخص.
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>الطفل</th><th>ولي الأمر</th><th>المتبقي</th><th>الهاتف</th><th>إرسال</th></tr></thead>
+          <tbody>${rows.map(r=>`<tr>
+            <td><strong>${esc(r.c.name||'—')}</strong></td>
+            <td style="font-size:13px">${esc(r.c.parentName||'—')}</td>
+            <td style="color:#ef4444;font-weight:700">${(r.s.price-r.s.paidAmount).toLocaleString()} ر.س</td>
+            <td style="font-size:12px">${r.c.parentPhone||'—'}</td>
+            <td>${r.url?`<a href="${r.url}" target="_blank" class="btn btn-wa btn-xs">💬 إرسال</a>`:'<span style="color:#94a3b8;font-size:12px">لا يوجد رقم</span>'}</td>
+          </tr>`).join('')}
+          </tbody>
+        </table></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="App.closeModal()">إغلاق</button>
       </div>
     </div></div>`);
   },
@@ -3688,6 +3906,8 @@ function savePay(){
   const subId=document.getElementById('pay-sub')?.value;
   const amount=parseFloat(document.getElementById('pay-amount')?.value||0);
   const status=document.getElementById('pay-status')?.value;
+  const paymentMethod=document.getElementById('pay-method')?.value||'cash';
+  const note=document.getElementById('pay-note')?.value?.trim()||'';
   const orig=DB.subscriptions().find(s=>s.id===subId);
   if(!orig||amount<=0){alert('يرجى إدخال مبلغ صحيح');return}
   // استنسخ لتجنب التأثير على المرجع المخزّن في _mem قبل الحفظ
@@ -3695,6 +3915,8 @@ function savePay(){
   sub.paidAmount=Math.min(sub.price,sub.paidAmount+amount);
   sub.paymentStatus=sub.paidAmount>=sub.price?'paid':status;
   DB.updateSub(sub);
+  DB.addPayment({id:uid(),subId,childId:sub.childId,invoiceNo:sub.invoiceNo||'',amount,paymentMethod,note,addedBy:Auth.user?.name||'—',date:T0});
+  DB.addAuditLog({action:'دفعة مُسجَّلة',entity:'اشتراك',entityId:subId,details:`${amount} ر.س للفاتورة ${sub.invoiceNo||subId} — طريقة: ${paymentMethod}${note?' — '+note:''}`,by:Auth.user?.name||'—'});
   toast('✅ تم تسجيل الدفعة');
   App.closeModal();
   App.refresh();
@@ -3721,6 +3943,7 @@ function saveEditSub(){
   if(endDate<startDate){alert('تاريخ الانتهاء يجب أن يكون بعد تاريخ البداية');return;}
   if(paidAmount>price){alert('المبلغ المدفوع لا يمكن أن يتجاوز الإجمالي');return;}
   DB.updateSub({...s,type,customDays,startDate,endDate,basePrice,discountPct:discPct,price,paidAmount,paymentStatus,paymentMethod,isActive});
+  DB.addAuditLog({action:'تعديل اشتراك',entity:'اشتراك',entityId:s.id,details:`فاتورة ${s.invoiceNo||s.id}: السعر ${price} | المدفوع ${paidAmount} | من ${startDate} إلى ${endDate}`,by:Auth.user?.name||'—'});
   toast('✅ تم حفظ التعديلات');
   App.closeModal();
   App.refresh();
@@ -3892,6 +4115,7 @@ function saveExpense(isEdit){
   } else {
     DB.addExpense({id:uid(),date,amount,category,description,branchId,paymentMethod,addedBy:Auth.user?.name||'',createdAt:new Date().toISOString()});
   }
+  DB.addAuditLog({action:isEdit?'تعديل مصروف':'إضافة مصروف',entity:'مصروف',entityId:date,details:`${amount} ر.س — ${category} — ${description||'—'}`,by:Auth.user?.name||'—'});
   toast(isEdit?'✅ تم حفظ التعديلات':'✅ تم تسجيل المصروف');
   App.closeModal();
   if(App.view==='expenses') App.refresh(); else App.go('expenses');
@@ -3900,6 +4124,8 @@ function saveExpense(isEdit){
 function deleteExpense(id){
   if(!Auth.isSuperAdmin()) return;
   if(!confirm('هل تريد حذف هذا المصروف؟')) return;
+  const exp=DB.expenses().find(e=>e.id===id);
+  DB.addAuditLog({action:'حذف مصروف',entity:'مصروف',entityId:id,details:exp?`${exp.amount} ر.س — ${exp.category}`:id,by:Auth.user?.name||'—'});
   DB.deleteExpense(id);
   toast('✅ تم الحذف');
   App.refresh();
@@ -4281,6 +4507,7 @@ function saveUser(edit=false){
     if(DB.users().find(x=>x.username===username)){alert('اسم المستخدم مستخدم مسبقاً');return}
     DB.addUser({id:uid(),name,username,password:pass,role,schoolId,branchId,period,phone});
   }
+  DB.addAuditLog({action:edit?'تعديل مستخدم':'إضافة مستخدم',entity:'مستخدم',entityId:username,details:`${name} (${username}) — دور: ${role}`,by:Auth.user?.name||'—'});
   toast(edit?'✅ تم حفظ المستخدم':'✅ تم إضافة المستخدم');
   App.closeModal();
   if(App.view==='users') App.refresh(); else App.go('users');
@@ -4299,6 +4526,7 @@ function deleteChild(id,name){
   DB.save('subscriptions',DB.subscriptions().filter(s=>s.childId!==id));
   DB.save('attendance',DB.attendance().filter(a=>a.childId!==id));
   DB.deleteChild(id);
+  DB.addAuditLog({action:'حذف طفل',entity:'طفل',entityId:id,details:`تم حذف الطفل "${name}" وجميع بياناته (اشتراكات + حضور)`,by:Auth.user?.name||'—'});
   toast(`✅ تم حذف "${name}" وكل بياناته`);
   App.refresh();
 }
