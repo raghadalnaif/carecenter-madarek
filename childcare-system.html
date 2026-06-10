@@ -10,7 +10,7 @@
 <!-- BUILD: 2026-06-10-v10 -->
 <script>
 (function(){
-  var BUILD='v13-20260610';
+  var BUILD='v14-20260610';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   if(stored!==BUILD){
@@ -264,8 +264,8 @@ let _fdb=null;
 let _lastWrite=0;
 let _fbStatus='connecting'; // 'connecting' | 'ok' | 'error'
 const _mem={};
-const _keyWriteTime={}; // حماية مفاتيح بعينها من الكتابة الفورية لـ 30 ثانية
-let _listenDebounce=null; // لمنع تكرار التحديث السريع
+const _pendingEcho={}; // key→snapshot لقيمة كتبناها مؤخراً (لتجاهل صدى ذاتي فقط، لا تأخير لتحديثات الأجهزة الأخرى)
+const _writeFails={}; // key→count محاولات فشلت
 
 // =========================================================
 //  DB
@@ -280,11 +280,22 @@ const DB = {
     try{localStorage.setItem('ccs_'+k,JSON.stringify(v))}catch{}
     if(_fdb&&_fbStatus==='ok'){
       _lastWrite=Date.now();
-      _keyWriteTime[k]=Date.now(); // حماية هذا المفتاح تحديداً لـ30 ثانية
+      // خزّن قيمة ما كتبنا — المستمع يقارن لرفض الصدى الذاتي فقط
+      try{_pendingEcho[k]=JSON.stringify(v);}catch{_pendingEcho[k]=null;}
+      // نظّف بعد 60 ثانية لتجنب نمو الذاكرة
+      setTimeout(()=>{delete _pendingEcho[k];},60000);
       const attempt=(n)=>{
-        _fdb.ref('ccs/'+k).set(_mem[k]).catch(()=>{
-          if(n<3) setTimeout(()=>attempt(n+1),2000*n);
-        });
+        _fdb.ref('ccs/'+k).set(_mem[k])
+          .then(()=>{_writeFails[k]=0;})
+          .catch(err=>{
+            if(n<4){
+              setTimeout(()=>attempt(n+1),1000*n);
+            } else {
+              _writeFails[k]=(_writeFails[k]||0)+1;
+              console.error('[DB] فشل حفظ '+k+':',err?.message||err);
+              if(typeof toast==='function') toast('⚠️ تعذّر مزامنة "'+k+'" — احفظ مرة أخرى','error');
+            }
+          });
       };
       attempt(1);
     }
@@ -309,37 +320,36 @@ const DB = {
           const raw=localStorage.getItem('ccs_'+k);
           if(raw){try{toMigrate[k]=JSON.parse(raw);_mem[k]=toMigrate[k];}catch{}}
         });
-        if(Object.keys(toMigrate).length) await _fdb.ref('ccs').set(toMigrate);
+        if(Object.keys(toMigrate).length) await _fdb.ref('ccs').update(toMigrate);
       }
-      // مستمع التحديثات الفورية — مع debounce ومنع الكتابة فوق التعديلات المحلية
+      // مستمع التحديثات الفورية — يقارن بالقيمة لا بالوقت، فيرفض صدى ذاتي فقط
       _fdb.ref('ccs').on('value',snap=>{
-        // تجاهل مباشر إن كانت هناك كتابة حديثة (أقل من 3 ثوانٍ)
-        if(Date.now()-_lastWrite<3000) return;
-        clearTimeout(_listenDebounce);
-        _listenDebounce=setTimeout(()=>{
-          const d=snap.val();
-          if(!d) return;
-          let changed=false;
-          Object.keys(d).forEach(k=>{
-            // تخطّ أي مفتاح كُتب محلياً في آخر 30 ثانية لمنع ضياع التعديلات
-            if(Date.now()-(_keyWriteTime[k]||0)<30000) return;
-            if(JSON.stringify(_mem[k])!==JSON.stringify(d[k])){_mem[k]=d[k];changed=true;}
-          });
-          if(changed&&Auth.user){
-            if(Auth.user.id){
-              const fresh=DB.users().find(u=>u.id===Auth.user.id);
-              if(fresh){Auth.user=fresh;sessionStorage.setItem('ccs_user',JSON.stringify(fresh));}
-            }
-            if(!App.modal&&App.view!=='settings'){
-              const el=document.getElementById('content');
-              if(!el) return;
-              const saved={};
-              el.querySelectorAll('input[id],select[id]').forEach(inp=>{saved[inp.id]=inp.value;});
-              el.innerHTML=App.currentView();
-              Object.entries(saved).forEach(([id,val])=>{const f=document.getElementById(id);if(f&&val!==undefined)f.value=val;});
-            }
+        const d=snap.val();
+        if(!d) return;
+        let changed=false;
+        Object.keys(d).forEach(k=>{
+          const incoming=JSON.stringify(d[k]);
+          // إذا كانت القيمة الواردة هي بالضبط ما كتبناه نحن، فهي صدى ذاتي — تجاهلها
+          if(_pendingEcho[k]===incoming){delete _pendingEcho[k];return;}
+          const current=JSON.stringify(_mem[k]);
+          if(current!==incoming){_mem[k]=d[k];changed=true;}
+        });
+        if(changed&&Auth.user){
+          if(Auth.user.id){
+            const fresh=DB.users().find(u=>u.id===Auth.user.id);
+            if(fresh){Auth.user=fresh;sessionStorage.setItem('ccs_user',JSON.stringify(fresh));}
           }
-        },800);
+          // لا تُعِد رسم الصفحة إن كان هناك modal مفتوح أو المستخدم في صفحة الإعدادات
+          if(!App.modal&&App.view!=='settings'){
+            const el=document.getElementById('content');
+            if(!el) return;
+            // حفظ قيم البحث والفلاتر قبل إعادة الرسم
+            const saved={};
+            el.querySelectorAll('input[id],select[id]').forEach(inp=>{saved[inp.id]=inp.value;});
+            el.innerHTML=App.currentView();
+            Object.entries(saved).forEach(([id,val])=>{const f=document.getElementById(id);if(f&&val!==undefined)f.value=val;});
+          }
+        }
       });
     }catch(e){
       _fdb=null; // أهم سطر: امنع DB.init() من الكتابة على Firebase بعد فشل القراءة
@@ -383,15 +393,15 @@ const DB = {
   attendance(){return this.get('attendance')||[]},
   save(k,arr){this.set(k,arr)},
   addUser(u){const a=this.users();a.push(u);this.save('users',a)},
-  updateUser(u){const a=this.users();const i=a.findIndex(x=>x.id===u.id);a[i]=u;this.save('users',a)},
+  updateUser(u){const a=this.users();const i=a.findIndex(x=>x.id===u.id);if(i>=0)a[i]=u;else a.push(u);this.save('users',a)},
   deleteUser(id){this.save('users',this.users().filter(x=>x.id!==id))},
   addSchool(s){const a=this.schools();a.push(s);this.save('schools',a)},
-  updateSchool(s){const a=this.schools();const i=a.findIndex(x=>x.id===s.id);a[i]=s;this.save('schools',a)},
+  updateSchool(s){const a=this.schools();const i=a.findIndex(x=>x.id===s.id);if(i>=0)a[i]=s;else a.push(s);this.save('schools',a)},
   addChild(c){const a=this.children();a.push(c);this.save('children',a)},
-  updateChild(c){const a=this.children();const i=a.findIndex(x=>x.id===c.id);a[i]=c;this.save('children',a)},
+  updateChild(c){const a=this.children();const i=a.findIndex(x=>x.id===c.id);if(i>=0)a[i]=c;else a.push(c);this.save('children',a)},
   deleteChild(id){this.save('children',this.children().filter(x=>x.id!==id))},
   addSub(s){const a=this.subscriptions();a.push(s);this.save('subscriptions',a)},
-  updateSub(s){const a=this.subscriptions();const i=a.findIndex(x=>x.id===s.id);a[i]=s;this.save('subscriptions',a)},
+  updateSub(s){const a=this.subscriptions();const i=a.findIndex(x=>x.id===s.id);if(i>=0)a[i]=s;else a.push(s);this.save('subscriptions',a)},
   saveAttendance(list){this.save('attendance',list)},
   notifications(){return this.get('notifications')||[]},
   addNotification(n){
@@ -449,7 +459,7 @@ const DB = {
   schoolName(id){return this.schools().find(s=>s.id===id)?.name||id},
   branchName(id){return this.branches().find(b=>b.id===id)?.name||'—'},
   addBranch(b){const a=this.branches();a.push(b);this.set('branches',a)},
-  updateBranch(b){const a=this.branches();const i=a.findIndex(x=>x.id===b.id);a[i]=b;this.set('branches',a)},
+  updateBranch(b){const a=this.branches();const i=a.findIndex(x=>x.id===b.id);if(i>=0)a[i]=b;else a.push(b);this.set('branches',a)},
 };
 
 // =========================================================
@@ -483,6 +493,12 @@ const App = {
   modal:null,
   params:{},
   go(view,params={}){this.view=view;this.params=params;this.render()},
+  refresh(){
+    // إعادة رسم سريع — لا يلمس الشريط الجانبي ولا الـtopbar، فقط محتوى الصفحة
+    const el=document.getElementById('content');
+    if(el){el.innerHTML=this.currentView();return;}
+    this.render();
+  },
   render(){document.getElementById('app').innerHTML=Auth.user?this.shell():Views.login()},
   shell(){
     return `
@@ -501,7 +517,7 @@ const App = {
         <div class="content" id="content">${this.currentView()}</div>
       </div>
     </div>
-    ${App.modal?App.modal:''}
+    <div id="modal-layer">${App.modal?App.modal:''}</div>
     `;
   },
   sidebar(){
@@ -620,8 +636,26 @@ const App = {
     try{return fn();}
     catch(e){console.error('[CCS]',App.view,e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة: ${App.view}</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
   },
-  showModal(html){App.modal=html;App.render()},
-  closeModal(){App.modal=null;App.render()},
+  showModal(html){
+    App.modal=html;
+    // أضف الـmodal مباشرة بدون إعادة رسم الـshell كله
+    const root=document.getElementById('app');
+    if(root&&Auth.user){
+      let modalLayer=document.getElementById('modal-layer');
+      if(!modalLayer){
+        modalLayer=document.createElement('div');
+        modalLayer.id='modal-layer';
+        root.appendChild(modalLayer);
+      }
+      modalLayer.innerHTML=html;
+    } else App.render();
+  },
+  closeModal(){
+    App.modal=null;
+    const modalLayer=document.getElementById('modal-layer');
+    if(modalLayer) modalLayer.innerHTML='';
+    else App.render();
+  },
 };
 
 // =========================================================
@@ -3130,8 +3164,9 @@ function saveBranch(edit=false){
     location:document.getElementById('br-loc')?.value?.trim()||'',
   };
   if(edit) DB.updateBranch(b); else DB.addBranch(b);
+  toast(edit?'✅ تم حفظ الفرع':'✅ تم إضافة الفرع');
   App.closeModal();
-  App.go('branches');
+  if(App.view==='branches') App.refresh(); else App.go('branches');
 }
 
 function saveSchool(edit=false){
@@ -3147,16 +3182,18 @@ function saveSchool(edit=false){
     isActive:true,
   };
   if(edit) DB.updateSchool(s); else DB.addSchool(s);
+  toast(edit?'✅ تم حفظ المدرسة':'✅ تم إضافة المدرسة');
   App.closeModal();
-  App.go('schools');
+  if(App.view==='schools') App.refresh(); else App.go('schools');
 }
 
 function toggleSchool(id){
-  const s=DB.schools().find(x=>x.id===id);
-  if(!s) return;
-  s.isActive=!s.isActive;
+  const orig=DB.schools().find(x=>x.id===id);
+  if(!orig) return;
+  const s={...orig,isActive:!orig.isActive};
   DB.updateSchool(s);
-  App.go('schools');
+  toast('✅ '+(s.isActive?'تم تفعيل':'تم إيقاف')+' المدرسة');
+  App.refresh();
 }
 
 function saveChild(edit=false){
@@ -3186,7 +3223,7 @@ function saveChild(edit=false){
   };
   if(edit) DB.updateChild(c); else {
     DB.addChild(c);
-    DB.addNotification({type:'new_child',title:'👶 طفل جديد',body:`تم تسجيل ${name} في ${DB.branchName(c.branchId)}`,addedBy:Auth.user.name});
+    if(Auth.user) DB.addNotification({type:'new_child',title:'👶 طفل جديد',body:`تم تسجيل ${name} في ${DB.branchName(c.branchId)}`,addedBy:Auth.user.name});
   }
 
   // حفظ الاشتراك مع الطفل (للتسجيل الجديد فقط)
@@ -3209,11 +3246,12 @@ function saveChild(edit=false){
       DB.addSub({id:uid(),childId,schoolId,branchId:c.branchId,period,type:subType,customDays:subCustomDays,startDate:subStart,endDate:subEnd,basePrice,discountPct:parseFloat(document.getElementById('c-disc')?.value||0),price:subPrice,paidAmount:subPaid,paymentStatus:subPay,paymentMethod:subPM,receiptImage:subReceipt,isActive:true,createdAt:T0,invoiceNo});
       const tl={'daily':'يومي','weekly':'أسبوعي','monthly':'٣٠ يوم','custom':'مخصص'};
       const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
-      DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[subType]||subType} لـ ${name} — ${subPrice} ر.س | الدفع: ${pmLbl[subPM]||subPM} | ${subPay==='paid'?'مدفوع بالكامل':subPay==='partial'?'مدفوع جزئياً':'مؤجل'}`,addedBy:Auth.user.name});
+      if(Auth.user) DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[subType]||subType} لـ ${name} — ${subPrice} ر.س | الدفع: ${pmLbl[subPM]||subPM} | ${subPay==='paid'?'مدفوع بالكامل':subPay==='partial'?'مدفوع جزئياً':'مؤجل'}`,addedBy:Auth.user.name});
     }
   }
+  toast(edit?'✅ تم حفظ التعديلات':'✅ تم تسجيل الطفل');
   App.closeModal();
-  App.go('children');
+  if(App.view==='children') App.refresh(); else App.go('children');
 }
 
 function saveSub(){
@@ -3241,22 +3279,26 @@ function saveSub(){
   DB.addSub(s);
   const tl={'daily':'يومي','weekly':'أسبوعي','monthly':'٣٠ يوم','custom':'مخصص'};
   const pmLbl2={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
-  DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[type]||type} لـ ${child?.name||''} — ${price} ر.س | الدفع: ${pmLbl2[paymentMethod]||paymentMethod} | ${paymentStatus==='paid'?'مدفوع بالكامل':paymentStatus==='partial'?'مدفوع جزئياً':'مؤجل'}`,addedBy:Auth.user.name});
+  if(Auth.user) DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[type]||type} لـ ${child?.name||''} — ${price} ر.س | الدفع: ${pmLbl2[paymentMethod]||paymentMethod} | ${paymentStatus==='paid'?'مدفوع بالكامل':paymentStatus==='partial'?'مدفوع جزئياً':'مؤجل'}`,addedBy:Auth.user.name});
+  toast('✅ تم حفظ الاشتراك');
   App.closeModal();
-  App.go('subscriptions');
+  App.refresh();
 }
 
 function savePay(){
   const subId=document.getElementById('pay-sub')?.value;
   const amount=parseFloat(document.getElementById('pay-amount')?.value||0);
   const status=document.getElementById('pay-status')?.value;
-  const sub=DB.subscriptions().find(s=>s.id===subId);
-  if(!sub||amount<=0){alert('يرجى إدخال مبلغ صحيح');return}
+  const orig=DB.subscriptions().find(s=>s.id===subId);
+  if(!orig||amount<=0){alert('يرجى إدخال مبلغ صحيح');return}
+  // استنسخ لتجنب التأثير على المرجع المخزّن في _mem قبل الحفظ
+  const sub={...orig};
   sub.paidAmount=Math.min(sub.price,sub.paidAmount+amount);
   sub.paymentStatus=sub.paidAmount>=sub.price?'paid':status;
   DB.updateSub(sub);
+  toast('✅ تم تسجيل الدفعة');
   App.closeModal();
-  App.go('subscriptions');
+  App.refresh();
 }
 
 function saveEditSub(){
@@ -3264,7 +3306,7 @@ function saveEditSub(){
   const subId=document.getElementById('edit-sub-id')?.value;
   if(!subId) return;
   const s=DB.subscriptions().find(x=>x.id===subId);
-  if(!s) return;
+  if(!s){toast('⚠️ الاشتراك غير موجود — قد يكون حُذف','error');App.closeModal();App.refresh();return;}
   const type=document.getElementById('edit-sub-type')?.value;
   const startDate=document.getElementById('edit-sub-start')?.value;
   const endDate=document.getElementById('edit-sub-end')?.value;
@@ -3277,9 +3319,12 @@ function saveEditSub(){
   const isActive=document.getElementById('edit-sub-active')?.value==='1';
   const customDays=type==='custom'?parseInt(document.getElementById('edit-sub-custom-days')?.value||s.customDays||15):undefined;
   if(!startDate||!endDate||price<0){alert('يرجى تعبئة الحقول المطلوبة');return;}
+  if(endDate<startDate){alert('تاريخ الانتهاء يجب أن يكون بعد تاريخ البداية');return;}
+  if(paidAmount>price){alert('المبلغ المدفوع لا يمكن أن يتجاوز الإجمالي');return;}
   DB.updateSub({...s,type,customDays,startDate,endDate,basePrice,discountPct:discPct,price,paidAmount,paymentStatus,paymentMethod,isActive});
+  toast('✅ تم حفظ التعديلات');
   App.closeModal();
-  App.go('subscriptions');
+  App.refresh();
 }
 
 // =========================================================
@@ -3399,14 +3444,16 @@ function saveSale(){
   const child=DB.children().find(c=>c.id===childId);
   const schoolId=child?.schoolId||Auth.schoolId()||DB.schools()[0]?.id||'';
   const branchId=child?.branchId||Auth.branchId()||'';
-  DB.addSale({id:uid(),date:T0,childId:childId||null,parentName:parentName||child?.parentName||'',itemType,itemName:itemType==='other'?itemName:'',price,paymentMethod,notes,schoolId,branchId,createdAt:new Date().toISOString(),addedBy:Auth.user.name});
+  DB.addSale({id:uid(),date:T0,childId:childId||null,parentName:parentName||child?.parentName||'',itemType,itemName:itemType==='other'?itemName:'',price,paymentMethod,notes,schoolId,branchId,createdAt:new Date().toISOString(),addedBy:Auth.user?.name||''});
+  toast('✅ تم تسجيل البيع');
   App.closeModal();
-  App.go('sales');
+  if(App.view==='sales') App.refresh(); else App.go('sales');
 }
 function deleteSale(id){
   if(!confirm('هل تريد حذف هذه المبيعة؟')) return;
   DB.deleteSale(id);
-  App.go('sales');
+  toast('✅ تم الحذف');
+  App.refresh();
 }
 
 function showSettingsToast(msg){
@@ -3415,6 +3462,24 @@ function showSettingsToast(msg){
   el.textContent=msg;
   el.style.display='block';
   setTimeout(()=>{if(el)el.style.display='none';},3000);
+}
+
+// Toast عالمي يظهر في أي صفحة بعد الحفظ
+function toast(msg,kind='success'){
+  let el=document.getElementById('global-toast');
+  if(!el){
+    el=document.createElement('div');
+    el.id='global-toast';
+    el.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 22px;border-radius:10px;font-weight:700;font-size:14px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.18);transition:opacity .3s;opacity:0';
+    document.body.appendChild(el);
+  }
+  el.style.background=kind==='error'?'#fee2e2':kind==='warn'?'#fef3c7':'#dcfce7';
+  el.style.color=kind==='error'?'#991b1b':kind==='warn'?'#92400e':'#166534';
+  el.style.border='1px solid '+(kind==='error'?'#fecaca':kind==='warn'?'#fde68a':'#bbf7d0');
+  el.textContent=msg;
+  el.style.opacity='1';
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>{el.style.opacity='0';},2500);
 }
 
 function confirmReset(){
@@ -3707,23 +3772,25 @@ function saveTeacher(edit=false){
   if(!edit&&!pass){alert('كلمة المرور مطلوبة');return}
   if(edit){
     const id=document.getElementById('t-id')?.value;
-    const u=DB.users().find(x=>x.id===id);
-    if(!u) return;
-    u.name=name;u.username=username;u.branchId=branchId;u.period=period;u.phone=phone;
+    const orig=DB.users().find(x=>x.id===id);
+    if(!orig){toast('⚠️ المعلمة غير موجودة','error');App.closeModal();return;}
+    const u={...orig,name,username,branchId,period,phone};
     if(pass) u.password=pass;
     DB.updateUser(u);
   } else {
     if(DB.users().find(x=>x.username===username)){alert('اسم المستخدم مستخدم مسبقاً');return}
     DB.addUser({id:uid(),name,username,password:pass,role:'teacher',schoolId,branchId,period,phone});
   }
+  toast(edit?'✅ تم حفظ التعديلات':'✅ تم إضافة المعلمة');
   App.closeModal();
-  App.go('teachers');
+  if(App.view==='teachers') App.refresh(); else App.go('teachers');
 }
 
 function deleteTeacher(id){
   if(!confirm('هل أنت متأكد من حذف هذه المعلمة؟')) return;
   DB.deleteUser(id);
-  App.go('teachers');
+  toast('✅ تم حذف المعلمة');
+  App.refresh();
 }
 
 function saveUser(edit=false){
@@ -3739,30 +3806,35 @@ function saveUser(edit=false){
   const period=document.getElementById('u-period')?.value||'morning';
   if(role==='school_admin'&&!branchId){alert('⚠️ يجب تحديد الفرع لمديرة الفرع');return}
   if(edit){
-    const u=DB.users().find(x=>x.id===document.getElementById('u-id')?.value);
-    if(!u) return;
-    u.name=name;u.username=username;u.role=role;u.schoolId=schoolId;u.branchId=branchId;u.period=period;u.phone=phone;
+    const orig=DB.users().find(x=>x.id===document.getElementById('u-id')?.value);
+    if(!orig){toast('⚠️ المستخدم غير موجود','error');App.closeModal();return;}
+    const u={...orig,name,username,role,schoolId,branchId,period,phone};
     if(pass) u.password=pass;
     DB.updateUser(u);
   } else {
     if(DB.users().find(x=>x.username===username)){alert('اسم المستخدم مستخدم مسبقاً');return}
     DB.addUser({id:uid(),name,username,password:pass,role,schoolId,branchId,period,phone});
   }
+  toast(edit?'✅ تم حفظ المستخدم':'✅ تم إضافة المستخدم');
   App.closeModal();
-  App.go('users');
+  if(App.view==='users') App.refresh(); else App.go('users');
 }
 
 function deleteUser(id){
   if(!confirm('هل أنت متأكد من حذف هذا المستخدم؟')) return;
   DB.deleteUser(id);
-  App.go('users');
+  toast('✅ تم الحذف');
+  App.refresh();
 }
 function deleteChild(id,name){
+  if(!Auth.isSuperAdmin()){toast('هذه الصلاحية للمدير العام فقط','error');return;}
   if(!confirm(`هل أنت متأكد من حذف الطفل "${name}"؟\nسيتم حذف جميع بيانات الطفل والاشتراكات والحضور المرتبطة به.`)) return;
-  DB.deleteChild(id);
+  // احفظ الثلاثة بالتتالي — كل save تكتب لـlocalStorage فوراً وFirebase بشكل متزامن
   DB.save('subscriptions',DB.subscriptions().filter(s=>s.childId!==id));
   DB.save('attendance',DB.attendance().filter(a=>a.childId!==id));
-  App.render();
+  DB.deleteChild(id);
+  toast(`✅ تم حذف "${name}" وكل بياناته`);
+  App.refresh();
 }
 
 // Attendance
@@ -3784,18 +3856,20 @@ function setAtt(childId,status,date,schoolId){
 function saveAttendance(date,schoolId){
   const att=DB.attendance();
   const entries=pendingAtt[date]||{};
+  if(!Object.keys(entries).length){toast('لم يتم تعديل أي حضور','warn');return;}
   Object.values(entries).forEach(entry=>{
     const hadPrev=att.some(a=>a.childId===entry.childId);
     const idx=att.findIndex(a=>a.childId===entry.childId&&a.date===date);
     if(idx>=0) att[idx]={...att[idx],...entry};
     else att.push({id:uid(),...entry});
-    if(!hadPrev&&entry.status==='present'){
+    if(!hadPrev&&entry.status==='present'&&Auth.user){
       const child=DB.children().find(c=>c.id===entry.childId);
       if(child) DB.addNotification({type:'first_att',title:'🌟 أول حضور',body:`${child.name} حضر لأول مرة — ${DB.branchName(child.branchId)}`,addedBy:Auth.user.name});
     }
   });
   DB.saveAttendance(att);
-  alert('✅ تم حفظ الحضور بنجاح');
+  delete pendingAtt[date]; // امسح الذاكرة المعلّقة
+  toast('✅ تم حفظ الحضور بنجاح');
 }
 
 // =========================================================
