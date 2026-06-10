@@ -10,7 +10,7 @@
 <!-- BUILD: 2026-06-10-v10 -->
 <script>
 (function(){
-  var BUILD='v19-20260610';
+  var BUILD='v20-20260610';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   if(stored!==BUILD){
@@ -415,6 +415,9 @@ const DB = {
   // سجل التدقيق (Audit Log)
   auditLog(){return this.get('auditLog')||[]},
   addAuditLog(entry){const a=this.auditLog();a.unshift({...entry,id:uid(),at:new Date().toISOString()});if(a.length>500)a.splice(500);this.save('auditLog',a)},
+  // تقفيل الصندوق اليومي (Daily Cash Closing)
+  cashClosings(){return this.get('cashClosings')||[]},
+  addCashClosing(c){const a=this.cashClosings();a.unshift({...c,id:uid(),at:new Date().toISOString()});if(a.length>730)a.splice(730);this.save('cashClosings',a)},
   saveAttendance(list){this.save('attendance',list)},
   notifications(){return this.get('notifications')||[]},
   addNotification(n){
@@ -549,6 +552,7 @@ const App = {
       {v:'expenses',icon:'💸',label:'المصروفات'},
       {v:'accounting',icon:'🧾',label:'المحاسبة'},
       {v:'tasks',icon:'📌',label:'مهام اليوم'},
+      {v:'cashClosing',icon:'💰',label:'تقفيل الصندوق'},
       {v:'auditLog',icon:'🔍',label:'سجل النشاط'},
       {v:'settings',icon:'⚙️',label:'الإعدادات'},
     ] : u.role==='school_admin' ? [
@@ -556,6 +560,8 @@ const App = {
       {v:'children',icon:'👶',label:'الأطفال'},
       {v:'subscriptions',icon:'📋',label:'الاشتراكات'},
       {v:'attendance',icon:'✅',label:'الحضور'},
+      {v:'branchTasks',icon:'🔴',label:'مهام التحصيل'},
+      {v:'cashClosing',icon:'💰',label:'تقفيل الصندوق'},
       {v:'reports',icon:'📊',label:'التقارير'},
       {v:'teachers',icon:'👩‍🏫',label:'المعلمات'},
       {v:'whatsapp',icon:'💬',label:'رسائل واتساب'},
@@ -646,6 +652,8 @@ const App = {
       accounting:()=>Auth.isSuperAdmin(),
       expenses:()=>Auth.isSuperAdmin(),
       tasks:()=>Auth.isSuperAdmin(),
+      branchTasks:()=>Auth.isSchoolAdmin(),
+      cashClosing:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
       statement:()=>Auth.isSuperAdmin(),
       auditLog:()=>Auth.isSuperAdmin(),
       branchReport:()=>Auth.isSuperAdmin(),
@@ -653,7 +661,7 @@ const App = {
     };
     const guard=guards[App.view];
     if(guard&&!guard()) return Views._forbidden();
-    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,expenses:Views.expenses,tasks:Views.tasks,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,settings:Views.settings};
+    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,settings:Views.settings};
     const fn=map[App.view]||Views.dashboard;
     try{return fn();}
     catch(e){console.error('[CCS]',App.view,e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة: ${App.view}</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
@@ -1018,10 +1026,9 @@ children(){
   const q=(App.params.q||'').toLowerCase();
   const bFilter=App.params.branch||'all';
   const pFilter=App.params.period||'all';
-  if(q) kids=kids.filter(c=>c.name.includes(q)||c.parentName.includes(q)||c.parentPhone.includes(q));
+  if(q) kids=kids.filter(c=>(c.name||'').includes(q)||(c.parentName||'').toLowerCase().includes(q)||(c.parentPhone||'').includes(q));
   if(!bid&&bFilter!=='all') kids=kids.filter(c=>c.branchId===bFilter);
   if(!uPeriod&&pFilter!=='all') kids=kids.filter(c=>c.period===pFilter);
-  const _fp={q:esc(App.params.q||''),branch:bFilter,period:pFilter};
   const branchColors=['badge-blue','badge-green','badge-orange','badge-red'];
   return `
   <div class="actions-bar" style="flex-wrap:wrap">
@@ -1030,20 +1037,20 @@ children(){
     <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('kids-table','الأطفال')">📊 تصدير</button>
     <div class="search-bar" style="flex:1;max-width:300px;margin:0">
       <span class="search-icon">🔍</span>
-      <input class="input" placeholder="بحث بالاسم أو الوالد..." value="${esc(App.params.q||'')}" oninput="App.go('children',{q:this.value,branch:'${bFilter}',period:'${pFilter}'})">
+      <input class="input" placeholder="بحث بالاسم أو ولي الأمر أو الهاتف..." value="${esc(App.params.q||'')}" oninput="App.go('children',{...App.params,q:this.value})">
     </div>
   </div>
-  ${!bid?`<div class="card" style="padding:12px;margin-bottom:12px">
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+  ${(!bid||!uPeriod)?`<div class="card" style="padding:12px;margin-bottom:12px">
+    ${!bid?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
       <span style="font-size:13px;font-weight:600;color:#64748b">🏢 الفرع:</span>
-      <span class="chip ${bFilter==='all'?'active':''}" onclick="App.go('children',{q:'${_fp.q}',branch:'all',period:'${pFilter}'})">الكل</span>
-      ${branches.map(b=>`<span class="chip ${bFilter===b.id?'active':''}" onclick="App.go('children',{q:'${_fp.q}',branch:'${b.id}',period:'${pFilter}'})">${esc(b.name)}</span>`).join('')}
-    </div>
-    ${!uPeriod?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid #f1f5f9;padding-top:8px">
+      <span class="chip ${bFilter==='all'?'active':''}" onclick="App.go('children',{...App.params,branch:'all'})">الكل</span>
+      ${branches.map(b=>`<span class="chip ${bFilter===b.id?'active':''}" onclick="App.go('children',{...App.params,branch:'${b.id}'})">${esc(b.name)}</span>`).join('')}
+    </div>`:''}
+    ${!uPeriod?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;${!bid?'border-top:1px solid #f1f5f9;padding-top:8px':''}">
       <span style="font-size:13px;font-weight:600;color:#64748b">⏰ الفترة:</span>
-      <span class="chip ${pFilter==='all'?'active':''}" onclick="App.go('children',{q:'${_fp.q}',branch:'${bFilter}',period:'all'})">الكل</span>
-      <span class="chip ${pFilter==='morning'?'active':''}" onclick="App.go('children',{q:'${_fp.q}',branch:'${bFilter}',period:'morning'})">🌅 صباحي</span>
-      <span class="chip ${pFilter==='evening'?'active':''}" onclick="App.go('children',{q:'${_fp.q}',branch:'${bFilter}',period:'evening'})">🌙 مسائي</span>
+      <span class="chip ${pFilter==='all'?'active':''}" onclick="App.go('children',{...App.params,period:'all'})">الكل</span>
+      <span class="chip ${pFilter==='morning'?'active':''}" onclick="App.go('children',{...App.params,period:'morning'})">🌅 صباحي</span>
+      <span class="chip ${pFilter==='evening'?'active':''}" onclick="App.go('children',{...App.params,period:'evening'})">🌙 مسائي</span>
     </div>`:''}
   </div>`:''}
   <div class="card"><div class="table-wrap">
@@ -1143,17 +1150,17 @@ subscriptions(){
     ${chips.map(([v,l])=>`<span class="chip ${filter===v?'active':''}" onclick="App.go('subscriptions',{filter:'${v}',subQ:'${_sp.subQ}',sBranch:'${sBranch}',sPeriod:'${sPeriod}'})">${l}</span>`).join('')}
     <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('subs-table','الاشتراكات')">📊 تصدير</button>
   </div>
-  ${!bid?`<div class="card" style="padding:12px;margin-bottom:12px">
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+  ${(!bid||!uPeriod)?`<div class="card" style="padding:12px;margin-bottom:12px">
+    ${!bid?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
       <span style="font-size:13px;font-weight:600;color:#64748b">🏢 الفرع:</span>
-      <span class="chip ${sBranch==='all'?'active':''}" onclick="App.go('subscriptions',{filter:'${filter}',subQ:'${_sp.subQ}',sBranch:'all',sPeriod:'${sPeriod}'})">الكل</span>
-      ${branches.map(b=>`<span class="chip ${sBranch===b.id?'active':''}" onclick="App.go('subscriptions',{filter:'${filter}',subQ:'${_sp.subQ}',sBranch:'${b.id}',sPeriod:'${sPeriod}'})">${esc(b.name)}</span>`).join('')}
-    </div>
-    ${!uPeriod?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid #f1f5f9;padding-top:8px">
+      <span class="chip ${sBranch==='all'?'active':''}" onclick="App.go('subscriptions',{...App.params,sBranch:'all'})">الكل</span>
+      ${branches.map(b=>`<span class="chip ${sBranch===b.id?'active':''}" onclick="App.go('subscriptions',{...App.params,sBranch:'${b.id}'})">${esc(b.name)}</span>`).join('')}
+    </div>`:''}
+    ${!uPeriod?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;${!bid?'border-top:1px solid #f1f5f9;padding-top:8px':''}">
       <span style="font-size:13px;font-weight:600;color:#64748b">⏰ الفترة:</span>
-      <span class="chip ${sPeriod==='all'?'active':''}" onclick="App.go('subscriptions',{filter:'${filter}',subQ:'${_sp.subQ}',sBranch:'${sBranch}',sPeriod:'all'})">الكل</span>
-      <span class="chip ${sPeriod==='morning'?'active':''}" onclick="App.go('subscriptions',{filter:'${filter}',subQ:'${_sp.subQ}',sBranch:'${sBranch}',sPeriod:'morning'})">🌅 صباحي</span>
-      <span class="chip ${sPeriod==='evening'?'active':''}" onclick="App.go('subscriptions',{filter:'${filter}',subQ:'${_sp.subQ}',sBranch:'${sBranch}',sPeriod:'evening'})">🌙 مسائي</span>
+      <span class="chip ${sPeriod==='all'?'active':''}" onclick="App.go('subscriptions',{...App.params,sPeriod:'all'})">الكل</span>
+      <span class="chip ${sPeriod==='morning'?'active':''}" onclick="App.go('subscriptions',{...App.params,sPeriod:'morning'})">🌅 صباحي</span>
+      <span class="chip ${sPeriod==='evening'?'active':''}" onclick="App.go('subscriptions',{...App.params,sPeriod:'evening'})">🌙 مسائي</span>
     </div>`:''}
   </div>`:''}
   ${studentSummary}
@@ -1220,8 +1227,9 @@ attendance(){
   } else {
     const bid=Auth.branchId();
     if(bid){
-      // مديرة الفرع: فقط أطفال فرعها (صباح ومساء)
+      // مديرة الفرع: فقط أطفال فرعها — مع إتاحة فلتر فترة وبحث
       kids=kids.filter(c=>c.branchId===bid);
+      if(App.params.periodFilter) kids=kids.filter(c=>c.period===App.params.periodFilter);
     } else {
       // المدير العام: فلترة بالفرع / فلترة بالفترة / فلترة بالمعلمة
       const teacherFilter=App.params.teacherFilter||'';
@@ -1233,6 +1241,9 @@ attendance(){
       if(App.params.periodFilter) kids=kids.filter(c=>c.period===App.params.periodFilter);
     }
   }
+  // بحث عام بالاسم لجميع المستخدمين
+  const attQ=(App.params.attQ||'').trim().toLowerCase();
+  if(attQ) kids=kids.filter(c=>(c.name||'').toLowerCase().includes(attQ)||(c.parentName||'').toLowerCase().includes(attQ));
 
   const attList=DB.attendance();
   const todayAtt=attList.filter(a=>a.date===date&&(sid?a.schoolId===sid:true));
@@ -1260,6 +1271,7 @@ attendance(){
         <button class="btn btn-xs ${status==='late'?'btn-warning':''}" style="flex:1;justify-content:center" onclick="setAtt('${c.id}','late','${date}','${c.schoolId}')">⏰ متأخر</button>
       </div>
       ${a?`<div style="font-size:11px;margin-top:6px;color:#64748b">دخول: ${a.checkIn||'—'} · خروج: ${a.checkOut||'—'}</div>`:''}
+      ${status==='absent'&&c.parentPhone?`<button class="btn btn-wa btn-xs" style="width:100%;margin-top:6px;justify-content:center" onclick="notifyAbsentParent('${c.id}','${date}')">💬 إبلاغ ولي الأمر بالغياب</button>`:''}
     </div>`;
   };
 
@@ -1269,13 +1281,16 @@ attendance(){
   const branchFilter=App.params.branchFilter||'';
   const periodFilter=App.params.periodFilter||'';
 
+  const bidScope=Auth.branchId();
   return `
-  <div class="actions-bar" style="flex-wrap:wrap">
+  <div class="actions-bar" style="flex-wrap:wrap;gap:10px">
     <div style="display:flex;align-items:center;gap:8px">
       <label style="font-weight:600;font-size:14px">التاريخ:</label>
-      <input type="date" class="input" style="width:160px" value="${date}" onchange="App.go('attendance',{date:this.value,schoolId:'${sid||''}',branchFilter:'${branchFilter}',periodFilter:'${periodFilter}',teacherFilter:'${teacherFilter}'})" max="${T0}">
+      <input type="date" class="input" style="width:160px" value="${date}" onchange="App.go('attendance',{...App.params,date:this.value,schoolId:'${sid||''}'})" max="${T0}">
     </div>
+    <input class="input" placeholder="🔍 بحث بالاسم..." value="${esc(App.params.attQ||'')}" style="width:200px" oninput="App.go('attendance',{...App.params,attQ:this.value})">
     <button class="btn btn-primary btn-sm" onclick="saveAttendance('${date}','${sid||''}')">💾 حفظ الحضور</button>
+    <button class="btn btn-success btn-sm" onclick="markAllPresent('${date}','${sid||''}')">✅ الكل حاضر</button>
     <div style="margin-right:auto;display:flex;gap:8px">
       <span class="badge badge-green">✅ ${Object.values(attMap).filter(a=>a.status==='present').length} حاضر</span>
       <span class="badge badge-red">❌ ${Object.values(attMap).filter(a=>a.status==='absent').length} غائب</span>
@@ -1283,26 +1298,26 @@ attendance(){
     </div>
   </div>
 
-  ${isAdmin?`
+  ${(isAdmin||bidScope)?`
   <div class="card" style="padding:12px;margin-bottom:12px">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+    ${!bidScope?`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
       <span style="font-size:13px;font-weight:600;color:#64748b">🏢 الفرع:</span>
-      <span class="chip ${!branchFilter?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'',periodFilter:'${periodFilter}',teacherFilter:'${teacherFilter}'})">الكل</span>
-      ${DB.branches().map(b=>`<span class="chip ${branchFilter===b.id?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${b.id}',periodFilter:'${periodFilter}',teacherFilter:'${teacherFilter}'})">${esc(b.name)}</span>`).join('')}
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid #f1f5f9;padding-top:10px;margin-bottom:10px">
+      <span class="chip ${!branchFilter?'active':''}" onclick="App.go('attendance',{...App.params,branchFilter:''})">الكل</span>
+      ${DB.branches().map(b=>`<span class="chip ${branchFilter===b.id?'active':''}" onclick="App.go('attendance',{...App.params,branchFilter:'${b.id}'})">${esc(b.name)}</span>`).join('')}
+    </div>`:''}
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;${!bidScope?'border-top:1px solid #f1f5f9;padding-top:10px;':''}margin-bottom:10px">
       <span style="font-size:13px;font-weight:600;color:#64748b">⏰ الفترة:</span>
-      <span class="chip ${!periodFilter?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${branchFilter}',periodFilter:'',teacherFilter:'${teacherFilter}'})">الكل</span>
-      <span class="chip ${periodFilter==='morning'?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${branchFilter}',periodFilter:'morning',teacherFilter:'${teacherFilter}'})">🌅 صباحي</span>
-      <span class="chip ${periodFilter==='evening'?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${branchFilter}',periodFilter:'evening',teacherFilter:'${teacherFilter}'})">🌙 مسائي</span>
+      <span class="chip ${!periodFilter?'active':''}" onclick="App.go('attendance',{...App.params,periodFilter:''})">الكل</span>
+      <span class="chip ${periodFilter==='morning'?'active':''}" onclick="App.go('attendance',{...App.params,periodFilter:'morning'})">🌅 صباحي</span>
+      <span class="chip ${periodFilter==='evening'?'active':''}" onclick="App.go('attendance',{...App.params,periodFilter:'evening'})">🌙 مسائي</span>
     </div>
-    <div style="border-top:1px solid #f1f5f9;padding-top:10px">
+    ${!bidScope?`<div style="border-top:1px solid #f1f5f9;padding-top:10px">
       <span style="font-size:13px;font-weight:600;color:#64748b">👩‍🏫 الفصل:</span>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-        <span class="chip ${!teacherFilter?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${branchFilter}',periodFilter:'${periodFilter}',teacherFilter:''})">جميع الفصول</span>
-        ${teachers.map(t=>`<span class="chip ${teacherFilter===t.id?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${branchFilter}',periodFilter:'${periodFilter}',teacherFilter:'${t.id}'})">${esc(t.name)}</span>`).join('')}
+        <span class="chip ${!teacherFilter?'active':''}" onclick="App.go('attendance',{...App.params,teacherFilter:''})">جميع الفصول</span>
+        ${teachers.map(t=>`<span class="chip ${teacherFilter===t.id?'active':''}" onclick="App.go('attendance',{...App.params,teacherFilter:'${t.id}'})">${esc(t.name)}</span>`).join('')}
       </div>
-    </div>
+    </div>`:''}
   </div>`:''}
 
   ${kids.length===0?`<div class="card"><div class="empty-state"><div class="es-icon">👶</div><p>${isTeacher?'لا يوجد أطفال مسجلون في فرعك وفترتك':'لا يوجد أطفال مسجلون في هذا الفرع'}</p></div></div>`:`
@@ -2353,6 +2368,220 @@ tasks(){
       <thead><tr><th>الطفل / ولي الأمر</th><th>الهاتف</th><th>ينتهي في</th><th>المتبقي للانتهاء</th><th>إجراء</th></tr></thead>
       <tbody>${expiringSoon.map(s=>{const d=diffDays(s.endDate,today);return renderRow(s,`<span class="badge badge-orange" style="font-size:11px">خلال ${d} يوم</span>`);}).join('')}</tbody>
     </table></div>`:`<div class="empty-state"><div class="es-icon">✅</div><p>لا توجد اشتراكات قريبة الانتهاء</p></div>`}
+  </div>`;
+},
+
+// ---------- BRANCH COLLECTION TASKS (school admin) ----------
+branchTasks(){
+  if(!Auth.isSchoolAdmin()&&!Auth.isSuperAdmin()) return Views._forbidden();
+  const sid=Auth.schoolId();
+  const bid=Auth.branchId();
+  const subs=DB.subscriptions().filter(s=>(!sid||s.schoolId===sid)&&(!bid||s.branchId===bid));
+  const children=DB.children().filter(c=>(!sid||c.schoolId===sid)&&(!bid||c.branchId===bid));
+  const today=T0;
+  const in7=addDays(today,7);
+  const defaulters=subs.filter(s=>Views._paymentState(s)==='defaulter').sort((a,b)=>(a.endDate||'').localeCompare(b.endDate||''));
+  const pending=subs.filter(s=>Views._paymentState(s)==='pending').sort((a,b)=>(a.endDate||'').localeCompare(b.endDate||''));
+  const expiringSoon=subs.filter(s=>s.isActive&&s.endDate>=today&&s.endDate<=in7).sort((a,b)=>(a.endDate||'').localeCompare(b.endDate||''));
+  const defAmount=defaulters.reduce((a,s)=>a+(s.price-s.paidAmount),0);
+  const pendAmount=pending.reduce((a,s)=>a+(s.price-s.paidAmount),0);
+  const branchName=bid?DB.branchName(bid):'كل الفروع';
+
+  const renderRow=(s,extra)=>{
+    const c=children.find(x=>x.id===s.childId);
+    const remaining=s.price-s.paidAmount;
+    return `<tr>
+      <td><strong>${esc(c?.name||'—')}</strong><br><small style="color:#64748b">${esc(c?.parentName||'')}</small></td>
+      <td><a href="tel:${c?.parentPhone||''}" style="color:#0f766e;font-weight:600">${c?.parentPhone||'—'}</a></td>
+      <td>${formatDate(s.endDate)}</td>
+      <td>${extra}</td>
+      <td style="white-space:nowrap">
+        ${c?.parentPhone?`<a href="https://wa.me/${c.parentPhone.replace(/^\+?/,'').replace(/^0/,'966')}?text=${encodeURIComponent('السلام عليكم '+(c.parentName||'')+'، بخصوص اشتراك '+(c.name||'')+' المتبقي '+remaining+' ر.س.')}" target="_blank" class="btn btn-success btn-xs">💬 واتساب</a>`:''}
+        ${remaining>0?`<button class="btn btn-primary btn-xs" onclick="Modals.pay('${s.id}')">💰 سداد</button>`:''}
+      </td>
+    </tr>`;
+  };
+
+  return `
+  <div class="card no-print" style="padding:14px;margin-bottom:14px;background:linear-gradient(135deg,#0f766e,#065f46);color:#fff">
+    <div style="font-size:18px;font-weight:800">🔴 مهام التحصيل — ${esc(branchName)}</div>
+    <p style="opacity:.9;font-size:13px;margin-top:4px">تابع المتعثرين والمعلّقين في فرعك. كل مبلغ تحصّله = ربح للمركز.</p>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card red"><div class="stat-val">${defaulters.length}</div><div class="stat-lbl">🔴 متعثرون</div></div>
+    <div class="stat-card red"><div class="stat-val">${defAmount.toLocaleString()}</div><div class="stat-lbl">💸 مبلغ المتعثرين (ر.س)</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${pending.length}</div><div class="stat-lbl">🟠 معلّقون</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${pendAmount.toLocaleString()}</div><div class="stat-lbl">💰 مبلغ المعلّقين (ر.س)</div></div>
+  </div>
+
+  ${(defaulters.length||pending.length)?`
+  <div class="card no-print" style="padding:14px;background:#f0fdf4;border:1px solid #bbf7d0">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#166534">💬 إرسال تذكيرات واتساب جماعية</div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">رسالة جاهزة لكل ولي أمر بضغطة زر</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${defaulters.length?`<button class="btn btn-danger btn-sm" onclick="Modals.bulkWhatsApp('defaulters')">🔴 المتعثرون (${defaulters.length})</button>`:''}
+        ${pending.length?`<button class="btn btn-warning btn-sm" onclick="Modals.bulkWhatsApp('pending')">🟠 المعلّقون (${pending.length})</button>`:''}
+      </div>
+    </div>
+  </div>`:''}
+
+  <div class="card" style="border-right:6px solid #ef4444">
+    <div class="card-title" style="color:#991b1b">🔴 متعثرون بالسداد (${defaulters.length}) — أولوية قصوى</div>
+    <p style="font-size:13px;color:#64748b;margin:-8px 0 14px">انتهى اشتراكهم وعليهم مبلغ متبقي. تحصيل فوري مطلوب.</p>
+    ${defaulters.length?`<div class="table-wrap"><table>
+      <thead><tr><th>الطفل / ولي الأمر</th><th>الهاتف</th><th>انتهى في</th><th>المتبقي</th><th>إجراء</th></tr></thead>
+      <tbody>${defaulters.map(s=>renderRow(s,`<span style="color:#ef4444;font-weight:700">${(s.price-s.paidAmount).toLocaleString()} ر.س</span>`)).join('')}</tbody>
+    </table></div>`:`<div class="empty-state"><div class="es-icon">✅</div><p>لا يوجد متعثرون — أحسنتِ!</p></div>`}
+  </div>
+
+  <div class="card" style="border-right:6px solid #f59e0b">
+    <div class="card-title" style="color:#92400e">🟠 معلّقون (${pending.length}) — متابعة دورية</div>
+    <p style="font-size:13px;color:#64748b;margin:-8px 0 14px">اشتراكهم نشط لكن عليهم مبلغ متبقي. ذكّريهم قبل ما يصبحوا متعثرين.</p>
+    ${pending.length?`<div class="table-wrap"><table>
+      <thead><tr><th>الطفل / ولي الأمر</th><th>الهاتف</th><th>ينتهي في</th><th>المتبقي</th><th>إجراء</th></tr></thead>
+      <tbody>${pending.map(s=>renderRow(s,`<span style="color:#f59e0b;font-weight:700">${(s.price-s.paidAmount).toLocaleString()} ر.س</span>`)).join('')}</tbody>
+    </table></div>`:`<div class="empty-state"><div class="es-icon">✅</div><p>لا يوجد معلّقون</p></div>`}
+  </div>
+
+  <div class="card" style="border-right:6px solid #3b82f6">
+    <div class="card-title" style="color:#1e40af">⏰ تنتهي خلال 7 أيام (${expiringSoon.length})</div>
+    <p style="font-size:13px;color:#64748b;margin:-8px 0 14px">تواصل مبكر للتجديد قبل الانتهاء.</p>
+    ${expiringSoon.length?`<div class="table-wrap"><table>
+      <thead><tr><th>الطفل / ولي الأمر</th><th>الهاتف</th><th>ينتهي في</th><th>الأيام المتبقية</th><th>إجراء</th></tr></thead>
+      <tbody>${expiringSoon.map(s=>{const d=diffDays(s.endDate,today);return renderRow(s,`<span class="badge badge-orange" style="font-size:11px">خلال ${d} يوم</span>`);}).join('')}</tbody>
+    </table></div>`:`<div class="empty-state"><div class="es-icon">✅</div><p>لا توجد اشتراكات قريبة الانتهاء</p></div>`}
+  </div>`;
+},
+
+// ---------- DAILY CASH CLOSING ----------
+cashClosing(){
+  if(!Auth.isSchoolAdmin()&&!Auth.isSuperAdmin()) return Views._forbidden();
+  const sid=Auth.schoolId();
+  const bid=Auth.branchId();
+  const fDate=App.params.ccDate||T0;
+  const branches=DB.branches();
+  const fBranch=Auth.isSuperAdmin()?(App.params.ccBranch||(bid||'all')):bid;
+
+  // الدفعات المسجلة لهذا اليوم
+  const allPayments=DB.payments().filter(p=>(p.date||'').startsWith(fDate));
+  const allSales=DB.sales().filter(s=>(s.date||'').startsWith(fDate));
+  // فلتر بالفرع
+  const childInBranch=(childId)=>{const c=DB.children().find(x=>x.id===childId);return c&&(fBranch==='all'||c.branchId===fBranch);};
+  const payments=allPayments.filter(p=>fBranch==='all'?true:childInBranch(p.childId));
+  const sales=allSales.filter(s=>fBranch==='all'?true:(!s.branchId||s.branchId===fBranch));
+
+  const byPM={cash:0,mada:0,transfer:0};
+  payments.forEach(p=>{const pm=p.paymentMethod||'cash';byPM[pm]=(byPM[pm]||0)+(+p.amount||0);});
+  sales.forEach(s=>{const pm=s.paymentMethod||'cash';byPM[pm]=(byPM[pm]||0)+(+s.price||0);});
+  const total=byPM.cash+byPM.mada+byPM.transfer;
+
+  // السجل السابق لهذا اليوم/الفرع (إن وجد)
+  const closings=DB.cashClosings();
+  const existing=closings.find(c=>c.date===fDate&&c.branchId===(fBranch==='all'?'all':fBranch));
+
+  // سجل آخر 10 تقفيلات
+  const recent=closings.filter(c=>!bid||c.branchId===bid||c.branchId==='all').slice(0,10);
+
+  return `
+  <div class="card no-print" style="padding:14px;margin-bottom:14px;background:linear-gradient(135deg,#0f766e,#0d9488);color:#fff">
+    <div style="font-size:18px;font-weight:800">💰 تقفيل الصندوق اليومي</div>
+    <p style="opacity:.9;font-size:13px;margin-top:4px">طابق الكاش الفعلي بالدرج مع المسجّل في النظام. أي فرق سيُسجّل للمحاسب.</p>
+  </div>
+
+  <div class="card no-print" style="padding:14px;margin-bottom:16px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="input-group" style="margin:0;min-width:160px">
+        <label style="font-size:12px">📅 التاريخ</label>
+        <input class="input" type="date" value="${fDate}" max="${T0}" onchange="App.go('cashClosing',{...App.params,ccDate:this.value})">
+      </div>
+      ${Auth.isSuperAdmin()?`<div class="input-group" style="margin:0;min-width:160px">
+        <label style="font-size:12px">🏢 الفرع</label>
+        <select class="input" onchange="App.go('cashClosing',{...App.params,ccBranch:this.value})">
+          <option value="all" ${fBranch==='all'?'selected':''}>كل الفروع</option>
+          ${branches.map(b=>`<option value="${b.id}" ${fBranch===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}
+        </select>
+      </div>`:''}
+    </div>
+  </div>
+
+  ${existing?`<div class="alert-box alert-green" style="margin-bottom:16px">
+    <div>
+      <strong>✅ تم تقفيل ${formatDate(fDate)}</strong><br>
+      <span style="font-size:12px">بواسطة ${esc(existing.closedBy||'—')} في ${new Date(existing.at).toLocaleString('ar-SA')} — الفعلي: ${(+existing.actualCash||0).toLocaleString()} ر.س | الفرق: <strong style="color:${existing.diff===0?'#10b981':existing.diff>0?'#3b82f6':'#ef4444'}">${existing.diff>=0?'+':''}${(+existing.diff||0).toLocaleString()} ر.س</strong>
+      ${existing.notes?'<br><em>ملاحظة: '+esc(existing.notes)+'</em>':''}
+    </div>
+  </div>`:''}
+
+  <div class="stats-grid">
+    <div class="stat-card green"><div class="stat-val">${byPM.cash.toLocaleString()}</div><div class="stat-lbl">💵 كاش</div></div>
+    <div class="stat-card blue"><div class="stat-val">${byPM.mada.toLocaleString()}</div><div class="stat-lbl">💳 مدى/شبكة</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${byPM.transfer.toLocaleString()}</div><div class="stat-lbl">🏦 حوالة</div></div>
+    <div class="stat-card red" style="border-color:#0f766e"><div class="stat-val" style="color:#0f766e">${total.toLocaleString()}</div><div class="stat-lbl">📊 إجمالي اليوم (ر.س)</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📝 تفاصيل اليوم — ${formatDate(fDate)}</div>
+    ${(payments.length+sales.length)?`<div class="table-wrap"><table>
+      <thead><tr><th>الوقت</th><th>النوع</th><th>الطفل</th><th>المبلغ</th><th>طريقة الدفع</th><th>أضافها</th></tr></thead>
+      <tbody>
+        ${payments.map(p=>{const c=DB.children().find(x=>x.id===p.childId);return `<tr>
+          <td style="font-size:12px">دفعة اشتراك</td>
+          <td><span class="badge badge-green" style="font-size:10px">💰 دفعة</span></td>
+          <td>${esc(c?.name||'—')}</td>
+          <td style="color:#10b981;font-weight:700">${(+p.amount||0).toLocaleString()} ر.س</td>
+          <td style="font-size:12px">${({cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'})[p.paymentMethod]||p.paymentMethod}</td>
+          <td style="font-size:12px;color:#64748b">${esc(p.addedBy||'—')}</td>
+        </tr>`;}).join('')}
+        ${sales.map(s=>`<tr>
+          <td style="font-size:12px">مبيعات</td>
+          <td><span class="badge badge-blue" style="font-size:10px">🛍️ بيع</span></td>
+          <td>${esc(s.childName||DB.childName(s.childId)||'—')}</td>
+          <td style="color:#3b82f6;font-weight:700">${(+s.price||0).toLocaleString()} ر.س</td>
+          <td style="font-size:12px">${({cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'})[s.paymentMethod]||s.paymentMethod}</td>
+          <td style="font-size:12px;color:#64748b">${esc(s.addedBy||'—')}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`:`<div class="empty-state"><div class="es-icon">📭</div><p>لا توجد دفعات أو مبيعات مسجّلة لهذا اليوم</p></div>`}
+  </div>
+
+  ${total>0&&!existing?`<div class="card" style="border-right:6px solid #0f766e">
+    <div class="card-title">🔒 إقفال اليوم</div>
+    <p style="font-size:13px;color:#64748b;margin-bottom:14px">عدّ الكاش الفعلي بالدرج وأدخله أدناه. سيُسجَّل أي فرق للمحاسب.</p>
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#1e40af">
+      💵 الكاش المتوقع حسب النظام: <strong>${byPM.cash.toLocaleString()} ر.س</strong>
+    </div>
+    <div class="input-group">
+      <label>💵 الكاش الفعلي في الدرج (ر.س)</label>
+      <input class="input" id="cc-actual" type="number" value="${byPM.cash}" min="0" oninput="document.getElementById('cc-diff').textContent=((+this.value||0)-${byPM.cash}).toLocaleString();const d=(+this.value||0)-${byPM.cash};document.getElementById('cc-diff-wrap').style.color=d===0?'#10b981':d>0?'#3b82f6':'#ef4444'">
+    </div>
+    <div class="input-group" id="cc-diff-wrap" style="color:#10b981;font-weight:700">
+      الفرق: <span id="cc-diff">0</span> ر.س
+    </div>
+    <div class="input-group">
+      <label>📝 ملاحظات (اختياري)</label>
+      <textarea class="input" id="cc-notes" rows="2" placeholder="مثال: نقص 50 ر.س لشراء بطارية ميزان..." style="resize:vertical"></textarea>
+    </div>
+    <button class="btn btn-primary" onclick="saveCashClosing('${fDate}','${fBranch}',${byPM.cash},${byPM.mada},${byPM.transfer})">🔒 تأكيد التقفيل</button>
+  </div>`:''}
+
+  <div class="card">
+    <div class="card-title">📋 سجل التقفيلات السابقة</div>
+    ${recent.length?`<div class="table-wrap"><table>
+      <thead><tr><th>التاريخ</th><th>الفرع</th><th>المتوقع</th><th>الفعلي</th><th>الفرق</th><th>بواسطة</th><th>ملاحظات</th></tr></thead>
+      <tbody>${recent.map(c=>`<tr>
+        <td style="font-weight:600">${formatDate(c.date)}</td>
+        <td style="font-size:12px">${c.branchId==='all'?'كل الفروع':DB.branchName(c.branchId)}</td>
+        <td>${(+c.expectedCash||0).toLocaleString()} ر.س</td>
+        <td>${(+c.actualCash||0).toLocaleString()} ر.س</td>
+        <td style="color:${c.diff===0?'#10b981':c.diff>0?'#3b82f6':'#ef4444'};font-weight:700">${c.diff>=0?'+':''}${(+c.diff||0).toLocaleString()} ر.س</td>
+        <td style="font-size:12px;color:#64748b">${esc(c.closedBy||'—')}</td>
+        <td style="font-size:12px;color:#64748b">${esc(c.notes||'—')}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`:`<div class="empty-state"><div class="es-icon">📂</div><p>لا توجد تقفيلات سابقة</p></div>`}
   </div>`;
 },
 
@@ -4919,6 +5148,55 @@ function saveAttendance(date,schoolId){
   DB.saveAttendance(att);
   delete pendingAtt[date]; // امسح الذاكرة المعلّقة
   toast('✅ تم حفظ الحضور بنجاح');
+}
+
+// تعليم جميع الأطفال المعروضين كحاضرين (الحضور الجماعي)
+function markAllPresent(date,schoolId){
+  const grid=document.getElementById('att-grid');
+  if(!grid){toast('لا توجد قائمة حضور','error');return;}
+  if(!confirm('سيتم تعليم جميع الأطفال المعروضين كحاضرين. متابعة؟')) return;
+  const cards=grid.querySelectorAll('[id^="att-"]');
+  let count=0;
+  cards.forEach(card=>{
+    const id=card.id.replace('att-','');
+    setAtt(id,'present',date,schoolId);
+    count++;
+  });
+  toast(`✅ تم تعليم ${count} طفل كحاضر — لا تنسي الحفظ`);
+}
+
+// تنبيه واتساب لولي أمر طفل غائب
+function notifyAbsentParent(childId,date){
+  const c=DB.children().find(x=>x.id===childId);
+  if(!c){toast('الطفل غير موجود','error');return;}
+  if(!c.parentPhone){toast('لا يوجد رقم لولي الأمر','error');return;}
+  const msg=`السلام عليكم ${c.parentName||''}، نُذكّركم بأن طفلكم ${c.name} غاب اليوم ${formatDate(date)}. نتمنى السلامة.`;
+  const phone=c.parentPhone.replace(/^\+?/,'').replace(/^0/,'966');
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,'_blank');
+}
+
+// تقفيل الصندوق اليومي
+function saveCashClosing(date,branchId,expCash,expMada,expTransfer){
+  const actualCash=+(document.getElementById('cc-actual')?.value||0);
+  const notes=document.getElementById('cc-notes')?.value?.trim()||'';
+  const diff=actualCash-expCash;
+  const existing=DB.cashClosings().find(c=>c.date===date&&c.branchId===branchId);
+  if(existing){
+    if(!confirm(`تم تقفيل هذا اليوم مسبقاً. هل تريد إعادة التقفيل (سيُحفَظ سجل جديد)؟`)) return;
+  }
+  if(Math.abs(diff)>0&&!notes){
+    if(!confirm(`الفرق ${diff} ر.س — يُفضّل إضافة ملاحظة. متابعة بدون ملاحظة؟`)) return;
+  }
+  DB.addCashClosing({
+    date,branchId,
+    expectedCash:expCash,actualCash,diff,
+    expectedMada:expMada,expectedTransfer:expTransfer,
+    total:expCash+expMada+expTransfer,
+    notes,closedBy:Auth.user?.name||'—',closedById:Auth.user?.id||''
+  });
+  DB.addAuditLog({action:'تقفيل صندوق',entity:'صندوق',entityId:date,details:`فرع: ${branchId==='all'?'الكل':DB.branchName(branchId)} | المتوقع: ${expCash} | الفعلي: ${actualCash} | الفرق: ${diff}${notes?' | '+notes:''}`,by:Auth.user?.name||'—'});
+  toast('🔒 تم تقفيل اليوم بنجاح');
+  App.refresh();
 }
 
 // =========================================================
