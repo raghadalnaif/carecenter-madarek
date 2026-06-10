@@ -10,7 +10,7 @@
 <!-- BUILD: 2026-06-10-v10 -->
 <script>
 (function(){
-  var BUILD='v18-20260610';
+  var BUILD='v19-20260610';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   if(stored!==BUILD){
@@ -2784,53 +2784,70 @@ settings(){
   } else if(tab==='reminders'){
     const warnDays=(s.alertDays||{}).warn||7;
     const urgentDays=(s.alertDays||{}).urgent||3;
-    const defVars=`<div style="margin-top:6px;font-size:12px;color:#64748b">المتغيرات: <code style="background:#f1f5f9;padding:1px 5px;border-radius:4px">{name}</code> اسم الطفل &nbsp;<code style="background:#f1f5f9;padding:1px 5px;border-radius:4px">{parentName}</code> ولي الأمر &nbsp;<code style="background:#f1f5f9;padding:1px 5px;border-radius:4px">{date}</code> التاريخ &nbsp;<code style="background:#f1f5f9;padding:1px 5px;border-radius:4px">{remaining}</code> المتبقي</div>`;
+    const varHint=`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">
+      <span style="font-size:11px;color:#64748b;align-self:center">المتغيرات:</span>
+      <code onclick="insertVar(event,'{name}')" style="background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:5px;font-size:11px;cursor:pointer" title="انقر للنسخ">{name} اسم الطفل</code>
+      <code onclick="insertVar(event,'{parentName}')" style="background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:5px;font-size:11px;cursor:pointer" title="انقر للنسخ">{parentName} ولي الأمر</code>
+      <code onclick="insertVar(event,'{date}')" style="background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:5px;font-size:11px;cursor:pointer" title="انقر للنسخ">{date} التاريخ</code>
+      <code onclick="insertVar(event,'{remaining}')" style="background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:5px;font-size:11px;cursor:pointer" title="انقر للنسخ">{remaining} المتبقي</code>
+      <code onclick="insertVar(event,'{branch}')" style="background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:5px;font-size:11px;cursor:pointer" title="انقر للنسخ">{branch} الفرع</code>
+    </div>`;
+    const mkPreview=(id,previewId,color)=>`
+      <div style="margin-top:10px">
+        <div style="font-size:11px;color:#64748b;margin-bottom:4px">👁 معاينة الرسالة:</div>
+        <div id="${previewId}" style="background:${color};border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.7;color:#1e293b;white-space:pre-wrap;min-height:40px;border:1px solid rgba(0,0,0,.06)"></div>
+      </div>`;
     content=`
     <div style="max-width:680px">
       <div class="card" style="margin-bottom:16px">
         <div class="card-title">⏰ توقيت التنبيهات</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div class="input-group">
             <label>تنبيه مبكر (قبل الانتهاء بـ)</label>
             <div style="display:flex;align-items:center;gap:8px">
               <input class="input" id="alert-warn" type="number" value="${warnDays}" min="1" max="30" style="width:80px">
-              <span style="font-size:13px;color:#475569">يوم</span>
+              <span style="font-size:13px;color:#475569">يوم — يظهر تنبيه أصفر</span>
             </div>
-            <small style="color:#64748b;font-size:12px">يظهر تنبيه أصفر على الاشتراكات</small>
           </div>
           <div class="input-group">
             <label>تنبيه عاجل (قبل الانتهاء بـ)</label>
             <div style="display:flex;align-items:center;gap:8px">
               <input class="input" id="alert-urgent" type="number" value="${urgentDays}" min="1" max="14" style="width:80px">
-              <span style="font-size:13px;color:#475569">يوم</span>
+              <span style="font-size:13px;color:#475569">يوم — يظهر تنبيه برتقالي</span>
             </div>
-            <small style="color:#64748b;font-size:12px">يظهر تنبيه برتقالي على الاشتراكات</small>
           </div>
         </div>
       </div>
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-title">💬 رسالة تذكير التجديد (قبل الانتهاء)</div>
+
+      <div class="card" style="margin-bottom:16px;border-right:4px solid #25d366">
+        <div class="card-title">💬 رسالة تذكير التجديد <span style="font-size:12px;font-weight:400;color:#64748b">(ترسل قبل انتهاء الاشتراك)</span></div>
         <div class="input-group">
-          <textarea class="input" id="wa-expiry-tmpl" rows="3" style="resize:vertical">${esc(s.waTemplate||'')}</textarea>
-          ${defVars}
+          <textarea class="input" id="wa-expiry-tmpl" rows="4" style="resize:vertical;line-height:1.7" oninput="previewWaMsg('wa-expiry-tmpl','prev-expiry')">${esc(s.waTemplate||'')}</textarea>
+          ${varHint}
         </div>
-        <div style="background:#f0fdf4;border-radius:8px;padding:10px 14px;font-size:12px;color:#166534;white-space:pre-wrap" id="prev-expiry"></div>
+        ${mkPreview('wa-expiry-tmpl','prev-expiry','#dcfce7')}
       </div>
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-title" style="color:#991b1b">🔴 رسالة المتعثر (انتهى الاشتراك + متبقي)</div>
+
+      <div class="card" style="margin-bottom:16px;border-right:4px solid #ef4444">
+        <div class="card-title" style="color:#991b1b">🔴 رسالة المتعثر <span style="font-size:12px;font-weight:400;color:#64748b">(انتهى الاشتراك + مبلغ متبقي)</span></div>
         <div class="input-group">
-          <textarea class="input" id="wa-defaulter-tmpl" rows="3" style="resize:vertical">${esc(s.waTemplateDefaulter||'')}</textarea>
-          ${defVars}
+          <textarea class="input" id="wa-defaulter-tmpl" rows="4" style="resize:vertical;line-height:1.7" oninput="previewWaMsg('wa-defaulter-tmpl','prev-defaulter')">${esc(s.waTemplateDefaulter||'')}</textarea>
+          ${varHint}
         </div>
+        ${mkPreview('wa-defaulter-tmpl','prev-defaulter','#fee2e2')}
       </div>
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-title" style="color:#92400e">🟠 رسالة المعلّق (اشتراك نشط + متبقي)</div>
+
+      <div class="card" style="margin-bottom:16px;border-right:4px solid #f59e0b">
+        <div class="card-title" style="color:#92400e">🟠 رسالة المعلّق <span style="font-size:12px;font-weight:400;color:#64748b">(اشتراك نشط + مبلغ متبقي)</span></div>
         <div class="input-group">
-          <textarea class="input" id="wa-pending-tmpl" rows="3" style="resize:vertical">${esc(s.waTemplatePending||'')}</textarea>
-          ${defVars}
+          <textarea class="input" id="wa-pending-tmpl" rows="4" style="resize:vertical;line-height:1.7" oninput="previewWaMsg('wa-pending-tmpl','prev-pending')">${esc(s.waTemplatePending||'')}</textarea>
+          ${varHint}
         </div>
+        ${mkPreview('wa-pending-tmpl','prev-pending','#fef9c3')}
       </div>
+
       <button class="btn btn-primary" onclick="saveSettingsReminders()">💾 حفظ إعدادات التذكيرات</button>
+      <img src="__none__" style="display:none" onerror="(function(){const sC=DB.children()[0];const sB=DB.branches()[0];window._waSample={name:sC?.name||'أحمد محمد',parentName:sC?.parentName||'أم أحمد',date:formatDate(addDays(T0,7)),remaining:'500',branch:sB?.name||'الفرع الأول'};['wa-expiry-tmpl','wa-defaulter-tmpl','wa-pending-tmpl'].forEach((id,i)=>{previewWaMsg(id,['prev-expiry','prev-defaulter','prev-pending'][i]);});})()">
     </div>`;
   }
   return `
@@ -4200,8 +4217,19 @@ function saveSettingsInvoice(){
   showSettingsToast('✅ تم حفظ إعدادات الفواتير والتنبيهات');
 }
 
-function saveSettingsReminders(){
-  if(!Auth.isSuperAdmin()) return;
+function previewWaMsg(textareaId, previewId){
+  const tmpl=document.getElementById(textareaId)?.value||'';
+  const sam=window._waSample||{name:'أحمد محمد',parentName:'أم أحمد',date:'10/06/2026',remaining:'500',branch:'الفرع الأول'};
+  const msg=tmpl.replace(/{name}/g,sam.name).replace(/{parentName}/g,sam.parentName).replace(/{date}/g,sam.date).replace(/{remaining}/g,sam.remaining).replace(/{branch}/g,sam.branch);
+  const el=document.getElementById(previewId);
+  if(el) el.textContent=msg||'(اكتبي نص الرسالة أعلاه لتظهر المعاينة هنا...)';
+}
+function insertVar(e,varText){
+  // انقر على المتغير لنسخه إلى الحافظة
+  navigator.clipboard?.writeText(varText).then(()=>toast('✅ تم نسخ '+varText)).catch(()=>{});
+  e.stopPropagation();
+}
+function saveSettingsReminders(){  if(!Auth.isSuperAdmin()) return;
   const s=DB.settings();
   s.alertDays={
     warn:+(document.getElementById('alert-warn')?.value||7),
