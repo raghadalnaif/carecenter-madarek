@@ -10,7 +10,7 @@
 <!-- BUILD: 2026-06-10-v10 -->
 <script>
 (function(){
-  var BUILD='v14-20260610';
+  var BUILD='v15-20260610';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   if(stored!==BUILD){
@@ -831,6 +831,31 @@ _payBadge(sub){
   return `<span class="badge ${bc}">${bl} ${sub.paidAmount}/${sub.price}</span>`;
 },
 
+// حالة الدفع الموسّعة: paid | deferred | pending (نشط+متبقي) | defaulter (انتهى+متبقي)
+_paymentState(sub){
+  if(!sub) return 'none';
+  const remaining=(sub.price||0)-(sub.paidAmount||0);
+  if(remaining<=0) return 'paid';
+  if(sub.endDate&&sub.endDate<T0) return 'defaulter';
+  if(sub.paymentStatus==='deferred') return 'deferred';
+  return 'pending';
+},
+
+// هل الطفل عليه أي اشتراك انتهى + متبقي؟ (يستخدم لإظهار بادج "متعثر" بجانب الاسم)
+_hasDefaultedDebt(childId){
+  return DB.subscriptions().some(s=>s.childId===childId&&s.endDate<T0&&(s.price-s.paidAmount)>0);
+},
+
+// بادج "متعثر" أحمر صغير
+_defaulterBadge(){
+  return `<span class="badge" style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca;font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;margin-right:4px">🔴 متعثر</span>`;
+},
+
+// بادج "معلّق" برتقالي صغير (نشط + متبقي)
+_pendingBadge(){
+  return `<span class="badge" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;margin-right:4px">🟠 معلّق</span>`;
+},
+
 // ---------- BRANCHES ----------
 branches(){
   const branches=DB.branches();
@@ -989,8 +1014,9 @@ children(){
               <br><span class="badge ${c.period==='morning'?'badge-blue':'badge-orange'}" style="font-size:10px;margin-top:4px">${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'}</span>
             </td>
             <td>
-              <div style="display:flex;align-items:center;gap:6px">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
                 <strong>${esc(c.name)}</strong>
+                ${Views._hasDefaultedDebt(c.id)?Views._defaulterBadge():''}
                 ${c.isVip?`<span class="badge badge-yellow" style="font-size:10px">⭐ VIP${c.discountPct?` ${c.discountPct}%`:''}</span>`:''}
               </div>
               ${c.healthNotes?`<small style="color:#ef4444">🏥 ${esc(c.healthNotes)}</small>`:''}
@@ -1090,9 +1116,11 @@ subscriptions(){
           const stLbl={active:'نشط',today:'ينتهي اليوم',soon3:`${daysLeft} أيام`,soon7:`${daysLeft} أيام`,expired:'منتهي',none:'—'};
           const typeMap={daily:'يومي',weekly:'أسبوعي',monthly:'٣٠ يوم',custom:'مخصص'};
           const pmLabel={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'}[s.paymentMethod]||'—';
+          const _payState=Views._paymentState(s);
           return `<tr>
             <td>
               <strong>${esc(child?.name||'—')}</strong>
+              ${_payState==='defaulter'?Views._defaulterBadge():(_payState==='pending'?Views._pendingBadge():'')}
               ${s.discountPct>0?`<br><small style="color:#d97706">خصم ${s.discountPct}% · أصل ${s.basePrice} ر.س</small>`:''}
               ${Auth.isSuperAdmin()?`<br><small style="color:#94a3b8">${DB.schoolName(s.schoolId)}</small>`:''}
             </td>
@@ -1963,57 +1991,79 @@ accounting(){
   const filterBranch=App.params.accBranch||'all';
   const filterPeriod=App.params.accPeriod||'all';
   const filterPay=App.params.accPay||'all';
+  const dateFrom=App.params.accFrom||'';
+  const dateTo=App.params.accTo||'';
   const searchQ=(App.params.accQ||'').toLowerCase();
+
   let filtered=subs;
   if(filterBranch!=='all') filtered=filtered.filter(s=>s.branchId===filterBranch);
   if(filterPeriod!=='all') filtered=filtered.filter(s=>s.period===filterPeriod);
-  if(filterPay==='paid') filtered=filtered.filter(s=>s.paymentStatus==='paid');
-  else if(filterPay==='partial') filtered=filtered.filter(s=>s.paymentStatus==='partial');
-  else if(filterPay==='deferred') filtered=filtered.filter(s=>s.paymentStatus==='deferred');
-  else if(filterPay==='pending') filtered=filtered.filter(s=>s.price-s.paidAmount>0);
+  // فلتر الفترة الزمنية: يطابق إذا تقاطع نطاق الاشتراك مع النطاق المحدد
+  if(dateFrom) filtered=filtered.filter(s=>(s.endDate||'')>=dateFrom);
+  if(dateTo)   filtered=filtered.filter(s=>(s.startDate||'')<=dateTo);
+  // فلتر حالة الدفع — استخدم الدالة المشتركة
+  if(filterPay==='paid')      filtered=filtered.filter(s=>Views._paymentState(s)==='paid');
+  else if(filterPay==='pending')   filtered=filtered.filter(s=>Views._paymentState(s)==='pending');
+  else if(filterPay==='defaulter') filtered=filtered.filter(s=>Views._paymentState(s)==='defaulter');
+  else if(filterPay==='deferred')  filtered=filtered.filter(s=>s.paymentStatus==='deferred');
   if(searchQ) filtered=filtered.filter(s=>{const c=children.find(x=>x.id===s.childId);return c&&(c.name.toLowerCase().includes(searchQ)||c.parentName.toLowerCase().includes(searchQ));});
   filtered.sort((a,b)=>(b.createdAt||b.startDate||'').localeCompare(a.createdAt||a.startDate||''));
+
+  // إحصائيات الحالات الثلاث (تُحسَب من جميع الاشتراكات لا المفلترة)
+  const pendingList=subs.filter(s=>Views._paymentState(s)==='pending');
+  const defaulterList=subs.filter(s=>Views._paymentState(s)==='defaulter');
+  const deferredList=subs.filter(s=>s.paymentStatus==='deferred');
   const totalRevenue=subs.reduce((a,s)=>a+s.paidAmount,0);
-  const totalPending=subs.reduce((a,s)=>a+(s.price-s.paidAmount),0);
+  const totalPending=subs.reduce((a,s)=>a+Math.max(0,(s.price||0)-(s.paidAmount||0)),0);
   const totalInvoices=subs.length;
+  const defaulterAmount=defaulterList.reduce((a,s)=>a+(s.price-s.paidAmount),0);
+  const pendingAmount=pendingList.reduce((a,s)=>a+(s.price-s.paidAmount),0);
+
   return `
   <div class="stats-grid">
     <div class="stat-card green"><div class="stat-val">${totalRevenue.toLocaleString()}</div><div class="stat-lbl">💰 إجمالي المحصّل (ر.س)</div></div>
-    <div class="stat-card red"><div class="stat-val">${totalPending.toLocaleString()}</div><div class="stat-lbl">⏳ مبالغ معلّقة (ر.س)</div></div>
-    <div class="stat-card blue"><div class="stat-val">${totalInvoices}</div><div class="stat-lbl">🧾 عدد الفواتير</div></div>
-    <div class="stat-card yellow"><div class="stat-val">${subs.filter(s=>s.paymentStatus==='deferred').length}</div><div class="stat-lbl">📋 فواتير مؤجلة</div></div>
+    <div class="stat-card red"><div class="stat-val">${defaulterAmount.toLocaleString()}</div><div class="stat-lbl">🔴 متعثرون (${defaulterList.length}) — مستحق فوراً</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${pendingAmount.toLocaleString()}</div><div class="stat-lbl">🟠 معلّقون (${pendingList.length}) — متابعة دورية</div></div>
+    <div class="stat-card blue"><div class="stat-val">${totalInvoices}</div><div class="stat-lbl">🧾 إجمالي الفواتير</div></div>
   </div>
   <div class="card no-print" style="padding:14px;margin-bottom:16px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <span style="font-size:13px;font-weight:700;color:#475569;align-self:center;margin-left:6px">💰 الحالة:</span>
+      <span class="chip ${filterPay==='all'?'active':''}"        onclick="accSet('accPay','all')">الكل (${subs.length})</span>
+      <span class="chip ${filterPay==='defaulter'?'active':''}"  onclick="accSet('accPay','defaulter')" style="${filterPay==='defaulter'?'background:#ef4444;color:#fff':'background:#fee2e2;color:#991b1b'}">🔴 متعثر (${defaulterList.length})</span>
+      <span class="chip ${filterPay==='pending'?'active':''}"    onclick="accSet('accPay','pending')" style="${filterPay==='pending'?'background:#f59e0b;color:#fff':'background:#fef3c7;color:#92400e'}">🟠 معلّق (${pendingList.length})</span>
+      <span class="chip ${filterPay==='deferred'?'active':''}"   onclick="accSet('accPay','deferred')">🟡 مؤجل (${deferredList.length})</span>
+      <span class="chip ${filterPay==='paid'?'active':''}"       onclick="accSet('accPay','paid')">✅ مدفوع</span>
+    </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
       <div class="input-group" style="margin:0;flex:1;min-width:160px">
         <label style="font-size:12px">🔍 بحث</label>
-        <input class="input" placeholder="اسم الطفل أو ولي الأمر..." value="${esc(App.params.accQ||'')}" oninput="App.go('accounting',{accQ:this.value,accBranch:'${filterBranch}',accPeriod:'${filterPeriod}',accPay:'${filterPay}'})">
+        <input class="input" placeholder="اسم الطفل أو ولي الأمر..." value="${esc(App.params.accQ||'')}" oninput="accSet('accQ',this.value)">
+      </div>
+      <div class="input-group" style="margin:0;min-width:140px">
+        <label style="font-size:12px">📅 من تاريخ</label>
+        <input class="input" type="date" value="${dateFrom}" onchange="accSet('accFrom',this.value)">
+      </div>
+      <div class="input-group" style="margin:0;min-width:140px">
+        <label style="font-size:12px">📅 إلى تاريخ</label>
+        <input class="input" type="date" value="${dateTo}" onchange="accSet('accTo',this.value)">
       </div>
       <div class="input-group" style="margin:0;min-width:140px">
         <label style="font-size:12px">🏢 الفرع</label>
-        <select class="input" onchange="App.go('accounting',{accQ:'${esc(App.params.accQ||'')}',accBranch:this.value,accPeriod:'${filterPeriod}',accPay:'${filterPay}'})">
+        <select class="input" onchange="accSet('accBranch',this.value)">
           <option value="all">الكل</option>
           ${branches.map(b=>`<option value="${b.id}" ${filterBranch===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}
         </select>
       </div>
       <div class="input-group" style="margin:0;min-width:120px">
         <label style="font-size:12px">⏰ الفترة</label>
-        <select class="input" onchange="App.go('accounting',{accQ:'${esc(App.params.accQ||'')}',accBranch:'${filterBranch}',accPeriod:this.value,accPay:'${filterPay}'})">
+        <select class="input" onchange="accSet('accPeriod',this.value)">
           <option value="all" ${filterPeriod==='all'?'selected':''}>الكل</option>
           <option value="morning" ${filterPeriod==='morning'?'selected':''}>صباحي</option>
           <option value="evening" ${filterPeriod==='evening'?'selected':''}>مسائي</option>
         </select>
       </div>
-      <div class="input-group" style="margin:0;min-width:140px">
-        <label style="font-size:12px">💰 حالة الدفع</label>
-        <select class="input" onchange="App.go('accounting',{accQ:'${esc(App.params.accQ||'')}',accBranch:'${filterBranch}',accPeriod:'${filterPeriod}',accPay:this.value})">
-          <option value="all" ${filterPay==='all'?'selected':''}>الكل</option>
-          <option value="paid" ${filterPay==='paid'?'selected':''}>مدفوع</option>
-          <option value="partial" ${filterPay==='partial'?'selected':''}>جزئي</option>
-          <option value="deferred" ${filterPay==='deferred'?'selected':''}>مؤجل</option>
-          <option value="pending" ${filterPay==='pending'?'selected':''}>عليه متبقي</option>
-        </select>
-      </div>
+      ${(dateFrom||dateTo||searchQ||filterBranch!=='all'||filterPeriod!=='all'||filterPay!=='all')?`<button class="btn btn-secondary btn-sm" onclick="App.go('accounting')">✕ مسح الفلاتر</button>`:''}
       <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ طباعة</button>
       <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('acc-table','فواتير')">📊 CSV</button>
     </div>
@@ -2026,9 +2076,10 @@ accounting(){
         ${filtered.length?filtered.map(s=>{
           const c=children.find(x=>x.id===s.childId);
           const remaining=s.price-s.paidAmount;
-          return `<tr>
+          const ps=Views._paymentState(s);
+          return `<tr style="${ps==='defaulter'?'background:#fef2f2':''}">
             <td style="font-weight:700;color:#0f766e;font-size:12px">${esc(s.invoiceNo||'—')}</td>
-            <td>${esc(c?.name||'—')}</td>
+            <td>${esc(c?.name||'—')} ${ps==='defaulter'?Views._defaulterBadge():(ps==='pending'?Views._pendingBadge():'')}</td>
             <td style="font-size:12px">${esc(c?.parentName||'—')}</td>
             <td><span class="badge badge-blue" style="font-size:10px">${DB.branchName(s.branchId)}</span></td>
             <td><span class="badge ${s.period==='morning'?'badge-blue':'badge-orange'}" style="font-size:10px">${s.period==='morning'?'صباحي':'مسائي'}</span></td>
@@ -2042,7 +2093,7 @@ accounting(){
             <td>${Views._payBadge(s)}</td>
             <td><button class="btn btn-xs" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0" onclick="openInvoice('${s.id}')">🧾</button></td>
           </tr>`;
-        }).join(''):`<tr><td colspan="14"><div class="empty-state"><div class="es-icon">🧾</div><p>لا توجد فواتير</p></div></td></tr>`}
+        }).join(''):`<tr><td colspan="14"><div class="empty-state"><div class="es-icon">🧾</div><p>لا توجد فواتير بهذه المعايير</p></div></td></tr>`}
       </tbody>
     </table></div>
   </div>`;
@@ -3462,6 +3513,11 @@ function showSettingsToast(msg){
   el.textContent=msg;
   el.style.display='block';
   setTimeout(()=>{if(el)el.style.display='none';},3000);
+}
+
+// Helper لصفحة المحاسبة: يحتفظ بالفلاتر السابقة ويحدّث واحدة فقط
+function accSet(key,value){
+  App.go('accounting',{...App.params,[key]:value});
 }
 
 // Toast عالمي يظهر في أي صفحة بعد الحفظ
