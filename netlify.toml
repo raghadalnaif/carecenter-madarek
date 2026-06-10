@@ -1,5 +1,4 @@
 [build]
-  command = ""
   publish = "."
 
 [[redirects]]
@@ -7,7 +6,6 @@
   to = "/index.html"
   status = 200
 
-# منع كيش HTML
 [[headers]]
   for = "/index.html"
   [headers.values]

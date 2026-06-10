@@ -7,11 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-09-v8 -->
+<!-- BUILD: 2026-06-10-v9 -->
 <script>
-// كسر الكيش — يُعيد التحميل بـURL مختلف مرة واحدة عند كل إصدار جديد
 (function(){
-  var BUILD='v8-20260609';
+  var BUILD='v9-20260610';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   if(stored!==BUILD){
@@ -229,8 +228,8 @@ const SEED = {
   ],
   users: [
     {id:'sa1',username:'admin',password:'admin123',role:'superadmin',name:'المدير العام',phone:''},
-    {id:'u1',username:'main',password:'123456',role:'school_admin',schoolId:'s1',branchId:'b1',name:'ادارة الفرع الرئيسي',phone:'0501234567'},
-    {id:'u2',username:'second',password:'123456',role:'school_admin',schoolId:'s1',branchId:'b2',name:'ادارة الفرع الثاني',phone:'0509876543'},
+    {id:'u1',username:'main',password:'123456',role:'school_admin',schoolId:'s1',branchId:'b1',period:'morning',name:'ادارة الفرع الرئيسي - صباحي',phone:'0501234567'},
+    {id:'u2',username:'second',password:'123456',role:'school_admin',schoolId:'s1',branchId:'b2',period:'morning',name:'ادارة الفرع الثاني - صباحي',phone:'0509876543'},
     {id:'u3',username:'sarah',password:'123456',role:'teacher',schoolId:'s1',branchId:'b1',period:'morning',name:'الأستاذة سارة',phone:'0507654321'},
     {id:'u4',username:'hessa',password:'123456',role:'teacher',schoolId:'s1',branchId:'b1',period:'evening',name:'الأستاذة هيفاء',phone:'0508765432'},
     {id:'u5',username:'noura',password:'123456',role:'teacher',schoolId:'s1',branchId:'b2',period:'morning',name:'الأستاذة نورا',phone:'0506543210'},
@@ -467,6 +466,7 @@ const Auth = {
   isTeacher(){return this.user?.role==='teacher'},
   schoolId(){return this.user?.schoolId||null},
   branchId(){return this.isSchoolAdmin()?this.user?.branchId||null:null},
+  period(){return (this.isSchoolAdmin()||this.isTeacher())?this.user?.period||null:null},
 };
 
 // =========================================================
@@ -510,6 +510,7 @@ const App = {
       {v:'users',icon:'👥',label:'المستخدمون'},
       {v:'activities',icon:'🎯',label:'دليل الأنشطة'},
       {v:'sales',icon:'🛍️',label:'المبيعات'},
+      {v:'accounting',icon:'🧾',label:'المحاسبة'},
       {v:'settings',icon:'⚙️',label:'الإعدادات'},
     ] : u.role==='school_admin' ? [
       {v:'dashboard',icon:'🏠',label:'الرئيسية'},
@@ -541,7 +542,7 @@ const App = {
     </div>`;
   },
   topbar(){
-    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات'};
+    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات',accounting:'🧾 المحاسبة'};
     const now=new Date();
     const hm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
     const unread=DB.unreadCount();
@@ -603,11 +604,12 @@ const App = {
       my_reports:()=>role==='teacher',
       activities:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       sales:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
+      accounting:()=>Auth.isSuperAdmin(),
       settings:()=>Auth.isSuperAdmin(),
     };
     const guard=guards[App.view];
     if(guard&&!guard()) return Views._forbidden();
-    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,settings:Views.settings};
+    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,settings:Views.settings};
     const fn=map[App.view]||Views.dashboard;
     try{return fn();}
     catch(e){console.error('[CCS]',App.view,e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة: ${App.view}</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
@@ -889,10 +891,12 @@ schools(){
 children(){
   const sid=Auth.schoolId();
   const bid=Auth.branchId();
+  const uPeriod=Auth.period();
   const branches=DB.branches();
   let kids=DB.children();
   if(sid) kids=kids.filter(c=>c.schoolId===sid);
   if(bid) kids=kids.filter(c=>c.branchId===bid);
+  if(uPeriod) kids=kids.filter(c=>c.period===uPeriod);
   const schools=DB.schools();
   const q=(App.params.q||'').toLowerCase();
   const bFilter=App.params.branch||'all';
@@ -940,7 +944,8 @@ children(){
                 <strong>${esc(c.name)}</strong>
                 ${c.isVip?`<span class="badge badge-yellow" style="font-size:10px">⭐ VIP${c.discountPct?` ${c.discountPct}%`:''}</span>`:''}
               </div>
-              ${c.notes?`<small style="color:#f59e0b">⚠️ ${esc(c.notes)}</small>`:''}
+              ${c.healthNotes?`<small style="color:#ef4444">🏥 ${esc(c.healthNotes)}</small>`:''}
+              ${c.notes?`<small style="color:#f59e0b">📝 ${esc(c.notes)}</small>`:''}
             </td>
             <td style="font-size:13px;color:#374151">${teacher?esc(teacher.name):'<span style="color:#94a3b8">—</span>'}</td>
             <td>${esc(c.parentName)}</td>
@@ -962,9 +967,11 @@ children(){
 subscriptions(){
   const sid=Auth.schoolId();
   const bid=Auth.branchId();
+  const uPeriod=Auth.period();
   let subs=DB.subscriptions();
   if(sid) subs=subs.filter(s=>s.schoolId===sid);
   if(bid) subs=subs.filter(s=>s.branchId===bid);
+  if(uPeriod) subs=subs.filter(s=>s.period===uPeriod);
   const filter=App.params.filter||'all';
   const subQ=(App.params.subQ||'').trim();
   const allChildren=DB.children();
@@ -1844,6 +1851,92 @@ activities(){
   </div>`;
 },
 
+// ---------- ACCOUNTING (super admin only) ----------
+accounting(){
+  if(!Auth.isSuperAdmin()) return Views._forbidden();
+  const subs=DB.subscriptions();
+  const children=DB.children();
+  const branches=DB.branches();
+  const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
+  const typeLbl={daily:'يومي',weekly:'أسبوعي',monthly:'٣٠ يوم',custom:'مخصص'};
+  const filterBranch=App.params.accBranch||'all';
+  const filterPay=App.params.accPay||'all';
+  const searchQ=(App.params.accQ||'').toLowerCase();
+  let filtered=subs;
+  if(filterBranch!=='all') filtered=filtered.filter(s=>s.branchId===filterBranch);
+  if(filterPay==='paid') filtered=filtered.filter(s=>s.paymentStatus==='paid');
+  else if(filterPay==='partial') filtered=filtered.filter(s=>s.paymentStatus==='partial');
+  else if(filterPay==='deferred') filtered=filtered.filter(s=>s.paymentStatus==='deferred');
+  else if(filterPay==='pending') filtered=filtered.filter(s=>s.price-s.paidAmount>0);
+  if(searchQ) filtered=filtered.filter(s=>{const c=children.find(x=>x.id===s.childId);return c&&(c.name.toLowerCase().includes(searchQ)||c.parentName.toLowerCase().includes(searchQ));});
+  filtered.sort((a,b)=>(b.createdAt||b.startDate||'').localeCompare(a.createdAt||a.startDate||''));
+  const totalRevenue=subs.reduce((a,s)=>a+s.paidAmount,0);
+  const totalPending=subs.reduce((a,s)=>a+(s.price-s.paidAmount),0);
+  const totalInvoices=subs.length;
+  return `
+  <div class="stats-grid">
+    <div class="stat-card green"><div class="stat-val">${totalRevenue.toLocaleString()}</div><div class="stat-lbl">💰 إجمالي المحصّل (ر.س)</div></div>
+    <div class="stat-card red"><div class="stat-val">${totalPending.toLocaleString()}</div><div class="stat-lbl">⏳ مبالغ معلّقة (ر.س)</div></div>
+    <div class="stat-card blue"><div class="stat-val">${totalInvoices}</div><div class="stat-lbl">🧾 عدد الفواتير</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${subs.filter(s=>s.paymentStatus==='deferred').length}</div><div class="stat-lbl">📋 فواتير مؤجلة</div></div>
+  </div>
+  <div class="card no-print" style="padding:14px;margin-bottom:16px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="input-group" style="margin:0;flex:1;min-width:160px">
+        <label style="font-size:12px">🔍 بحث</label>
+        <input class="input" placeholder="اسم الطفل أو ولي الأمر..." value="${esc(App.params.accQ||'')}" oninput="App.go('accounting',{accQ:this.value,accBranch:'${filterBranch}',accPay:'${filterPay}'})">
+      </div>
+      <div class="input-group" style="margin:0;min-width:140px">
+        <label style="font-size:12px">🏢 الفرع</label>
+        <select class="input" onchange="App.go('accounting',{accQ:'${esc(App.params.accQ||'')}',accBranch:this.value,accPay:'${filterPay}'})">
+          <option value="all">الكل</option>
+          ${branches.map(b=>`<option value="${b.id}" ${filterBranch===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="input-group" style="margin:0;min-width:140px">
+        <label style="font-size:12px">💰 حالة الدفع</label>
+        <select class="input" onchange="App.go('accounting',{accQ:'${esc(App.params.accQ||'')}',accBranch:'${filterBranch}',accPay:this.value})">
+          <option value="all" ${filterPay==='all'?'selected':''}>الكل</option>
+          <option value="paid" ${filterPay==='paid'?'selected':''}>مدفوع</option>
+          <option value="partial" ${filterPay==='partial'?'selected':''}>جزئي</option>
+          <option value="deferred" ${filterPay==='deferred'?'selected':''}>مؤجل</option>
+          <option value="pending" ${filterPay==='pending'?'selected':''}>عليه متبقي</option>
+        </select>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ طباعة</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('acc-table','فواتير')">📊 CSV</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">🧾 فواتير الاشتراكات (${filtered.length})</div>
+    <table id="acc-table">
+      <thead><tr><th>رقم الفاتورة</th><th>الطفل</th><th>ولي الأمر</th><th>الفرع</th><th>الفترة</th><th>نوع الاشتراك</th><th>من</th><th>إلى</th><th>المبلغ</th><th>المدفوع</th><th>المتبقي</th><th>طريقة الدفع</th><th>الحالة</th><th>فاتورة</th></tr></thead>
+      <tbody>
+        ${filtered.length?filtered.map(s=>{
+          const c=children.find(x=>x.id===s.childId);
+          const remaining=s.price-s.paidAmount;
+          return `<tr>
+            <td style="font-weight:700;color:#0f766e;font-size:12px">${esc(s.invoiceNo||'—')}</td>
+            <td>${esc(c?.name||'—')}</td>
+            <td style="font-size:12px">${esc(c?.parentName||'—')}</td>
+            <td><span class="badge badge-blue" style="font-size:10px">${DB.branchName(s.branchId)}</span></td>
+            <td><span class="badge ${s.period==='morning'?'badge-blue':'badge-orange'}" style="font-size:10px">${s.period==='morning'?'صباحي':'مسائي'}</span></td>
+            <td>${typeLbl[s.type]||s.type}</td>
+            <td style="font-size:12px">${formatDate(s.startDate)}</td>
+            <td style="font-size:12px">${formatDate(s.endDate)}</td>
+            <td style="font-weight:700">${s.price} ر.س</td>
+            <td style="color:#10b981;font-weight:600">${s.paidAmount} ر.س</td>
+            <td style="color:${remaining>0?'#ef4444':'#10b981'};font-weight:600">${remaining} ر.س</td>
+            <td style="font-size:12px">${pmLbl[s.paymentMethod]||'—'}</td>
+            <td>${Views._payBadge(s)}</td>
+            <td><button class="btn btn-xs" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0" onclick="openInvoice('${s.id}')">🧾</button></td>
+          </tr>`;
+        }).join(''):`<tr><td colspan="14"><div class="empty-state"><div class="es-icon">🧾</div><p>لا توجد فواتير</p></div></td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+},
+
 // ---------- SETTINGS (super admin only) ----------
 settings(){
   if(!Auth.isSuperAdmin()) return Views._forbidden();
@@ -2311,7 +2404,8 @@ const Modals = {
           <div class="input-group"><label>الصف</label><input class="input" id="c-grade" value="${esc(c.grade||'')}"></div>
           <div class="input-group"><label>تاريخ الانتساب</label><input class="input" id="c-join" type="date" value="${c.joinDate}"></div>
         </div>
-        <div class="input-group"><label>ملاحظات</label><textarea class="input" id="c-notes" rows="2">${esc(c.notes||'')}</textarea></div>
+        <div class="input-group"><label>🏥 الملاحظات الصحية والطبية</label><textarea class="input" id="c-health" rows="2" placeholder="حساسيات، أمراض مزمنة، أدوية...">${esc(c.healthNotes||'')}</textarea></div>
+        <div class="input-group"><label>📝 ملاحظات عامة</label><textarea class="input" id="c-notes" rows="2" placeholder="ملاحظات إضافية...">${esc(c.notes||'')}</textarea></div>
         <div style="display:flex;align-items:center;gap:16px;padding:10px 14px;background:#fefce8;border-radius:8px;border:1px solid #fde68a">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:13px">
             <input type="checkbox" id="c-vip" ${c.isVip?'checked':''} style="width:16px;height:16px;cursor:pointer">
@@ -2692,6 +2786,13 @@ const Modals = {
             <label style="display:flex;align-items:center;gap:8px;background:#fff;border:2px solid #e2e8f0;border-radius:8px;padding:10px 12px;cursor:pointer;font-size:13px;font-weight:600" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="if(!document.querySelector('#u-branch-none').checked)this.style.borderColor='#e2e8f0'"><input type="radio" name="u-branch-radio" id="u-branch-none" value="" style="accent-color:#3b82f6" onchange="document.getElementById('u-branch').value='';document.querySelectorAll('[name=u-branch-radio]').forEach(r=>r.closest('label').style.borderColor=r.checked?'#3b82f6':'#e2e8f0')"> بدون فرع</label>
           </div>
           <input type="hidden" id="u-branch" value="">
+          <div style="margin-top:10px">
+            <div style="font-size:13px;font-weight:700;color:#1d4ed8;margin-bottom:6px">⏰ الفترة *</div>
+            <select class="input" id="u-period">
+              <option value="morning">🌅 صباحية</option>
+              <option value="evening">🌙 مسائية</option>
+            </select>
+          </div>
         </div>
         <div class="input-group" id="school-field">
           <label>المدرسة *</label>
@@ -2757,6 +2858,13 @@ const Modals = {
             <label style="display:flex;align-items:center;gap:8px;background:#fff;border:2px solid ${!u.branchId?'#3b82f6':'#e2e8f0'};border-radius:8px;padding:10px 12px;cursor:pointer;font-size:13px;font-weight:600" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="if(!document.querySelector('#u-branch-none').checked)this.style.borderColor='#e2e8f0'"><input type="radio" name="u-branch-radio" id="u-branch-none" value="" ${!u.branchId?'checked':''} style="accent-color:#3b82f6" onchange="document.getElementById('u-branch').value='';document.querySelectorAll('[name=u-branch-radio]').forEach(r=>r.closest('label').style.borderColor=r.checked?'#3b82f6':'#e2e8f0')"> بدون فرع</label>
           </div>
           <input type="hidden" id="u-branch" value="${esc(u.branchId||'')}">
+          <div style="margin-top:10px">
+            <div style="font-size:13px;font-weight:700;color:#1d4ed8;margin-bottom:6px">⏰ الفترة *</div>
+            <select class="input" id="u-period">
+              <option value="morning" ${(u.period||'morning')==='morning'?'selected':''}>🌅 صباحية</option>
+              <option value="evening" ${u.period==='evening'?'selected':''}>🌙 مسائية</option>
+            </select>
+          </div>
         </div>
         <div class="input-group" id="school-field" style="${u.role==='superadmin'?'display:none':''}">
           <label>المدرسة</label>
@@ -2992,6 +3100,7 @@ function saveChild(edit=false){
     parentName:parent,
     parentPhone:phone,
     grade:document.getElementById('c-grade')?.value?.trim()||'',
+    healthNotes:document.getElementById('c-health')?.value?.trim()||'',
     notes:document.getElementById('c-notes')?.value?.trim()||'',
     joinDate:document.getElementById('c-join')?.value||T0,
     isActive:true,
@@ -3022,7 +3131,8 @@ function saveChild(edit=false){
       const subReceipt=document.getElementById('c-receipt-data')?.value||'';
       DB.addSub({id:uid(),childId,schoolId,branchId:c.branchId,period,type:subType,customDays:subCustomDays,startDate:subStart,endDate:subEnd,basePrice,discountPct:parseFloat(document.getElementById('c-disc')?.value||0),price:subPrice,paidAmount:subPaid,paymentStatus:subPay,paymentMethod:subPM,receiptImage:subReceipt,isActive:true,createdAt:T0,invoiceNo});
       const tl={'daily':'يومي','weekly':'أسبوعي','monthly':'٣٠ يوم','custom':'مخصص'};
-      DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[subType]||subType} لـ ${name} — ${subPrice} ر.س`,addedBy:Auth.user.name});
+      const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
+      DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[subType]||subType} لـ ${name} — ${subPrice} ر.س | الدفع: ${pmLbl[subPM]||subPM} | ${subPay==='paid'?'مدفوع بالكامل':subPay==='partial'?'مدفوع جزئياً':'مؤجل'}`,addedBy:Auth.user.name});
     }
   }
   App.closeModal();
@@ -3053,7 +3163,8 @@ function saveSub(){
   const s={id:uid(),childId,schoolId,branchId:child?.branchId||'',period,type,customDays,startDate,endDate,basePrice,discountPct:discPct,price,paidAmount,paymentStatus,paymentMethod,receiptImage,isActive:true,createdAt:T0,invoiceNo};
   DB.addSub(s);
   const tl={'daily':'يومي','weekly':'أسبوعي','monthly':'٣٠ يوم','custom':'مخصص'};
-  DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[type]||type} لـ ${child?.name||''} — ${price} ر.س`,addedBy:Auth.user.name});
+  const pmLbl2={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
+  DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[type]||type} لـ ${child?.name||''} — ${price} ر.س | الدفع: ${pmLbl2[paymentMethod]||paymentMethod} | ${paymentStatus==='paid'?'مدفوع بالكامل':paymentStatus==='partial'?'مدفوع جزئياً':'مؤجل'}`,addedBy:Auth.user.name});
   App.closeModal();
   App.go('subscriptions');
 }
@@ -3508,16 +3619,17 @@ function saveUser(edit=false){
   if(!name||!username){alert('الاسم واسم المستخدم مطلوبان');return}
   if(!edit&&!pass){alert('كلمة المرور مطلوبة');return}
   const branchId=document.getElementById('u-branch')?.value||'';
+  const period=document.getElementById('u-period')?.value||'morning';
   if(role==='school_admin'&&!branchId){alert('⚠️ يجب تحديد الفرع لمديرة الفرع');return}
   if(edit){
     const u=DB.users().find(x=>x.id===document.getElementById('u-id')?.value);
     if(!u) return;
-    u.name=name;u.username=username;u.role=role;u.schoolId=schoolId;u.branchId=branchId;u.phone=phone;
+    u.name=name;u.username=username;u.role=role;u.schoolId=schoolId;u.branchId=branchId;u.period=period;u.phone=phone;
     if(pass) u.password=pass;
     DB.updateUser(u);
   } else {
     if(DB.users().find(x=>x.username===username)){alert('اسم المستخدم مستخدم مسبقاً');return}
-    DB.addUser({id:uid(),name,username,password:pass,role,schoolId,branchId,phone});
+    DB.addUser({id:uid(),name,username,password:pass,role,schoolId,branchId,period,phone});
   }
   App.closeModal();
   App.go('users');
