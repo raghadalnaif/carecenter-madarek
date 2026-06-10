@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-10-v9 -->
+<!-- BUILD: 2026-06-10-v10 -->
 <script>
 (function(){
-  var BUILD='v9-20260610';
+  var BUILD='v10-20260610';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   if(stored!==BUILD){
@@ -900,28 +900,37 @@ children(){
   const schools=DB.schools();
   const q=(App.params.q||'').toLowerCase();
   const bFilter=App.params.branch||'all';
+  const pFilter=App.params.period||'all';
   if(q) kids=kids.filter(c=>c.name.includes(q)||c.parentName.includes(q)||c.parentPhone.includes(q));
   if(!bid&&bFilter!=='all') kids=kids.filter(c=>c.branchId===bFilter);
+  if(!uPeriod&&pFilter!=='all') kids=kids.filter(c=>c.period===pFilter);
+  const _fp={q:esc(App.params.q||''),branch:bFilter,period:pFilter};
   const branchColors=['badge-blue','badge-green','badge-orange','badge-red'];
   return `
   <div class="actions-bar" style="flex-wrap:wrap">
     <button class="btn btn-primary btn-sm" onclick="Modals.addChild()">+ إضافة طفل</button>
     <button class="btn btn-secondary btn-sm" onclick="Modals.importChildren()">📥 استيراد Excel</button>
+    <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('kids-table','الأطفال')">📊 تصدير</button>
     <div class="search-bar" style="flex:1;max-width:300px;margin:0">
       <span class="search-icon">🔍</span>
-      <input class="input" placeholder="بحث بالاسم أو الوالد..." value="${esc(App.params.q||'')}" oninput="App.go('children',{q:this.value,branch:'${bFilter}'})">
+      <input class="input" placeholder="بحث بالاسم أو الوالد..." value="${esc(App.params.q||'')}" oninput="App.go('children',{q:this.value,branch:'${bFilter}',period:'${pFilter}'})">
     </div>
-    ${!bid?`<div style="display:flex;gap:6px;align-items:center">
-      <span style="font-size:13px;font-weight:600;color:#64748b">الفرع:</span>
-      <span class="chip ${bFilter==='all'?'active':''}" onclick="App.go('children',{q:'${esc(App.params.q||'')}',branch:'all'})">الكل (${DB.children().filter(c=>sid?c.schoolId===sid:true).length})</span>
-      ${branches.map((b,i)=>{
-        const cnt=DB.children().filter(c=>(sid?c.schoolId===sid:true)&&c.branchId===b.id).length;
-        return `<span class="chip ${bFilter===b.id?'active':''}" onclick="App.go('children',{q:'${esc(App.params.q||'')}',branch:'${b.id}'})">${b.name} (${cnt})</span>`;
-      }).join('')}
-    </div>`:''}
   </div>
+  ${!bid?`<div class="card" style="padding:12px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <span style="font-size:13px;font-weight:600;color:#64748b">🏢 الفرع:</span>
+      <span class="chip ${bFilter==='all'?'active':''}" onclick="App.go('children',{q:'${_fp.q}',branch:'all',period:'${pFilter}'})">الكل</span>
+      ${branches.map(b=>`<span class="chip ${bFilter===b.id?'active':''}" onclick="App.go('children',{q:'${_fp.q}',branch:'${b.id}',period:'${pFilter}'})">${esc(b.name)}</span>`).join('')}
+    </div>
+    ${!uPeriod?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid #f1f5f9;padding-top:8px">
+      <span style="font-size:13px;font-weight:600;color:#64748b">⏰ الفترة:</span>
+      <span class="chip ${pFilter==='all'?'active':''}" onclick="App.go('children',{q:'${_fp.q}',branch:'${bFilter}',period:'all'})">الكل</span>
+      <span class="chip ${pFilter==='morning'?'active':''}" onclick="App.go('children',{q:'${_fp.q}',branch:'${bFilter}',period:'morning'})">🌅 صباحي</span>
+      <span class="chip ${pFilter==='evening'?'active':''}" onclick="App.go('children',{q:'${_fp.q}',branch:'${bFilter}',period:'evening'})">🌙 مسائي</span>
+    </div>`:''}
+  </div>`:''}
   <div class="card">
-    <table>
+    <table id="kids-table">
       <thead><tr>${Auth.isSuperAdmin()?'<th>المدرسة</th>':''}<th>الفرع / الفترة</th><th>اسم الطفل</th><th>المعلمة</th><th>ولي الأمر</th><th>الهاتف</th><th>الاشتراك الحالي</th><th>حالة الدفع</th><th>إجراءات</th></tr></thead>
       <tbody>
         ${kids.length?kids.map(c=>{
@@ -968,10 +977,15 @@ subscriptions(){
   const sid=Auth.schoolId();
   const bid=Auth.branchId();
   const uPeriod=Auth.period();
+  const branches=DB.branches();
   let subs=DB.subscriptions();
   if(sid) subs=subs.filter(s=>s.schoolId===sid);
   if(bid) subs=subs.filter(s=>s.branchId===bid);
   if(uPeriod) subs=subs.filter(s=>s.period===uPeriod);
+  const sBranch=App.params.sBranch||'all';
+  const sPeriod=App.params.sPeriod||'all';
+  if(!bid&&sBranch!=='all') subs=subs.filter(s=>s.branchId===sBranch);
+  if(!uPeriod&&sPeriod!=='all') subs=subs.filter(s=>s.period===sPeriod);
   const filter=App.params.filter||'all';
   const subQ=(App.params.subQ||'').trim();
   const allChildren=DB.children();
@@ -998,18 +1012,33 @@ subscriptions(){
       </div>
     </div>`;
   }
+  const _sp={subQ:esc(subQ),filter,sBranch,sPeriod};
   return `
-  <div class="actions-bar" style="gap:10px;align-items:center">
+  <div class="actions-bar" style="gap:10px;align-items:center;flex-wrap:wrap">
     <div class="search-bar" style="position:relative;flex:1;max-width:280px;margin:0">
       <span class="search-icon">🔍</span>
       <input class="input" style="padding-right:34px" placeholder="بحث باسم الطالب..." value="${esc(subQ)}"
-        oninput="App.go('subscriptions',{filter:'${filter}',subQ:this.value})">
+        oninput="App.go('subscriptions',{filter:'${filter}',subQ:this.value,sBranch:'${sBranch}',sPeriod:'${sPeriod}'})">
     </div>
-    ${chips.map(([v,l])=>`<span class="chip ${filter===v?'active':''}" onclick="App.go('subscriptions',{filter:'${v}',subQ:'${esc(subQ)}'})">${l}</span>`).join('')}
+    ${chips.map(([v,l])=>`<span class="chip ${filter===v?'active':''}" onclick="App.go('subscriptions',{filter:'${v}',subQ:'${_sp.subQ}',sBranch:'${sBranch}',sPeriod:'${sPeriod}'})">${l}</span>`).join('')}
+    <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('subs-table','الاشتراكات')">📊 تصدير</button>
   </div>
+  ${!bid?`<div class="card" style="padding:12px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <span style="font-size:13px;font-weight:600;color:#64748b">🏢 الفرع:</span>
+      <span class="chip ${sBranch==='all'?'active':''}" onclick="App.go('subscriptions',{filter:'${filter}',subQ:'${_sp.subQ}',sBranch:'all',sPeriod:'${sPeriod}'})">الكل</span>
+      ${branches.map(b=>`<span class="chip ${sBranch===b.id?'active':''}" onclick="App.go('subscriptions',{filter:'${filter}',subQ:'${_sp.subQ}',sBranch:'${b.id}',sPeriod:'${sPeriod}'})">${esc(b.name)}</span>`).join('')}
+    </div>
+    ${!uPeriod?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid #f1f5f9;padding-top:8px">
+      <span style="font-size:13px;font-weight:600;color:#64748b">⏰ الفترة:</span>
+      <span class="chip ${sPeriod==='all'?'active':''}" onclick="App.go('subscriptions',{filter:'${filter}',subQ:'${_sp.subQ}',sBranch:'${sBranch}',sPeriod:'all'})">الكل</span>
+      <span class="chip ${sPeriod==='morning'?'active':''}" onclick="App.go('subscriptions',{filter:'${filter}',subQ:'${_sp.subQ}',sBranch:'${sBranch}',sPeriod:'morning'})">🌅 صباحي</span>
+      <span class="chip ${sPeriod==='evening'?'active':''}" onclick="App.go('subscriptions',{filter:'${filter}',subQ:'${_sp.subQ}',sBranch:'${sBranch}',sPeriod:'evening'})">🌙 مسائي</span>
+    </div>`:''}
+  </div>`:''}
   ${studentSummary}
   <div class="card">
-    <table>
+    <table id="subs-table">
       <thead><tr><th>الطفل</th><th>النوع</th><th>يبدأ</th><th>ينتهي</th><th>المبلغ</th><th>طريقة الدفع</th><th>حالة الدفع</th><th>الحالة</th><th>إجراءات</th></tr></thead>
       <tbody>
         ${filtered.length?filtered.map(s=>{
@@ -1072,13 +1101,14 @@ attendance(){
       // مديرة الفرع: فقط أطفال فرعها (صباح ومساء)
       kids=kids.filter(c=>c.branchId===bid);
     } else {
-      // المدير العام: فلترة بالفرع / فلترة بالمعلمة
+      // المدير العام: فلترة بالفرع / فلترة بالفترة / فلترة بالمعلمة
       const teacherFilter=App.params.teacherFilter||'';
       if(teacherFilter){
         const tf=DB.users().find(t=>t.id===teacherFilter);
         if(tf) kids=kids.filter(c=>c.branchId===tf.branchId&&c.period===tf.period);
       }
       if(App.params.branchFilter) kids=kids.filter(c=>c.branchId===App.params.branchFilter);
+      if(App.params.periodFilter) kids=kids.filter(c=>c.period===App.params.periodFilter);
     }
   }
 
@@ -1115,12 +1145,13 @@ attendance(){
   const teachers=isAdmin?DB.users().filter(t=>t.role==='teacher'&&(!sid||t.schoolId===sid)):[];
   const teacherFilter=App.params.teacherFilter||'';
   const branchFilter=App.params.branchFilter||'';
+  const periodFilter=App.params.periodFilter||'';
 
   return `
   <div class="actions-bar" style="flex-wrap:wrap">
     <div style="display:flex;align-items:center;gap:8px">
       <label style="font-weight:600;font-size:14px">التاريخ:</label>
-      <input type="date" class="input" style="width:160px" value="${date}" onchange="App.go('attendance',{date:this.value,schoolId:'${sid||''}',branchFilter:'${branchFilter}',teacherFilter:'${teacherFilter}'})" max="${T0}">
+      <input type="date" class="input" style="width:160px" value="${date}" onchange="App.go('attendance',{date:this.value,schoolId:'${sid||''}',branchFilter:'${branchFilter}',periodFilter:'${periodFilter}',teacherFilter:'${teacherFilter}'})" max="${T0}">
     </div>
     <button class="btn btn-primary btn-sm" onclick="saveAttendance('${date}','${sid||''}')">💾 حفظ الحضور</button>
     <div style="margin-right:auto;display:flex;gap:8px">
@@ -1134,14 +1165,20 @@ attendance(){
   <div class="card" style="padding:12px;margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
       <span style="font-size:13px;font-weight:600;color:#64748b">🏢 الفرع:</span>
-      <span class="chip ${!branchFilter?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'',teacherFilter:'${teacherFilter}'})">الكل</span>
-      ${DB.branches().map(b=>`<span class="chip ${branchFilter===b.id?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${b.id}',teacherFilter:'${teacherFilter}'})">${esc(b.name)}</span>`).join('')}
+      <span class="chip ${!branchFilter?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'',periodFilter:'${periodFilter}',teacherFilter:'${teacherFilter}'})">الكل</span>
+      ${DB.branches().map(b=>`<span class="chip ${branchFilter===b.id?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${b.id}',periodFilter:'${periodFilter}',teacherFilter:'${teacherFilter}'})">${esc(b.name)}</span>`).join('')}
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid #f1f5f9;padding-top:10px;margin-bottom:10px">
+      <span style="font-size:13px;font-weight:600;color:#64748b">⏰ الفترة:</span>
+      <span class="chip ${!periodFilter?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${branchFilter}',periodFilter:'',teacherFilter:'${teacherFilter}'})">الكل</span>
+      <span class="chip ${periodFilter==='morning'?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${branchFilter}',periodFilter:'morning',teacherFilter:'${teacherFilter}'})">🌅 صباحي</span>
+      <span class="chip ${periodFilter==='evening'?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${branchFilter}',periodFilter:'evening',teacherFilter:'${teacherFilter}'})">🌙 مسائي</span>
     </div>
     <div style="border-top:1px solid #f1f5f9;padding-top:10px">
       <span style="font-size:13px;font-weight:600;color:#64748b">👩‍🏫 الفصل:</span>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-        <span class="chip ${!teacherFilter?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${branchFilter}',teacherFilter:''})">جميع الفصول</span>
-        ${teachers.map(t=>`<span class="chip ${teacherFilter===t.id?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${branchFilter}',teacherFilter:'${t.id}'})">${esc(t.name)}</span>`).join('')}
+        <span class="chip ${!teacherFilter?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${branchFilter}',periodFilter:'${periodFilter}',teacherFilter:''})">جميع الفصول</span>
+        ${teachers.map(t=>`<span class="chip ${teacherFilter===t.id?'active':''}" onclick="App.go('attendance',{date:'${date}',schoolId:'${sid||''}',branchFilter:'${branchFilter}',periodFilter:'${periodFilter}',teacherFilter:'${t.id}'})">${esc(t.name)}</span>`).join('')}
       </div>
     </div>
   </div>`:''}
@@ -1157,6 +1194,10 @@ attendance(){
 reports(){
   const sid=Auth.schoolId();
   const bid=Auth.branchId();
+  const uPeriod=Auth.period();
+  const branches=DB.branches();
+  const rBranch=App.params.rBranch||'all';
+  const rPeriod=App.params.rPeriod||'all';
   let children=DB.children();
   let subs=DB.subscriptions();
   let attList=DB.attendance();
@@ -1171,6 +1212,12 @@ reports(){
     subs=subs.filter(s=>branchChildIds.has(s.childId));
     attList=attList.filter(a=>branchChildIds.has(a.childId));
   }
+  if(uPeriod) children=children.filter(c=>c.period===uPeriod);
+  if(!bid&&rBranch!=='all') children=children.filter(c=>c.branchId===rBranch);
+  if(!uPeriod&&rPeriod!=='all') children=children.filter(c=>c.period===rPeriod);
+  const childIds=new Set(children.map(c=>c.id));
+  subs=subs.filter(s=>childIds.has(s.childId));
+  attList=attList.filter(a=>childIds.has(a.childId));
   const totalRev=subs.reduce((a,s)=>a+s.paidAmount,0);
   const pendingRev=subs.reduce((a,s)=>a+(s.price-s.paidAmount),0);
   const monthlyCount=subs.filter(s=>s.type==='monthly').length;
@@ -1193,11 +1240,24 @@ reports(){
     <p>${tabLabel[tab]||''}${stChild?' — '+stChild.name:''} — تاريخ الطباعة: ${formatDate(T0)}</p>
   </div>
   <div class="tabs no-print">
-    ${isSA?`<div class="tab ${tab==='financial'?'active':''}" onclick="App.go('reports',{tab:'financial'})">💰 المالي</div>`:''}
-    <div class="tab ${tab==='attendance'?'active':''}" onclick="App.go('reports',{tab:'attendance'})">✅ الحضور</div>
-    ${isSA?`<div class="tab ${tab==='subscriptions'?'active':''}" onclick="App.go('reports',{tab:'subscriptions'})">📋 الاشتراكات</div>`:''}
-    <div class="tab ${tab==='student'?'active':''}" onclick="App.go('reports',{tab:'student'})">👤 تقرير طالب</div>
+    ${isSA?`<div class="tab ${tab==='financial'?'active':''}" onclick="App.go('reports',{tab:'financial',rBranch:'${rBranch}',rPeriod:'${rPeriod}'})">💰 المالي</div>`:''}
+    <div class="tab ${tab==='attendance'?'active':''}" onclick="App.go('reports',{tab:'attendance',rBranch:'${rBranch}',rPeriod:'${rPeriod}'})">✅ الحضور</div>
+    ${isSA?`<div class="tab ${tab==='subscriptions'?'active':''}" onclick="App.go('reports',{tab:'subscriptions',rBranch:'${rBranch}',rPeriod:'${rPeriod}'})">📋 الاشتراكات</div>`:''}
+    <div class="tab ${tab==='student'?'active':''}" onclick="App.go('reports',{tab:'student',rBranch:'${rBranch}',rPeriod:'${rPeriod}'})">👤 تقرير طالب</div>
   </div>
+  ${!bid?`<div class="card no-print" style="padding:12px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <span style="font-size:13px;font-weight:600;color:#64748b">🏢 الفرع:</span>
+      <span class="chip ${rBranch==='all'?'active':''}" onclick="App.go('reports',{tab:'${tab}',rBranch:'all',rPeriod:'${rPeriod}'})">الكل</span>
+      ${branches.map(b=>`<span class="chip ${rBranch===b.id?'active':''}" onclick="App.go('reports',{tab:'${tab}',rBranch:'${b.id}',rPeriod:'${rPeriod}'})">${esc(b.name)}</span>`).join('')}
+    </div>
+    ${!uPeriod?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid #f1f5f9;padding-top:8px">
+      <span style="font-size:13px;font-weight:600;color:#64748b">⏰ الفترة:</span>
+      <span class="chip ${rPeriod==='all'?'active':''}" onclick="App.go('reports',{tab:'${tab}',rBranch:'${rBranch}',rPeriod:'all'})">الكل</span>
+      <span class="chip ${rPeriod==='morning'?'active':''}" onclick="App.go('reports',{tab:'${tab}',rBranch:'${rBranch}',rPeriod:'morning'})">🌅 صباحي</span>
+      <span class="chip ${rPeriod==='evening'?'active':''}" onclick="App.go('reports',{tab:'${tab}',rBranch:'${rBranch}',rPeriod:'evening'})">🌙 مسائي</span>
+    </div>`:''}
+  </div>`:''}
   <div class="rpt-bar no-print">
     <span class="rpt-bar-title">${tabLabel[tab]||''}</span>
     <div class="rpt-bar-btns">
@@ -1860,10 +1920,12 @@ accounting(){
   const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
   const typeLbl={daily:'يومي',weekly:'أسبوعي',monthly:'٣٠ يوم',custom:'مخصص'};
   const filterBranch=App.params.accBranch||'all';
+  const filterPeriod=App.params.accPeriod||'all';
   const filterPay=App.params.accPay||'all';
   const searchQ=(App.params.accQ||'').toLowerCase();
   let filtered=subs;
   if(filterBranch!=='all') filtered=filtered.filter(s=>s.branchId===filterBranch);
+  if(filterPeriod!=='all') filtered=filtered.filter(s=>s.period===filterPeriod);
   if(filterPay==='paid') filtered=filtered.filter(s=>s.paymentStatus==='paid');
   else if(filterPay==='partial') filtered=filtered.filter(s=>s.paymentStatus==='partial');
   else if(filterPay==='deferred') filtered=filtered.filter(s=>s.paymentStatus==='deferred');
@@ -1884,18 +1946,26 @@ accounting(){
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
       <div class="input-group" style="margin:0;flex:1;min-width:160px">
         <label style="font-size:12px">🔍 بحث</label>
-        <input class="input" placeholder="اسم الطفل أو ولي الأمر..." value="${esc(App.params.accQ||'')}" oninput="App.go('accounting',{accQ:this.value,accBranch:'${filterBranch}',accPay:'${filterPay}'})">
+        <input class="input" placeholder="اسم الطفل أو ولي الأمر..." value="${esc(App.params.accQ||'')}" oninput="App.go('accounting',{accQ:this.value,accBranch:'${filterBranch}',accPeriod:'${filterPeriod}',accPay:'${filterPay}'})">
       </div>
       <div class="input-group" style="margin:0;min-width:140px">
         <label style="font-size:12px">🏢 الفرع</label>
-        <select class="input" onchange="App.go('accounting',{accQ:'${esc(App.params.accQ||'')}',accBranch:this.value,accPay:'${filterPay}'})">
+        <select class="input" onchange="App.go('accounting',{accQ:'${esc(App.params.accQ||'')}',accBranch:this.value,accPeriod:'${filterPeriod}',accPay:'${filterPay}'})">
           <option value="all">الكل</option>
           ${branches.map(b=>`<option value="${b.id}" ${filterBranch===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}
         </select>
       </div>
+      <div class="input-group" style="margin:0;min-width:120px">
+        <label style="font-size:12px">⏰ الفترة</label>
+        <select class="input" onchange="App.go('accounting',{accQ:'${esc(App.params.accQ||'')}',accBranch:'${filterBranch}',accPeriod:this.value,accPay:'${filterPay}'})">
+          <option value="all" ${filterPeriod==='all'?'selected':''}>الكل</option>
+          <option value="morning" ${filterPeriod==='morning'?'selected':''}>صباحي</option>
+          <option value="evening" ${filterPeriod==='evening'?'selected':''}>مسائي</option>
+        </select>
+      </div>
       <div class="input-group" style="margin:0;min-width:140px">
         <label style="font-size:12px">💰 حالة الدفع</label>
-        <select class="input" onchange="App.go('accounting',{accQ:'${esc(App.params.accQ||'')}',accBranch:'${filterBranch}',accPay:this.value})">
+        <select class="input" onchange="App.go('accounting',{accQ:'${esc(App.params.accQ||'')}',accBranch:'${filterBranch}',accPeriod:'${filterPeriod}',accPay:this.value})">
           <option value="all" ${filterPay==='all'?'selected':''}>الكل</option>
           <option value="paid" ${filterPay==='paid'?'selected':''}>مدفوع</option>
           <option value="partial" ${filterPay==='partial'?'selected':''}>جزئي</option>
@@ -3531,32 +3601,49 @@ function exportAllData(){
   const attStatusLabel={'present':'حاضر','absent':'غائب','late':'متأخر'};
   const wb=XLSX.utils.book_new();
 
+  const pmLabel={cash:'كاش',mada:'مدى',transfer:'حوالة'};
+  const payLabel={paid:'مدفوع',partial:'جزئي',deferred:'مؤجل'};
+
   // ورقة الأطفال
-  const wsChildren=XLSX.utils.json_to_sheet(children.map(c=>({
-    'الاسم':c.name,
-    'اسم ولي الأمر':c.parentName,
-    'هاتف ولي الأمر':c.parentPhone,
-    'الفرع':DB.branchName(c.branchId),
-    'الفترة':periodLabel(c.period),
-    'المرحلة':c.grade||'',
-    'تاريخ الانضمام':c.joinDate||'',
-    'ملاحظات':c.notes||'',
-  })));
+  const wsChildren=XLSX.utils.json_to_sheet(children.map(c=>{
+    const sub=DB.activeSub(c.id);
+    return {
+      'الاسم':c.name,
+      'اسم ولي الأمر':c.parentName,
+      'هاتف ولي الأمر':c.parentPhone,
+      'الفرع':DB.branchName(c.branchId),
+      'الفترة':periodLabel(c.period),
+      'المعلمة':(DB.users().find(u=>u.id===c.teacherId)||{}).name||'',
+      'المرحلة':c.grade||'',
+      'تاريخ الانضمام':c.joinDate||'',
+      'حالة الاشتراك':sub?'فعال':'غير فعال',
+      'ملاحظات صحية':c.healthNotes||'',
+      'ملاحظات':c.notes||'',
+      'VIP':c.isVip?'نعم':'لا',
+      'خصم %':c.discountPct||0,
+    };
+  }));
   XLSX.utils.book_append_sheet(wb,wsChildren,'الأطفال');
 
   // ورقة الاشتراكات
   const wsSubs=XLSX.utils.json_to_sheet(subs.map(s=>{
     const child=allChildren.find(c=>c.id===s.childId);
     return {
+      'رقم الفاتورة':s.invoiceNo||'',
       'اسم الطفل':child?.name||'',
+      'ولي الأمر':child?.parentName||'',
+      'الفرع':DB.branchName(s.branchId),
       'النوع':subTypeLabel[s.type]||s.type,
       'الفترة':periodLabel(s.period),
       'من':s.startDate||'',
       'إلى':s.endDate||'',
-      'السعر':s.price||0,
+      'السعر الأساسي':s.basePrice||s.price||0,
+      'الخصم %':s.discountPct||0,
+      'السعر النهائي':s.price||0,
       'المدفوع':s.paidAmount||0,
       'المتبقي':(s.price||0)-(s.paidAmount||0),
-      'رقم الفاتورة':s.invoiceNo||'',
+      'طريقة الدفع':pmLabel[s.paymentMethod]||'',
+      'حالة الدفع':payLabel[s.paymentStatus]||'',
     };
   }));
   XLSX.utils.book_append_sheet(wb,wsSubs,'الاشتراكات');
@@ -3566,6 +3653,8 @@ function exportAllData(){
     const child=allChildren.find(c=>c.id===a.childId);
     return {
       'اسم الطفل':child?.name||'',
+      'الفرع':child?DB.branchName(child.branchId):'',
+      'الفترة':child?periodLabel(child.period):'',
       'التاريخ':a.date||'',
       'الحالة':attStatusLabel[a.status]||a.status,
       'دخول':a.checkIn||'',
@@ -3574,8 +3663,29 @@ function exportAllData(){
   }));
   XLSX.utils.book_append_sheet(wb,wsAtt,'الحضور');
 
+  // ورقة المبيعات
+  const sales=DB.sales();
+  if(sales.length){
+    const itemNames={exit_card:'بطاقة خروج',uniform:'الزي الرسمي',other:'أخرى'};
+    const wsSales=XLSX.utils.json_to_sheet(sales.map(s=>{
+      const child=allChildren.find(c=>c.id===s.childId);
+      return {
+        'التاريخ':s.date||'',
+        'المنتج':itemNames[s.itemType]||s.itemName||'',
+        'اسم المنتج':s.itemName||'',
+        'الطفل':child?.name||'',
+        'ولي الأمر':s.parentName||'',
+        'السعر':s.price||0,
+        'طريقة الدفع':pmLabel[s.paymentMethod]||'',
+        'الفرع':DB.branchName(s.branchId),
+        'ملاحظات':s.notes||'',
+      };
+    }));
+    XLSX.utils.book_append_sheet(wb,wsSales,'المبيعات');
+  }
+
   const date=new Date().toISOString().split('T')[0];
-  XLSX.writeFile(wb,'مدارك-الطفل-'+date+'.xlsx');
+  XLSX.writeFile(wb,'مدارك-الطفل-تصدير-شامل-'+date+'.xlsx');
 }
 
 function saveTeacher(edit=false){
