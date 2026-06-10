@@ -10,7 +10,7 @@
 <!-- BUILD: 2026-06-10-v10 -->
 <script>
 (function(){
-  var BUILD='v11-20260610';
+  var BUILD='v12-20260610';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   if(stored!==BUILD){
@@ -385,6 +385,7 @@ const DB = {
   updateSchool(s){const a=this.schools();const i=a.findIndex(x=>x.id===s.id);a[i]=s;this.save('schools',a)},
   addChild(c){const a=this.children();a.push(c);this.save('children',a)},
   updateChild(c){const a=this.children();const i=a.findIndex(x=>x.id===c.id);a[i]=c;this.save('children',a)},
+  deleteChild(id){this.save('children',this.children().filter(x=>x.id!==id))},
   addSub(s){const a=this.subscriptions();a.push(s);this.save('subscriptions',a)},
   updateSub(s){const a=this.subscriptions();const i=a.findIndex(x=>x.id===s.id);a[i]=s;this.save('subscriptions',a)},
   saveAttendance(list){this.save('attendance',list)},
@@ -965,6 +966,7 @@ children(){
             <td style="white-space:nowrap">
               <button class="btn btn-secondary btn-xs" onclick="Modals.editChild('${c.id}')">تعديل</button>
               <button class="btn btn-primary btn-xs" onclick="Modals.addSub('${c.id}')">اشتراك</button>
+              ${Auth.isSuperAdmin()?`<button class="btn btn-danger btn-xs" onclick="deleteChild('${c.id}','${esc(c.name)}')">حذف</button>`:''}
             </td>
           </tr>`;
         }).join(''):`<tr><td colspan="9"><div class="empty-state"><div class="es-icon">👶</div><p>لا يوجد أطفال في هذا الفرع</p></div></td></tr>`}
@@ -3750,6 +3752,13 @@ function deleteUser(id){
   if(!confirm('هل أنت متأكد من حذف هذا المستخدم؟')) return;
   DB.deleteUser(id);
   App.go('users');
+}
+function deleteChild(id,name){
+  if(!confirm(`هل أنت متأكد من حذف الطفل "${name}"؟\nسيتم حذف جميع بيانات الطفل والاشتراكات والحضور المرتبطة به.`)) return;
+  DB.deleteChild(id);
+  DB.save('subscriptions',DB.subscriptions().filter(s=>s.childId!==id));
+  DB.save('attendance',DB.attendance().filter(a=>a.childId!==id));
+  App.render();
 }
 
 // Attendance
