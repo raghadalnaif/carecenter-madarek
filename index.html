@@ -7,16 +7,21 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-10-v21 -->
+<!-- BUILD: 2026-06-10-v22 -->
 <script>
 (function(){
-  var BUILD='v21-20260610';
+  var BUILD='v22-20260610-2';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
-  if(stored!==BUILD){
+  // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
+  var urlMatch=location.search.match(/[?&]r=([^&]+)/);
+  var urlBuild=urlMatch?decodeURIComponent(urlMatch[1]):null;
+  if(stored!==BUILD||urlBuild!==BUILD){
     localStorage.setItem(key,BUILD);
-    var url=location.pathname+'?r='+BUILD;
-    if(location.search.indexOf('r=')===-1){location.replace(url);}
+    if(urlBuild!==BUILD){
+      var url=location.pathname+'?r='+BUILD;
+      location.replace(url);
+    }
   }
 })();
 </script>
