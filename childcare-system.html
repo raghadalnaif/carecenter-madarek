@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-10-v23 -->
+<!-- BUILD: 2026-06-10-v24 -->
 <script>
 (function(){
-  var BUILD='v23-20260610-3';
+  var BUILD='v24-20260610-4';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -50,7 +50,10 @@ body{font-family:'Tajawal',sans-serif;background:#f1f5f9;color:#1e293b;direction
 .topbar-title{font-size:18px;font-weight:700;color:#0f766e}
 .topbar-user{display:flex;align-items:center;gap:10px;cursor:pointer}
 .avatar{width:36px;height:36px;background:#0f766e;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px}
-.content{padding:20px;flex:1;overflow-x:auto}
+.content{padding:20px;flex:1;overflow-x:auto;width:100%;max-width:none}
+.content > *{max-width:none!important}
+.info-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#e0e7ff;color:#3730a3;font-size:11px;font-weight:900;font-style:italic;cursor:pointer;margin-right:4px;border:1px solid #c7d2fe;font-family:'Tajawal',sans-serif;vertical-align:middle;transition:.15s;font-family:serif}
+.info-icon:hover{background:#3730a3;color:#fff;transform:scale(1.1)}
 .card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.08);padding:24px;margin-bottom:20px}
 .card-title{font-size:16px;font-weight:700;color:#1e293b;margin-bottom:16px;display:flex;align-items:center;gap:8px}
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px}
@@ -832,7 +835,7 @@ _superDash(){
     <div class="stat-card blue"><div class="stat-val">${children.length}</div><div class="stat-lbl">👶 إجمالي الأطفال</div></div>
     <div class="stat-card green"><div class="stat-val">${subs.filter(s=>s.isActive).length}</div><div class="stat-lbl">📋 اشتراكات فعالة</div></div>
     <div class="stat-card yellow"><div class="stat-val">${totalRevenue.toLocaleString()} ر.س</div><div class="stat-lbl">💰 إجمالي الإيرادات</div></div>
-    <div class="stat-card red"><div class="stat-val">${pendingRevenue.toLocaleString()} ر.س</div><div class="stat-lbl">⏳ مبالغ معلقة</div></div>
+    <div class="stat-card red"><div class="stat-val">${pendingRevenue.toLocaleString()} ر.س</div><div class="stat-lbl">⏳ مبالغ معلقة ${infoIcon('pending')}</div></div>
   </div>
   ${Views._alertBanners(al)}
   <div class="card">
@@ -1470,7 +1473,7 @@ reports(){
     <div class="stat-card blue"><div class="stat-val">${monthlyCount}</div><div class="stat-lbl">اشتراكات شهرية</div></div>
     <div class="stat-card yellow"><div class="stat-val">${weeklyCount}</div><div class="stat-lbl">اشتراكات أسبوعية</div></div>
     <div class="stat-card green"><div class="stat-val">${dailyCount}</div><div class="stat-lbl">اشتراكات يومية</div></div>
-    <div class="stat-card yellow"><div class="stat-val">${subs.filter(s=>s.paymentStatus==='deferred').length}</div><div class="stat-lbl">مبالغ مؤجلة</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${subs.filter(s=>s.paymentStatus==='deferred').length}</div><div class="stat-lbl">مبالغ مؤجلة ${infoIcon('deferred')}</div></div>
   </div>
   <div class="card">
     <div class="card-title">تفاصيل المدفوعات لكل طفل</div>
@@ -2015,7 +2018,7 @@ activities(){
     });
     const pubCats=Object.values(pubByKey);
     return `
-    <div style="padding:20px;max-width:1100px;margin:0 auto">
+    <div style="padding:20px">
       <div style="background:linear-gradient(135deg,#16a34a 0%,#059669 100%);color:#fff;border-radius:16px;padding:28px 32px;margin-bottom:24px;position:relative;overflow:hidden">
         <div style="position:absolute;top:-20px;left:-20px;font-size:120px;opacity:.07">📅</div>
         <h2 style="margin:0 0 8px;font-size:22px;font-weight:800">الأنشطة الأسبوعية المنشورة</h2>
@@ -2049,7 +2052,7 @@ activities(){
   const filtered=selCat==='all'?ACTS:ACTS.filter(c=>c.catKey===selCat);
   const total=ACTS.reduce((s,c)=>s+c.items.length,0);
   return `
-  <div style="padding:20px;max-width:1100px;margin:0 auto">
+  <div style="padding:20px">
     <div style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff;border-radius:16px;padding:28px 32px;margin-bottom:24px;position:relative;overflow:hidden">
       <div style="position:absolute;top:-20px;left:-20px;font-size:120px;opacity:.07">🎯</div>
       <h2 style="margin:0 0 8px;font-size:22px;font-weight:800">دليل الأنشطة المبتكرة</h2>
@@ -2150,17 +2153,17 @@ accounting(){
   return `
   <div class="stats-grid">
     <div class="stat-card green"><div class="stat-val">${totalRevenue.toLocaleString()}</div><div class="stat-lbl">💰 إجمالي المحصّل (ر.س)</div></div>
-    <div class="stat-card red"><div class="stat-val">${defaulterAmount.toLocaleString()}</div><div class="stat-lbl">🔴 متعثرون (${defaulterList.length}) — مستحق فوراً</div></div>
-    <div class="stat-card yellow"><div class="stat-val">${pendingAmount.toLocaleString()}</div><div class="stat-lbl">🟠 معلّقون (${pendingList.length}) — متابعة دورية</div></div>
+    <div class="stat-card red"><div class="stat-val">${defaulterAmount.toLocaleString()}</div><div class="stat-lbl">🔴 متعثرون ${infoIcon('defaulter')} (${defaulterList.length}) — مستحق فوراً</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${pendingAmount.toLocaleString()}</div><div class="stat-lbl">🟠 معلّقون ${infoIcon('pending')} (${pendingList.length}) — متابعة دورية</div></div>
     <div class="stat-card blue"><div class="stat-val">${totalInvoices}</div><div class="stat-lbl">🧾 إجمالي الفواتير</div></div>
   </div>
   <div class="card no-print" style="padding:14px;margin-bottom:16px">
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
       <span style="font-size:13px;font-weight:700;color:#475569;align-self:center;margin-left:6px">💰 الحالة:</span>
       <span class="chip ${filterPay==='all'?'active':''}"        onclick="accSet('accPay','all')">الكل (${subs.length})</span>
-      <span class="chip ${filterPay==='defaulter'?'active':''}"  onclick="accSet('accPay','defaulter')" style="${filterPay==='defaulter'?'background:#ef4444;color:#fff':'background:#fee2e2;color:#991b1b'}">🔴 متعثر (${defaulterList.length})</span>
-      <span class="chip ${filterPay==='pending'?'active':''}"    onclick="accSet('accPay','pending')" style="${filterPay==='pending'?'background:#f59e0b;color:#fff':'background:#fef3c7;color:#92400e'}">🟠 معلّق (${pendingList.length})</span>
-      <span class="chip ${filterPay==='deferred'?'active':''}"   onclick="accSet('accPay','deferred')">🟡 مؤجل (${deferredList.length})</span>
+      <span class="chip ${filterPay==='defaulter'?'active':''}"  onclick="accSet('accPay','defaulter')" style="${filterPay==='defaulter'?'background:#ef4444;color:#fff':'background:#fee2e2;color:#991b1b'}">🔴 متعثر (${defaulterList.length})</span>${infoIcon('defaulter')}
+      <span class="chip ${filterPay==='pending'?'active':''}"    onclick="accSet('accPay','pending')" style="${filterPay==='pending'?'background:#f59e0b;color:#fff':'background:#fef3c7;color:#92400e'}">🟠 معلّق (${pendingList.length})</span>${infoIcon('pending')}
+      <span class="chip ${filterPay==='deferred'?'active':''}"   onclick="accSet('accPay','deferred')">🟡 مؤجل (${deferredList.length})</span>${infoIcon('deferred')}
       <span class="chip ${filterPay==='paid'?'active':''}"       onclick="accSet('accPay','paid')">✅ مدفوع</span>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
@@ -2384,8 +2387,8 @@ tasks(){
 
   return `
   <div class="stats-grid">
-    <div class="stat-card red"><div class="stat-val">${defaulters.length}</div><div class="stat-lbl">🔴 متعثرون — تحصيل فوري</div></div>
-    <div class="stat-card yellow"><div class="stat-val">${pending.length}</div><div class="stat-lbl">🟠 معلّقون — متابعة سداد</div></div>
+    <div class="stat-card red"><div class="stat-val">${defaulters.length}</div><div class="stat-lbl">🔴 متعثرون ${infoIcon('defaulter')} — تحصيل فوري</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${pending.length}</div><div class="stat-lbl">🟠 معلّقون ${infoIcon('pending')} — متابعة سداد</div></div>
     <div class="stat-card orange" style="border-color:#f59e0b"><div class="stat-val">${expiringSoon.length}</div><div class="stat-lbl">⏰ تنتهي خلال 7 أيام</div></div>
     <div class="stat-card blue"><div class="stat-val">${expiringToday.length}</div><div class="stat-lbl">📅 تنتهي اليوم</div></div>
   </div>
@@ -2405,7 +2408,7 @@ tasks(){
   </div>`:''}
 
   <div class="card" style="border-right:6px solid #ef4444">
-    <div class="card-title" style="color:#991b1b">🔴 متعثرون بالسداد (${defaulters.length})</div>
+    <div class="card-title" style="color:#991b1b">🔴 متعثرون بالسداد ${infoIcon('defaulter')} (${defaulters.length})</div>
     <p style="font-size:13px;color:#64748b;margin:-8px 0 14px">اشتراكات منتهية + عليها متبقي. ضرورة التحصيل فوراً.</p>
     ${defaulters.length?`<div class="table-wrap"><table>
       <thead><tr><th>الطفل / ولي الأمر</th><th>الهاتف</th><th>انتهى في</th><th>المتبقي</th><th>إجراء</th></tr></thead>
@@ -2414,7 +2417,7 @@ tasks(){
   </div>
 
   <div class="card" style="border-right:6px solid #f59e0b">
-    <div class="card-title" style="color:#92400e">🟠 معلّقون (${pending.length})</div>
+    <div class="card-title" style="color:#92400e">🟠 معلّقون ${infoIcon('pending')} (${pending.length})</div>
     <p style="font-size:13px;color:#64748b;margin:-8px 0 14px">اشتراكات نشطة + عليها متبقي. متابعة دورية مطلوبة.</p>
     ${pending.length?`<div class="table-wrap"><table>
       <thead><tr><th>الطفل / ولي الأمر</th><th>الهاتف</th><th>ينتهي في</th><th>المتبقي</th><th>إجراء</th></tr></thead>
@@ -2470,9 +2473,9 @@ branchTasks(){
   </div>
 
   <div class="stats-grid">
-    <div class="stat-card red"><div class="stat-val">${defaulters.length}</div><div class="stat-lbl">🔴 متعثرون</div></div>
+    <div class="stat-card red"><div class="stat-val">${defaulters.length}</div><div class="stat-lbl">🔴 متعثرون ${infoIcon('defaulter')}</div></div>
     <div class="stat-card red"><div class="stat-val">${defAmount.toLocaleString()}</div><div class="stat-lbl">💸 مبلغ المتعثرين (ر.س)</div></div>
-    <div class="stat-card yellow"><div class="stat-val">${pending.length}</div><div class="stat-lbl">🟠 معلّقون</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${pending.length}</div><div class="stat-lbl">🟠 معلّقون ${infoIcon('pending')}</div></div>
     <div class="stat-card yellow"><div class="stat-val">${pendAmount.toLocaleString()}</div><div class="stat-lbl">💰 مبلغ المعلّقين (ر.س)</div></div>
   </div>
 
@@ -2491,7 +2494,7 @@ branchTasks(){
   </div>`:''}
 
   <div class="card" style="border-right:6px solid #ef4444">
-    <div class="card-title" style="color:#991b1b">🔴 متعثرون بالسداد (${defaulters.length}) — أولوية قصوى</div>
+    <div class="card-title" style="color:#991b1b">🔴 متعثرون بالسداد ${infoIcon('defaulter')} (${defaulters.length}) — أولوية قصوى</div>
     <p style="font-size:13px;color:#64748b;margin:-8px 0 14px">انتهى اشتراكهم وعليهم مبلغ متبقي. تحصيل فوري مطلوب.</p>
     ${defaulters.length?`<div class="table-wrap"><table>
       <thead><tr><th>الطفل / ولي الأمر</th><th>الهاتف</th><th>انتهى في</th><th>المتبقي</th><th>إجراء</th></tr></thead>
@@ -2500,7 +2503,7 @@ branchTasks(){
   </div>
 
   <div class="card" style="border-right:6px solid #f59e0b">
-    <div class="card-title" style="color:#92400e">🟠 معلّقون (${pending.length}) — متابعة دورية</div>
+    <div class="card-title" style="color:#92400e">🟠 معلّقون ${infoIcon('pending')} (${pending.length}) — متابعة دورية</div>
     <p style="font-size:13px;color:#64748b;margin:-8px 0 14px">اشتراكهم نشط لكن عليهم مبلغ متبقي. ذكّريهم قبل ما يصبحوا متعثرين.</p>
     ${pending.length?`<div class="table-wrap"><table>
       <thead><tr><th>الطفل / ولي الأمر</th><th>الهاتف</th><th>ينتهي في</th><th>المتبقي</th><th>إجراء</th></tr></thead>
@@ -3048,7 +3051,7 @@ settings(){
       </div>`;
     }).join('');
     content=`
-    <div style="max-width:680px">
+    <div>
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#166534">✅ يمكن تحديد أسعار مختلفة لكل فرع — الأسعار تُطبَّق تلقائياً عند إنشاء كل اشتراك جديد</div>
       ${branchCards}
       <button class="btn btn-primary" onclick="saveSettingsPrices()">💾 حفظ أسعار جميع الفروع</button>
@@ -3143,7 +3146,7 @@ settings(){
     const mem={};
     ['children','subscriptions','users','branches','schools','attendance','notifications'].forEach(k=>{const v=_mem[k];mem[k]=Array.isArray(v)?v.length:'—';});
     content=`
-    <div style="max-width:680px">
+    <div>
       <div class="card" style="margin-bottom:16px">
         <div class="card-title">🗄️ حالة قاعدة البيانات</div>
         <div class="alert-box ${_fbStatus==='ok'?'alert-green':'alert-red'}" style="margin-bottom:16px">
@@ -3184,7 +3187,7 @@ settings(){
         <div id="${previewId}" style="background:${color};border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.7;color:#1e293b;white-space:pre-wrap;min-height:40px;border:1px solid rgba(0,0,0,.06)"></div>
       </div>`;
     content=`
-    <div style="max-width:680px">
+    <div>
       <div class="card" style="margin-bottom:16px">
         <div class="card-title">⏰ توقيت التنبيهات</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -3237,7 +3240,7 @@ settings(){
     </div>`;
   }
   return `
-  <div style="padding:20px;max-width:1100px;margin:0 auto">
+  <div style="padding:20px">
     <div style="background:linear-gradient(135deg,#0f766e 0%,#0d9488 100%);color:#fff;border-radius:16px;padding:24px 28px;margin-bottom:24px;position:relative;overflow:hidden">
       <div style="position:absolute;top:-20px;left:-20px;font-size:100px;opacity:.07">⚙️</div>
       <h2 style="margin:0 0 6px;font-size:20px;font-weight:800">⚙️ لوحة تحكم المدير العام</h2>
@@ -5499,6 +5502,69 @@ function markAllNotifsRead(){
   DB.markNotifsRead();
   App.render();
 }
+// ============== INFO POPUPS (تعريفات مصطلحات) ==============
+const INFO_DEFS={
+  defaulter:{
+    icon:'🔴',
+    title:'المتعثرون',
+    color:'#dc2626',
+    bg:'#fef2f2',
+    desc:'هم أولياء الأمور الذين <strong>انتهى اشتراك أطفالهم</strong> ولا يزال عليهم <strong>مبلغ متبقي لم يُسدَّد</strong>.',
+    rules:['اشتراك الطفل انتهى تاريخياً (endDate &lt; اليوم)','المبلغ المدفوع أقل من إجمالي الاشتراك','يحتاجون تواصلاً <strong>فورياً</strong> للتحصيل'],
+    color2:'هذه أولوية قصوى — كل يوم يمر بدون تحصيل يزيد صعوبة استرداد المبلغ.',
+  },
+  pending:{
+    icon:'🟠',
+    title:'المعلّقون',
+    color:'#d97706',
+    bg:'#fef3c7',
+    desc:'هم أولياء الأمور الذين <strong>اشتراك أطفالهم ما زال نشطاً</strong> ولكنهم <strong>دفعوا جزءاً من المبلغ فقط</strong> وعليهم متبقي.',
+    rules:['الاشتراك نشط (endDate &gt;= اليوم)','المبلغ المدفوع أقل من إجمالي الاشتراك','يحتاجون <strong>متابعة دورية</strong> قبل أن ينتهي اشتراكهم ويصبحوا متعثرين'],
+    color2:'هذه فرصة ذهبية — التذكير المبكر يمنع تحولهم إلى متعثرين.',
+  },
+  deferred:{
+    icon:'🟡',
+    title:'المؤجلون',
+    color:'#ca8a04',
+    bg:'#fef9c3',
+    desc:'هم أولياء الأمور الذين <strong>اتفقوا مسبقاً</strong> مع الإدارة على <strong>تأجيل سداد المبلغ كاملاً أو جزئياً</strong> لمدة محددة.',
+    rules:['الحالة سُجِّلت يدوياً كـ "مؤجل" عند إنشاء الاشتراك','المركز موافق على التأجيل بناءً على اتفاق','الاشتراك قد يكون نشطاً أو منتهياً'],
+    color2:'هؤلاء بحاجة لتذكير قرب موعد الاستحقاق المتفق عليه.',
+  },
+};
+function showInfo(key){
+  const d=INFO_DEFS[key];
+  if(!d){return;}
+  App.showModal(`
+  <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header" style="background:${d.bg};border-bottom:1px solid ${d.color}33">
+      <h2 style="color:${d.color};display:flex;align-items:center;gap:8px;margin:0">
+        <span style="font-size:22px">${d.icon}</span> ${d.title}
+      </h2>
+      <button class="close-btn" onclick="App.closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:14px;line-height:1.8;color:#374151;margin-bottom:14px">${d.desc}</div>
+      <div style="background:#f8fafc;border-radius:10px;padding:14px;border:1px solid #e2e8f0">
+        <div style="font-size:13px;font-weight:700;color:${d.color};margin-bottom:8px">📋 شروط التصنيف:</div>
+        <ul style="margin:0;padding-right:18px;line-height:1.8;font-size:13px;color:#475569">
+          ${d.rules.map(r=>`<li>${r}</li>`).join('')}
+        </ul>
+      </div>
+      <div style="background:${d.bg};border:1px solid ${d.color}33;border-radius:10px;padding:12px 14px;margin-top:12px;font-size:13px;color:${d.color};line-height:1.6">
+        💡 <strong>ملاحظة:</strong> ${d.color2}
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:flex-end">
+      <button class="btn btn-primary" onclick="App.closeModal()">فهمت ✓</button>
+    </div>
+  </div></div>`);
+}
+function infoIcon(key){
+  return `<span class="info-icon" onclick="event.stopPropagation();showInfo('${key}')" title="ما المقصود؟">i</span>`;
+}
+
 function setNotifFilter(key,val){
   App.notifFilter={...(App.notifFilter||{branch:'all',period:'all'}),[key]:val};
   App.render();
