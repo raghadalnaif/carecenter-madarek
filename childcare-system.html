@@ -10,7 +10,7 @@
 <!-- BUILD: 2026-06-10-v10 -->
 <script>
 (function(){
-  var BUILD='v12-20260610';
+  var BUILD='v13-20260610';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   if(stored!==BUILD){
@@ -264,6 +264,8 @@ let _fdb=null;
 let _lastWrite=0;
 let _fbStatus='connecting'; // 'connecting' | 'ok' | 'error'
 const _mem={};
+const _keyWriteTime={}; // حماية مفاتيح بعينها من الكتابة الفورية لـ 30 ثانية
+let _listenDebounce=null; // لمنع تكرار التحديث السريع
 
 // =========================================================
 //  DB
@@ -278,12 +280,13 @@ const DB = {
     try{localStorage.setItem('ccs_'+k,JSON.stringify(v))}catch{}
     if(_fdb&&_fbStatus==='ok'){
       _lastWrite=Date.now();
-      // إعادة المحاولة مرة واحدة عند الفشل لضمان وصول البيانات لـFirebase
-      _fdb.ref('ccs/'+k).set(v).catch(()=>{
-        setTimeout(()=>{
-          if(_fdb&&_fbStatus==='ok') _fdb.ref('ccs/'+k).set(_mem[k]).catch(e=>console.error('[DB] Retry failed for key='+k+':',e.message));
-        },2000);
-      });
+      _keyWriteTime[k]=Date.now(); // حماية هذا المفتاح تحديداً لـ30 ثانية
+      const attempt=(n)=>{
+        _fdb.ref('ccs/'+k).set(_mem[k]).catch(()=>{
+          if(n<3) setTimeout(()=>attempt(n+1),2000*n);
+        });
+      };
+      attempt(1);
     }
   },
   async initFirebase(){
@@ -308,34 +311,35 @@ const DB = {
         });
         if(Object.keys(toMigrate).length) await _fdb.ref('ccs').set(toMigrate);
       }
-      // مستمع التحديثات الفورية
+      // مستمع التحديثات الفورية — مع debounce ومنع الكتابة فوق التعديلات المحلية
       _fdb.ref('ccs').on('value',snap=>{
-        // تجاهل إذا كانت الكتابة حديثة (أقل من 5 ثوانٍ) لمنع التعارض
-        if(Date.now()-_lastWrite<5000) return;
-        const d=snap.val();
-        if(!d) return;
-        let changed=false;
-        Object.keys(d).forEach(k=>{
-          if(JSON.stringify(_mem[k])!==JSON.stringify(d[k])){_mem[k]=d[k];changed=true;}
-        });
-        if(changed&&Auth.user){
-          // تحديث Auth.user إن تغيّرت بياناته (الدور أو الفرع أو كلمة المرور)
-          if(Auth.user.id){
-            const fresh=DB.users().find(u=>u.id===Auth.user.id);
-            if(fresh){Auth.user=fresh;sessionStorage.setItem('ccs_user',JSON.stringify(fresh));}
+        // تجاهل مباشر إن كانت هناك كتابة حديثة (أقل من 3 ثوانٍ)
+        if(Date.now()-_lastWrite<3000) return;
+        clearTimeout(_listenDebounce);
+        _listenDebounce=setTimeout(()=>{
+          const d=snap.val();
+          if(!d) return;
+          let changed=false;
+          Object.keys(d).forEach(k=>{
+            // تخطّ أي مفتاح كُتب محلياً في آخر 30 ثانية لمنع ضياع التعديلات
+            if(Date.now()-(_keyWriteTime[k]||0)<30000) return;
+            if(JSON.stringify(_mem[k])!==JSON.stringify(d[k])){_mem[k]=d[k];changed=true;}
+          });
+          if(changed&&Auth.user){
+            if(Auth.user.id){
+              const fresh=DB.users().find(u=>u.id===Auth.user.id);
+              if(fresh){Auth.user=fresh;sessionStorage.setItem('ccs_user',JSON.stringify(fresh));}
+            }
+            if(!App.modal&&App.view!=='settings'){
+              const el=document.getElementById('content');
+              if(!el) return;
+              const saved={};
+              el.querySelectorAll('input[id],select[id]').forEach(inp=>{saved[inp.id]=inp.value;});
+              el.innerHTML=App.currentView();
+              Object.entries(saved).forEach(([id,val])=>{const f=document.getElementById(id);if(f&&val!==undefined)f.value=val;});
+            }
           }
-          // لا تُعِد الرسم إذا كان المستخدم يعدّل بيانات في صفحة الإعدادات
-          if(!App.modal&&App.view!=='settings'){
-            const el=document.getElementById('content');
-            if(!el) return;
-            // حفظ قيم حقول البحث/الفلترة قبل إعادة الرسم وإعادتها بعده
-            const saved={};
-            el.querySelectorAll('input[id],select[id]').forEach(inp=>{saved[inp.id]=inp.value;});
-            el.innerHTML=App.currentView();
-            // استعادة القيم التي عدّلها المستخدم (وليس فقط الفارغة)
-            Object.entries(saved).forEach(([id,val])=>{const f=document.getElementById(id);if(f&&val!==undefined)f.value=val;});
-          }
-        }
+        },800);
       });
     }catch(e){
       _fdb=null; // أهم سطر: امنع DB.init() من الكتابة على Firebase بعد فشل القراءة
