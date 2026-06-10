@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-10-v22 -->
+<!-- BUILD: 2026-06-10-v23 -->
 <script>
 (function(){
-  var BUILD='v22-20260610-2';
+  var BUILD='v23-20260610-3';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -517,6 +517,7 @@ const App = {
   view:'dashboard',
   modal:null,
   params:{},
+  notifFilter:{branch:'all',period:'all'},
   go(view,params={}){this.view=view;this.params=params;this.render()},
   refresh(){
     // إعادة رسم سريع — لا يلمس الشريط الجانبي ولا الـtopbar، فقط محتوى الصفحة
@@ -603,8 +604,29 @@ const App = {
     const now=new Date();
     const hm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
     const unread=DB.unreadCount();
-    const notifs=DB.notifications();
+    const allNotifs=DB.notifications();
+    const isSA=Auth.isSuperAdmin();
+    // فلتر للمدير العام: حسب الفرع والفترة
+    const nFilter=App.notifFilter||{branch:'all',period:'all'};
+    let notifs=allNotifs;
+    if(isSA){
+      if(nFilter.branch!=='all') notifs=notifs.filter(n=>n.branchId===nFilter.branch);
+      if(nFilter.period!=='all') notifs=notifs.filter(n=>n.period===nFilter.period);
+    } else if(Auth.isSchoolAdmin()){
+      // مديرة الفرع ترى تنبيهات فرعها فقط
+      const bid=Auth.branchId();
+      if(bid) notifs=notifs.filter(n=>!n.branchId||n.branchId===bid);
+    }
     const typeIcon={new_child:'👶',new_sub:'📋',first_att:'🌟'};
+    const branches=DB.branches();
+    // لون لكل فرع (للتمييز البصري)
+    const branchColor=(bid)=>{
+      if(!bid) return {bg:'#f1f5f9',fg:'#475569'};
+      const idx=branches.findIndex(b=>b.id===bid);
+      const colors=[{bg:'#dbeafe',fg:'#1e40af'},{bg:'#dcfce7',fg:'#166534'},{bg:'#fef3c7',fg:'#92400e'},{bg:'#fce7f3',fg:'#9f1239'}];
+      return colors[idx>=0?idx%colors.length:0];
+    };
+    const periodLbl={morning:'🌅 صباحي',evening:'🌙 مسائي'};
     return `
     <div class="topbar">
       <div style="display:flex;align-items:center;gap:10px">
@@ -621,20 +643,44 @@ const App = {
             🔔${unread>0?`<span class="notif-badge">${unread>9?'9+':unread}</span>`:''}
           </button>
           <div class="notif-panel" id="notif-panel" style="display:none">
-            <div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1">
+            <div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1;flex-wrap:wrap;gap:6px">
               <strong style="font-size:14px">🔔 الإشعارات ${unread>0?`<span class="badge badge-red" style="font-size:11px">${unread} جديد</span>`:''}</strong>
               ${unread>0?`<button class="btn btn-secondary btn-xs" onclick="markAllNotifsRead()">قراءة الكل ✓</button>`:''}
             </div>
-            ${notifs.length===0?`<div style="padding:32px;text-align:center;color:#94a3b8;font-size:14px">لا توجد إشعارات بعد</div>`:
-            notifs.slice(0,30).map(n=>`
-              <div class="notif-item ${n.isRead?'':'unread'}">
+            ${isSA?`<div style="padding:10px 14px;border-bottom:1px solid #e2e8f0;background:#f8fafc">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+                <span style="font-size:11px;font-weight:700;color:#64748b">🏢 الفرع:</span>
+                <span class="chip ${nFilter.branch==='all'?'active':''}" style="font-size:11px;padding:3px 9px" onclick="setNotifFilter('branch','all')">الكل</span>
+                ${branches.map(b=>`<span class="chip ${nFilter.branch===b.id?'active':''}" style="font-size:11px;padding:3px 9px" onclick="setNotifFilter('branch','${b.id}')">${esc(b.name.split(' - ')[0]||b.name)}</span>`).join('')}
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <span style="font-size:11px;font-weight:700;color:#64748b">⏰ الفترة:</span>
+                <span class="chip ${nFilter.period==='all'?'active':''}" style="font-size:11px;padding:3px 9px" onclick="setNotifFilter('period','all')">الكل</span>
+                <span class="chip ${nFilter.period==='morning'?'active':''}" style="font-size:11px;padding:3px 9px" onclick="setNotifFilter('period','morning')">🌅 صباحي</span>
+                <span class="chip ${nFilter.period==='evening'?'active':''}" style="font-size:11px;padding:3px 9px" onclick="setNotifFilter('period','evening')">🌙 مسائي</span>
+              </div>
+              <div style="font-size:11px;color:#64748b;margin-top:6px">عرض ${notifs.length} من ${allNotifs.length} تنبيه</div>
+            </div>`:''}
+            ${notifs.length===0?`<div style="padding:32px;text-align:center;color:#94a3b8;font-size:14px">لا توجد إشعارات${isSA&&(nFilter.branch!=='all'||nFilter.period!=='all')?' بهذه الفلاتر':' بعد'}</div>`:
+            notifs.slice(0,30).map(n=>{
+              const c=branchColor(n.branchId);
+              const bName=n.branchId?DB.branchName(n.branchId):'';
+              const sideBar=n.branchId?`border-right:4px solid ${c.fg};`:'';
+              return `
+              <div class="notif-item ${n.isRead?'':'unread'}" style="${sideBar}">
                 <span style="font-size:20px;flex-shrink:0">${typeIcon[n.type]||'🔔'}</span>
                 <div style="flex:1;min-width:0">
                   <div style="font-size:13px;font-weight:600;color:#1e293b">${esc(n.title)}</div>
                   <div style="font-size:12px;color:#64748b;margin-top:2px">${esc(n.body)}</div>
-                  <div style="font-size:11px;color:#94a3b8;margin-top:3px">${formatRelTime(n.createdAt)}</div>
+                  <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px">
+                    ${bName?`<span style="background:${c.bg};color:${c.fg};font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px">🏢 ${esc(bName)}</span>`:''}
+                    ${n.period?`<span style="background:${n.period==='morning'?'#fef3c7':'#e0e7ff'};color:${n.period==='morning'?'#92400e':'#3730a3'};font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px">${periodLbl[n.period]||n.period}</span>`:''}
+                    ${n.addedBy?`<span style="background:#f1f5f9;color:#475569;font-size:10px;font-weight:600;padding:2px 7px;border-radius:5px">👤 ${esc(n.addedBy)}</span>`:''}
+                  </div>
+                  <div style="font-size:11px;color:#94a3b8;margin-top:4px">${formatRelTime(n.createdAt)}</div>
                 </div>
-              </div>`).join('')}
+              </div>`;
+            }).join('')}
           </div>
         </div>`:''}
         <div class="topbar-user">
@@ -4359,7 +4405,7 @@ function saveChild(edit=false){
   };
   if(edit) DB.updateChild(c); else {
     DB.addChild(c);
-    if(Auth.user) DB.addNotification({type:'new_child',title:'👶 طفل جديد',body:`تم تسجيل ${name} في ${DB.branchName(c.branchId)}`,addedBy:Auth.user.name});
+    if(Auth.user) DB.addNotification({type:'new_child',title:'👶 طفل جديد',body:`تم تسجيل ${name}`,branchId:c.branchId,period:c.period,addedBy:Auth.user.name,addedById:Auth.user.id});
   }
 
   // حفظ الاشتراك مع الطفل (للتسجيل الجديد فقط)
@@ -4382,7 +4428,7 @@ function saveChild(edit=false){
       DB.addSub({id:uid(),childId,schoolId,branchId:c.branchId,period,type:subType,customDays:subCustomDays,startDate:subStart,endDate:subEnd,basePrice,discountPct:parseFloat(document.getElementById('c-disc')?.value||0),price:subPrice,paidAmount:subPaid,paymentStatus:subPay,paymentMethod:subPM,receiptImage:subReceipt,isActive:true,createdAt:T0,invoiceNo});
       const tl={'daily':'يومي','weekly':'أسبوعي','monthly':'٣٠ يوم','custom':'مخصص'};
       const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
-      if(Auth.user) DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[subType]||subType} لـ ${name} — ${subPrice} ر.س | الدفع: ${pmLbl[subPM]||subPM} | ${subPay==='paid'?'مدفوع بالكامل':subPay==='partial'?'مدفوع جزئياً':'مؤجل'}`,addedBy:Auth.user.name});
+      if(Auth.user) DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[subType]||subType} لـ ${name} — ${subPrice} ر.س | الدفع: ${pmLbl[subPM]||subPM} | ${subPay==='paid'?'مدفوع بالكامل':subPay==='partial'?'مدفوع جزئياً':'مؤجل'}`,branchId:c.branchId,period:period,addedBy:Auth.user.name,addedById:Auth.user.id});
     }
   }
   toast(edit?'✅ تم حفظ التعديلات':'✅ تم تسجيل الطفل');
@@ -4415,7 +4461,7 @@ function saveSub(){
   DB.addSub(s);
   const tl={'daily':'يومي','weekly':'أسبوعي','monthly':'٣٠ يوم','custom':'مخصص'};
   const pmLbl2={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
-  if(Auth.user) DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[type]||type} لـ ${child?.name||''} — ${price} ر.س | الدفع: ${pmLbl2[paymentMethod]||paymentMethod} | ${paymentStatus==='paid'?'مدفوع بالكامل':paymentStatus==='partial'?'مدفوع جزئياً':'مؤجل'}`,addedBy:Auth.user.name});
+  if(Auth.user) DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[type]||type} لـ ${child?.name||''} — ${price} ر.س | الدفع: ${pmLbl2[paymentMethod]||paymentMethod} | ${paymentStatus==='paid'?'مدفوع بالكامل':paymentStatus==='partial'?'مدفوع جزئياً':'مؤجل'}`,branchId:child?.branchId||'',period:period,addedBy:Auth.user.name,addedById:Auth.user.id});
   toast('✅ تم حفظ الاشتراك');
   App.closeModal();
   App.refresh();
@@ -5253,7 +5299,7 @@ function saveAttendance(date,schoolId){
     else att.push({id:uid(),...entry});
     if(!hadPrev&&entry.status==='present'&&Auth.user){
       const child=DB.children().find(c=>c.id===entry.childId);
-      if(child) DB.addNotification({type:'first_att',title:'🌟 أول حضور',body:`${child.name} حضر لأول مرة — ${DB.branchName(child.branchId)}`,addedBy:Auth.user.name});
+      if(child) DB.addNotification({type:'first_att',title:'🌟 أول حضور',body:`${child.name} حضر لأول مرة`,branchId:child.branchId,period:child.period,addedBy:Auth.user.name,addedById:Auth.user.id});
     }
   });
   DB.saveAttendance(att);
@@ -5452,6 +5498,21 @@ function toggleNotifPanel(){
 function markAllNotifsRead(){
   DB.markNotifsRead();
   App.render();
+}
+function setNotifFilter(key,val){
+  App.notifFilter={...(App.notifFilter||{branch:'all',period:'all'}),[key]:val};
+  App.render();
+  // أبقِ اللوحة مفتوحة بعد إعادة الرسم وأعد ربط مستمع الإغلاق
+  setTimeout(()=>{
+    const p=document.getElementById('notif-panel');
+    if(!p) return;
+    p.style.display='block';
+    document.addEventListener('click',function h(e){
+      if(!p.contains(e.target)&&e.target.id!=='notif-btn'&&!e.target.closest('#notif-btn')){
+        p.style.display='none';document.removeEventListener('click',h);
+      }
+    });
+  },50);
 }
 
 // =========================================================
