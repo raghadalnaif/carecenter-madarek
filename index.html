@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-10-v25 -->
+<!-- BUILD: 2026-06-10-v26 -->
 <script>
 (function(){
-  var BUILD='v25-20260610-1';
+  var BUILD='v26-20260610-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -1178,6 +1178,7 @@ children(){
             <td style="white-space:nowrap">
               <button class="btn btn-secondary btn-xs" onclick="Modals.editChild('${c.id}')">تعديل</button>
               <button class="btn btn-primary btn-xs" onclick="Modals.addSub('${c.id}')">اشتراك</button>
+              ${Auth.isSuperAdmin()?`<button class="btn btn-xs" style="background:#fffbeb;color:#92400e;border:1px solid #fde68a" onclick="Modals.transferChild('${c.id}')" title="نقل بين الفروع">🔄 نقل</button>`:''}
               ${Auth.isSuperAdmin()?`<button class="btn btn-xs" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe" onclick="App.go('statement',{childId:'${c.id}'})" title="كشف حساب">📄</button>`:''}
               ${Auth.isSuperAdmin()?`<button class="btn btn-danger btn-xs" onclick="deleteChild('${c.id}','${esc(c.name)}')">حذف</button>`:''}
             </td>
@@ -3774,6 +3775,71 @@ const Modals = {
     </div></div>`);
   },
 
+  transferChild(id){
+    const c=DB.children().find(x=>x.id===id);
+    if(!c) return;
+    const branches=DB.branches().filter(b=>b.id!==c.branchId);
+    if(!branches.length){toast('لا توجد فروع أخرى للنقل','error');return;}
+    const subs=DB.subscriptions().filter(s=>s.childId===id&&s.isActive&&s.endDate>=T0);
+    const activeSubsCount=subs.length;
+    const totalPaid=subs.reduce((a,s)=>a+(+s.paidAmount||0),0);
+    const totalDue=subs.reduce((a,s)=>a+(+s.price||0),0);
+    const fromBranch=DB.branches().find(b=>b.id===c.branchId);
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal" style="max-width:560px">
+      <div class="modal-header"><h2>🔄 نقل الطفل بين الفروع</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px;margin-bottom:16px">
+          <div style="font-size:13px;font-weight:700;color:#1e40af;margin-bottom:6px">👶 ${esc(c.name)}</div>
+          <div style="font-size:12px;color:#475569">الفرع الحالي: <strong>${esc(fromBranch?.name||'—')}</strong> · الفترة: ${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'}</div>
+        </div>
+
+        <input type="hidden" id="tc-id" value="${c.id}">
+        <div class="input-group">
+          <label>🏢 نقل إلى الفرع *</label>
+          <select class="input" id="tc-branch">
+            ${branches.map(b=>`<option value="${b.id}">${esc(b.name)}${b.location?' — '+b.location:''}</option>`).join('')}
+          </select>
+        </div>
+
+        ${activeSubsCount>0?`
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px;margin:14px 0">
+          <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:8px">📋 اشتراكات نشطة (${activeSubsCount})</div>
+          <div style="font-size:12px;color:#92400e;margin-bottom:10px">إجمالي الرسوم: <strong>${totalDue.toLocaleString()} ر.س</strong> · المدفوع: <strong>${totalPaid.toLocaleString()} ر.س</strong></div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+            <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;background:#fff;border:1px solid #fde68a;border-radius:8px;padding:10px">
+              <input type="radio" name="tc-mode" value="with-fees" checked style="margin-top:3px">
+              <div>
+                <div style="font-size:13px;font-weight:700;color:#1e293b">✅ نقل مع الرسوم</div>
+                <div style="font-size:11px;color:#64748b;margin-top:2px">يبقى الاشتراك الحالي ساري المفعول وينتقل للفرع الجديد بنفس المبلغ المدفوع</div>
+              </div>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;background:#fff;border:1px solid #fde68a;border-radius:8px;padding:10px">
+              <input type="radio" name="tc-mode" value="no-fees" style="margin-top:3px">
+              <div>
+                <div style="font-size:13px;font-weight:700;color:#1e293b">🆕 نقل بدون رسوم</div>
+                <div style="font-size:11px;color:#64748b;margin-top:2px">يُلغى الاشتراك الحالي تماماً — الفرع الجديد يبدأ من الصفر باشتراك ودفعة جديدة</div>
+              </div>
+            </label>
+          </div>
+        </div>`:`
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;margin:14px 0;font-size:12px;color:#166534">
+          ℹ️ لا توجد اشتراكات نشطة — سيتم نقل الطفل فقط
+        </div>`}
+
+        <div class="input-group">
+          <label>📝 سبب النقل (اختياري)</label>
+          <input class="input" id="tc-reason" placeholder="مثال: تغيير سكن العائلة">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="transferChild()">🔄 تأكيد النقل</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+
   addSub(childId){
     const c=DB.children().find(x=>x.id===childId);
     if(!c) return;
@@ -5486,6 +5552,76 @@ function deleteChild(id,name){
   DB.deleteChild(id);
   DB.addAuditLog({action:'حذف طفل',entity:'طفل',entityId:id,details:`تم حذف الطفل "${name}" وجميع بياناته (اشتراكات + حضور)`,by:Auth.user?.name||'—'});
   toast(`✅ تم حذف "${name}" وكل بياناته`);
+  App.refresh();
+}
+
+// نقل طفل بين الفروع
+function transferChild(){
+  const id=document.getElementById('tc-id')?.value;
+  const toBranch=document.getElementById('tc-branch')?.value;
+  const modeEl=document.querySelector('input[name="tc-mode"]:checked');
+  const mode=modeEl?modeEl.value:'with-fees';
+  const reason=document.getElementById('tc-reason')?.value?.trim()||'';
+  if(!id||!toBranch){toast('اختر الفرع المستهدف','error');return;}
+  const children=DB.children();
+  const c=children.find(x=>x.id===id);
+  if(!c){toast('الطفل غير موجود','error');return;}
+  if(c.branchId===toBranch){toast('الطفل موجود في هذا الفرع أصلاً','error');return;}
+  const fromBranch=DB.branches().find(b=>b.id===c.branchId);
+  const toBranchObj=DB.branches().find(b=>b.id===toBranch);
+  const subs=DB.subscriptions();
+  const activeSubs=subs.filter(s=>s.childId===id&&s.isActive&&s.endDate>=T0);
+  const paidSum=activeSubs.reduce((a,s)=>a+(+s.paidAmount||0),0);
+  // confirm
+  const confirmMsg=`نقل "${c.name}" من ${fromBranch?.name||'—'} إلى ${toBranchObj?.name||'—'}\n\n`
+    +(activeSubs.length?(mode==='with-fees'?`✅ مع نقل الرسوم — يبقى الاشتراك ساري المفعول (${paidSum.toLocaleString()} ر.س مدفوع)`:`🆕 بدون رسوم — سيتم إلغاء الاشتراك الحالي والمبلغ المدفوع يصبح للفرع القديم`):'');
+  if(!confirm(confirmMsg+'\n\nهل تريد المتابعة؟')) return;
+
+  // 1) Update child
+  const idx=children.findIndex(x=>x.id===id);
+  children[idx]={...c,branchId:toBranch};
+  // إذا الفرع الجديد فيه معلمات، نُعيد تعيين المعلمة (لأنها مربوطة بالفرع القديم)
+  const newBranchTeachers=DB.users().filter(u=>u.role==='teacher'&&u.branchId===toBranch);
+  if(c.teacherId&&!newBranchTeachers.find(t=>t.id===c.teacherId)){
+    children[idx].teacherId='';
+  }
+  DB.save('children',children);
+
+  // 2) Update subscriptions according to mode
+  let movedSubs=0,cancelledSubs=0;
+  if(activeSubs.length){
+    if(mode==='with-fees'){
+      const updated=subs.map(s=>{
+        if(s.childId===id&&s.isActive&&s.endDate>=T0){
+          movedSubs++;
+          return {...s,branchId:toBranch};
+        }
+        return s;
+      });
+      DB.save('subscriptions',updated);
+    } else {
+      const updated=subs.map(s=>{
+        if(s.childId===id&&s.isActive&&s.endDate>=T0){
+          cancelledSubs++;
+          return {...s,isActive:false,cancelledAt:new Date().toISOString(),cancelReason:'نقل بدون رسوم — اشتراك مُلغى'};
+        }
+        return s;
+      });
+      DB.save('subscriptions',updated);
+    }
+  }
+
+  // 3) Audit log
+  const details=`نقل الطفل "${c.name}" من ${fromBranch?.name||'—'} إلى ${toBranchObj?.name||'—'} | الوضع: ${mode==='with-fees'?'مع نقل الرسوم':'بدون رسوم'}${activeSubs.length?` | اشتراكات: ${mode==='with-fees'?'نُقل '+movedSubs:'أُلغي '+cancelledSubs}`:''}${reason?` | السبب: ${reason}`:''}`;
+  DB.addAuditLog({action:'نقل طفل',entity:'طفل',entityId:id,details,by:Auth.user?.name||'—'});
+
+  // 4) Notification for new branch
+  if(Auth.user){
+    DB.addNotification({type:'new_child',title:'🔄 طفل مُنقول إليكم',body:`${c.name} نُقل من ${fromBranch?.name||'—'} — ${mode==='with-fees'?'مع نقل الرسوم':'بدون رسوم (يبدأ من جديد)'}`,branchId:toBranch,period:c.period,addedBy:Auth.user.name,addedById:Auth.user.id});
+  }
+
+  App.closeModal();
+  toast(`✅ تم نقل "${c.name}" إلى ${toBranchObj?.name||''}`);
   App.refresh();
 }
 
