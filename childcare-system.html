@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-10-v26 -->
+<!-- BUILD: 2026-06-17-v27 -->
 <script>
 (function(){
-  var BUILD='v26-20260610-1';
+  var BUILD='v27-20260617-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -2300,6 +2300,7 @@ accounting(){
 // ---------- EXPENSES ----------
 expenses(){
   if(!Auth.isSuperAdmin()&&!Auth.isSchoolAdmin()) return Views._forbidden();
+  const isSA=Auth.isSuperAdmin();
   const bid=Auth.branchId();
   const exps=DB.expenses();
   const branches=DB.branches();
@@ -2328,9 +2329,9 @@ expenses(){
 
   return `
   <div class="stats-grid">
-    <div class="stat-card green"><div class="stat-val">${totalIncome.toLocaleString()}</div><div class="stat-lbl">📈 إيرادات الشهر (ر.س)</div></div>
+    ${isSA?`<div class="stat-card green"><div class="stat-val">${totalIncome.toLocaleString()}</div><div class="stat-lbl">📈 إيرادات الشهر (ر.س)</div></div>`:''}
     <div class="stat-card red"><div class="stat-val">${monthTotal.toLocaleString()}</div><div class="stat-lbl">📉 مصروفات الشهر (ر.س)</div></div>
-    <div class="stat-card ${netProfit>=0?'blue':'red'}"><div class="stat-val">${netProfit.toLocaleString()}</div><div class="stat-lbl">${netProfit>=0?'💎 صافي الربح':'⚠️ خسارة'} (ر.س)</div></div>
+    ${isSA?`<div class="stat-card ${netProfit>=0?'blue':'red'}"><div class="stat-val">${netProfit.toLocaleString()}</div><div class="stat-lbl">${netProfit>=0?'💎 صافي الربح':'⚠️ خسارة'} (ر.س)</div></div>`:''}
     <div class="stat-card yellow"><div class="stat-val">${topCat?catLbl[topCat[0]]?.split(' ')[1]||'—':'—'}</div><div class="stat-lbl">${topCat?'أعلى بند ('+topCat[1].toLocaleString()+' ر.س)':'لا يوجد'}</div></div>
   </div>
   <div class="card no-print" style="padding:14px;margin-bottom:16px">
@@ -2928,6 +2929,7 @@ auditLog(){
 // ---------- BRANCH MONTHLY REPORT ----------
 branchReport(){
   if(!Auth.isSuperAdmin()&&!Auth.isSchoolAdmin()) return Views._forbidden();
+  const isSA=Auth.isSuperAdmin();
   const bid=Auth.branchId();
   const fMonth=App.params.brMonth||T0.slice(0,7);
   const fBranch=bid||(App.params.brBranch||'all');
@@ -2974,14 +2976,14 @@ branchReport(){
         </select>
       </div>`:`<div class="input-group" style="margin:0"><label style="font-size:12px">🏢 الفرع</label><div class="input" style="background:#f8fafc;color:#0f766e;font-weight:700">${esc(DB.branchName(bid))}</div></div>`}
       <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ طباعة</button>
-      <button class="btn btn-primary btn-sm" onclick="printBranchReport('${fMonth}','${fBranch}')">📄 تصدير PDF</button>
+      ${isSA?`<button class="btn btn-primary btn-sm" onclick="printBranchReport('${fMonth}','${fBranch}')">📄 تصدير PDF</button>`:''}
     </div>
   </div>
 
   <div class="stats-grid">
-    <div class="stat-card green"><div class="stat-val">${totalRev.toLocaleString()}</div><div class="stat-lbl">💰 إجمالي المحصّل (ر.س)</div></div>
+    ${isSA?`<div class="stat-card green"><div class="stat-val">${totalRev.toLocaleString()}</div><div class="stat-lbl">💰 إجمالي المحصّل (ر.س)</div></div>
     <div class="stat-card red"><div class="stat-val">${totalExp.toLocaleString()}</div><div class="stat-lbl">📉 إجمالي المصروفات (ر.س)</div></div>
-    <div class="stat-card ${totalNet>=0?'blue':'red'}"><div class="stat-val" style="color:${totalNet>=0?'#1d4ed8':'#ef4444'}">${totalNet.toLocaleString()}</div><div class="stat-lbl">${totalNet>=0?'💎 صافي الربح':'⚠️ خسارة'} (ر.س)</div></div>
+    <div class="stat-card ${totalNet>=0?'blue':'red'}"><div class="stat-val" style="color:${totalNet>=0?'#1d4ed8':'#ef4444'}">${totalNet.toLocaleString()}</div><div class="stat-lbl">${totalNet>=0?'💎 صافي الربح':'⚠️ خسارة'} (ر.س)</div></div>`:''}
     <div class="stat-card yellow"><div class="stat-val">${totalActive}</div><div class="stat-lbl">👶 أطفال نشطون</div></div>
   </div>
 
@@ -2992,24 +2994,24 @@ branchReport(){
       <div style="font-size:13px;opacity:.85">تقرير شهر ${fMonth}</div>
     </div>
     <div class="stats-grid" style="margin-bottom:14px">
-      <div class="stat-card green" style="padding:14px"><div class="stat-val" style="font-size:22px">${rev.toLocaleString()}</div><div class="stat-lbl">💰 المحصّل (ر.س)</div></div>
+      ${isSA?`<div class="stat-card green" style="padding:14px"><div class="stat-val" style="font-size:22px">${rev.toLocaleString()}</div><div class="stat-lbl">💰 المحصّل (ر.س)</div></div>
       <div class="stat-card red" style="padding:14px"><div class="stat-val" style="font-size:22px">${exp.toLocaleString()}</div><div class="stat-lbl">📉 المصروفات (ر.س)</div></div>
-      <div class="stat-card ${net>=0?'blue':'red'}" style="padding:14px"><div class="stat-val" style="font-size:22px;color:${net>=0?'#1d4ed8':'#ef4444'}">${net.toLocaleString()}</div><div class="stat-lbl">${net>=0?'💎 الربح':'⚠️ الخسارة'} (ر.س)</div></div>
+      <div class="stat-card ${net>=0?'blue':'red'}" style="padding:14px"><div class="stat-val" style="font-size:22px;color:${net>=0?'#1d4ed8':'#ef4444'}">${net.toLocaleString()}</div><div class="stat-lbl">${net>=0?'💎 الربح':'⚠️ الخسارة'} (ر.س)</div></div>`:''}
       <div class="stat-card yellow" style="padding:14px"><div class="stat-val" style="font-size:22px">${activeChildIds.length}</div><div class="stat-lbl">👶 نشطون</div></div>
       <div class="stat-card red" style="padding:14px;border-color:#ef4444"><div class="stat-val" style="font-size:22px;color:#ef4444">${defaulters.length}</div><div class="stat-lbl">🔴 متعثرون</div></div>
       <div class="stat-card yellow" style="padding:14px;border-color:#f59e0b"><div class="stat-val" style="font-size:22px;color:#f59e0b">${pending.length}</div><div class="stat-lbl">🟠 معلّقون</div></div>
     </div>
-    <div style="margin-bottom:12px">
+    ${isSA?`<div style="margin-bottom:12px">
       <div style="font-size:13px;font-weight:700;color:#475569;margin-bottom:6px">💳 توزيع طريقة الدفع (هذا الشهر)</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         ${Object.entries(byPM).length
           ? Object.entries(byPM).map(([pm,amt])=>`<span class="badge badge-blue">${pmLbl[pm]||pm}: ${amt.toLocaleString()} ر.س</span>`).join('')
           : '<span style="color:#94a3b8;font-size:12px">لا توجد اشتراكات مسجّلة هذا الشهر</span>'}
       </div>
-    </div>
+    </div>`:''}
     ${bSubs.length?`
     <div style="font-size:12px;color:#64748b;border-top:1px solid #f1f5f9;padding-top:10px">
-      عدد الفواتير: ${bSubs.length} | إجمالي مستحق: ${charged.toLocaleString()} ر.س | نسبة التحصيل: <strong>${charged?Math.round(rev/charged*100):0}%</strong>
+      عدد الفواتير: ${bSubs.length}${isSA?` | إجمالي مستحق: ${charged.toLocaleString()} ر.س | نسبة التحصيل: <strong>${charged?Math.round(rev/charged*100):0}%</strong>`:''}
     </div>
     <div class="table-wrap" style="margin-top:12px"><table>
       <thead><tr><th>الطفل</th><th>نوع الاشتراك</th><th>المبلغ</th><th>المدفوع</th><th>طريقة الدفع</th><th>الحالة</th></tr></thead>
@@ -3472,6 +3474,7 @@ settings(){
 // ---------- SALES ----------
 sales(){
   if(!Auth.isSuperAdmin()&&!Auth.isSchoolAdmin()) return Views._forbidden();
+  const isSA=Auth.isSuperAdmin();
   const sid=Auth.isSuperAdmin()?null:Auth.schoolId();
   const bid=Auth.branchId();
   let allSales=DB.sales();
@@ -3506,9 +3509,9 @@ sales(){
     <button class="btn btn-primary" onclick="Modals.addSale()">+ إضافة مبيعة</button>
   </div>
   <div class="stats-grid" style="margin-bottom:20px">
-    <div class="stat-card green"><div class="stat-val">${totalToday.toLocaleString()} ر.س</div><div class="stat-lbl">💰 مبيعات اليوم</div></div>
+    ${isSA?`<div class="stat-card green"><div class="stat-val">${totalToday.toLocaleString()} ر.س</div><div class="stat-lbl">💰 مبيعات اليوم</div></div>`:''}
     <div class="stat-card blue"><div class="stat-val">${todaySales.length}</div><div class="stat-lbl">📦 سجلات اليوم</div></div>
-    <div class="stat-card green"><div class="stat-val">${totalAll.toLocaleString()} ر.س</div><div class="stat-lbl">💵 إجمالي المبيعات</div></div>
+    ${isSA?`<div class="stat-card green"><div class="stat-val">${totalAll.toLocaleString()} ر.س</div><div class="stat-lbl">💵 إجمالي المبيعات</div></div>`:''}
     <div class="stat-card blue"><div class="stat-val">${allSales.length}</div><div class="stat-lbl">📋 إجمالي السجلات</div></div>
   </div>
   ${allSales.length===0?`
