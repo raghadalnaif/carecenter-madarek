@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-17-v27 -->
+<!-- BUILD: 2026-06-17-v28 -->
 <script>
 (function(){
-  var BUILD='v27-20260617-1';
+  var BUILD='v28-20260617-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -253,6 +253,7 @@ const SEED = {
   notifications: [],
   weekly_activities: [],
   sales: [],
+  govDocs: [],
   settings: {prices:{morning:{daily:150,weekly:600,monthly:1800},evening:{daily:70,weekly:300,monthly:900}},invoicePrefix:'INV',alertDays:{warn:7,urgent:3},waTemplate:'مرحباً {name}، اشتراك طفلك ينتهي بتاريخ {date}. يرجى التواصل للتجديد. مع تحيات مدارك الطفل 🌟',vatRate:15,vatInclusive:true},
 };
 
@@ -416,6 +417,11 @@ const DB = {
   addExpense(e){const a=this.expenses();a.push(e);this.save('expenses',a)},
   updateExpense(e){const a=this.expenses();const i=a.findIndex(x=>x.id===e.id);if(i>=0)a[i]=e;else a.push(e);this.save('expenses',a)},
   deleteExpense(id){this.save('expenses',this.expenses().filter(x=>x.id!==id))},
+  // الوثائق الحكومية لكل فرع (سجل تجاري، دفاع مدني...)
+  govDocs(){return this.get('govDocs')||[]},
+  addGovDoc(d){const a=this.govDocs();a.push(d);this.save('govDocs',a)},
+  updateGovDoc(d){const a=this.govDocs();const i=a.findIndex(x=>x.id===d.id);if(i>=0)a[i]=d;else a.push(d);this.save('govDocs',a)},
+  deleteGovDoc(id){this.save('govDocs',this.govDocs().filter(x=>x.id!==id))},
   // سجل الدفعات لكل اشتراك (تاريخ كل دفعة جزئية)
   payments(){return this.get('payments')||[]},
   addPayment(p){const a=this.payments();a.push(p);this.save('payments',a)},
@@ -507,6 +513,15 @@ const DB = {
       in7:subs.filter(s=>diffDays(s.endDate,T0)>3&&diffDays(s.endDate,T0)<=7),
     };
   },
+  // حالة الوثيقة الحكومية: نافذة تنبيه أطول من الاشتراكات (تجديد رخص يحتاج وقت أطول)
+  govDocStatus(d){
+    if(!d?.expiryDate) return 'none';
+    const dd=diffDays(d.expiryDate,T0);
+    if(dd<0) return 'expired';
+    if(dd<=7) return 'soon7';
+    if(dd<=30) return 'soon30';
+    return 'active';
+  },
   childName(id){return this.children().find(c=>c.id===id)?.name||id},
   schoolName(id){return this.schools().find(s=>s.id===id)?.name||id},
   branchName(id){return this.branches().find(b=>b.id===id)?.name||'—'},
@@ -588,6 +603,7 @@ const App = {
       {v:'sales',icon:'🛍️',label:'المبيعات'},
       {v:'expenses',icon:'💸',label:'المصروفات'},
       {v:'accounting',icon:'🧾',label:'المحاسبة'},
+      {v:'govDocs',icon:'🏛️',label:'الوثائق الحكومية'},
       {v:'tasks',icon:'📌',label:'مهام اليوم'},
       {v:'cashClosing',icon:'💰',label:'تقفيل الصندوق'},
       {v:'messages',icon:'💬',label:'الرسائل الداخلية'},
@@ -629,7 +645,7 @@ const App = {
     </div>`;
   },
   topbar(){
-    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات',accounting:'🧾 المحاسبة',branchReport:'📈 تقرير الفرع الشهري',childNotes:'📝 ملاحظات الأطفال',expenses:'💸 مصروفات الفرع',messages:'💬 الرسائل الداخلية',auditLog:'🔍 سجل النشاط'};
+    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات',accounting:'🧾 المحاسبة',branchReport:'📈 تقرير الفرع الشهري',childNotes:'📝 ملاحظات الأطفال',expenses:'💸 مصروفات الفرع',messages:'💬 الرسائل الداخلية',auditLog:'🔍 سجل النشاط',govDocs:'🏛️ الوثائق الحكومية'};
     const now=new Date();
     const hm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
     const unread=DB.unreadCount();
@@ -747,10 +763,11 @@ const App = {
       childNotes:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
       messages:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
       settings:()=>Auth.isSuperAdmin(),
+      govDocs:()=>Auth.isSuperAdmin(),
     };
     const guard=guards[App.view];
     if(guard&&!guard()) return Views._forbidden();
-    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,childNotes:Views.childNotes,messages:Views.messages,settings:Views.settings};
+    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,childNotes:Views.childNotes,messages:Views.messages,settings:Views.settings,govDocs:Views.govDocs};
     const fn=map[App.view]||Views.dashboard;
     try{return fn();}
     catch(e){console.error('[CCS]',App.view,e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة: ${App.view}</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
@@ -865,6 +882,7 @@ _superDash(){
     <div class="stat-card red"><div class="stat-val">${pendingRevenue.toLocaleString()} ر.س</div><div class="stat-lbl">⏳ مبالغ معلقة ${infoIcon('pending')}</div></div>
   </div>
   ${Views._alertBanners(al)}
+  ${Views._govDocAlertBanner()}
   <div class="card">
     <div class="card-title">🏢 توزيع الأطفال على الفروع</div>
     <div style="display:flex;gap:16px;flex-wrap:wrap">
@@ -972,6 +990,27 @@ _alertBanners(al,schoolId=null){
     html+=`<div class="alert-box alert-blue">🔵 <div><strong>تنتهي خلال أسبوع (${al.in7.length})</strong><br>${al.in7.map(s=>`${getName(s)} — ${formatDate(s.endDate)}`).join(' | ')}</div></div>`;
   }
   return html;
+},
+
+_govDocAlertBanner(){
+  const docs=DB.govDocs();
+  const expired=docs.filter(d=>DB.govDocStatus(d)==='expired');
+  const soon=docs.filter(d=>['soon7','soon30'].includes(DB.govDocStatus(d)));
+  if(!expired.length&&!soon.length) return '';
+  const label=(d)=>`${esc(d.type==='other'?(d.customType||'وثيقة'):this._govDocTypeLabel(d.type))} — ${esc(DB.branchName(d.branchId))}`;
+  let html='';
+  if(expired.length){
+    html+=`<div class="alert-box alert-red" style="cursor:pointer" onclick="App.go('govDocs')">🏛️ <div><strong>وثائق حكومية منتهية (${expired.length})</strong><br>${expired.map(d=>`${label(d)} — انتهت ${formatDate(d.expiryDate)}`).join(' | ')}</div></div>`;
+  }
+  if(soon.length){
+    html+=`<div class="alert-box alert-orange" style="cursor:pointer" onclick="App.go('govDocs')">🏛️ <div><strong>وثائق حكومية تنتهي قريباً (${soon.length})</strong><br>${soon.map(d=>`${label(d)} — ${formatDate(d.expiryDate)}`).join(' | ')}</div></div>`;
+  }
+  return html;
+},
+
+_govDocTypeLabel(type){
+  const labels={commercial_reg:'📜 السجل التجاري',civil_defense:'🧯 رخصة الدفاع المدني',municipality:'🏙️ رخصة البلدية',health_cert:'🩺 الشهادة الصحية',chamber_cert:'🏢 شهادة الغرفة التجارية',lease:'📃 عقد الإيجار',other:'📋 أخرى'};
+  return labels[type]||type;
 },
 
 _payBadge(sub){
@@ -2377,6 +2416,97 @@ expenses(){
             <button class="btn btn-danger btn-xs" onclick="deleteExpense('${e.id}')">🗑</button>
           </td>
         </tr>`).join(''):`<tr><td colspan="8"><div class="empty-state"><div class="es-icon">💸</div><p>لا توجد مصروفات لهذا الشهر</p></div></td></tr>`}
+      </tbody>
+    </table></div>
+  </div>`;
+},
+
+// ---------- الوثائق الحكومية (سجل تجاري، دفاع مدني...) ----------
+govDocs(){
+  if(!Auth.isSuperAdmin()) return Views._forbidden();
+  const branches=DB.branches();
+  const docs=DB.govDocs();
+  const fBranch=App.params.gdBranch||'all';
+  const fStatus=App.params.gdStatus||'all';
+  let filtered=docs;
+  if(fBranch!=='all') filtered=filtered.filter(d=>d.branchId===fBranch);
+  if(fStatus!=='all') filtered=filtered.filter(d=>{
+    const st=DB.govDocStatus(d);
+    if(fStatus==='expired') return st==='expired';
+    if(fStatus==='soon') return st==='soon7'||st==='soon30';
+    if(fStatus==='active') return st==='active';
+    return true;
+  });
+  filtered=[...filtered].sort((a,b)=>(a.expiryDate||'').localeCompare(b.expiryDate||''));
+
+  const expiredCnt=docs.filter(d=>DB.govDocStatus(d)==='expired').length;
+  const soonCnt=docs.filter(d=>['soon7','soon30'].includes(DB.govDocStatus(d))).length;
+  const activeCnt=docs.filter(d=>DB.govDocStatus(d)==='active').length;
+
+  const statusBadge=(st)=>{
+    const map={expired:['badge-red','🔴 منتهية'],soon7:['badge-red','🟠 تنتهي خلال 7 أيام'],soon30:['badge-yellow','🟡 تنتهي خلال 30 يوم'],active:['badge-green','🟢 سارية'],none:['badge-gray','—']};
+    const [c,l]=map[st]||map.none;
+    return `<span class="badge ${c}">${l}</span>`;
+  };
+  const attachCell=(d)=>{
+    if(!d.fileData) return '<span style="color:#94a3b8">—</span>';
+    if((d.fileType||'').startsWith('image/')) return `<a href="${d.fileData}" target="_blank"><img src="${d.fileData}" style="max-width:48px;max-height:48px;border-radius:6px;border:1px solid #e2e8f0;object-fit:cover"></a>`;
+    return `<a href="${d.fileData}" target="_blank" download="${esc(d.fileName||'document')}" class="btn btn-secondary btn-xs">📄 فتح</a>`;
+  };
+
+  return `
+  <div class="stats-grid">
+    <div class="stat-card blue"><div class="stat-val">${docs.length}</div><div class="stat-lbl">🏛️ إجمالي الوثائق</div></div>
+    <div class="stat-card red"><div class="stat-val">${expiredCnt}</div><div class="stat-lbl">🔴 منتهية</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${soonCnt}</div><div class="stat-lbl">🟠 تنتهي قريباً (≤30 يوم)</div></div>
+    <div class="stat-card green"><div class="stat-val">${activeCnt}</div><div class="stat-lbl">🟢 سارية</div></div>
+  </div>
+  <div class="print-cover">
+    <h1>🏛️ الوثائق الحكومية</h1>
+    <p>${fBranch==='all'?'كل الفروع':esc(DB.branchName(fBranch))} · تاريخ الطباعة: ${formatDate(T0)}</p>
+  </div>
+  <div class="card no-print" style="padding:14px;margin-bottom:16px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="input-group" style="margin:0;min-width:160px">
+        <label style="font-size:12px">🏢 الفرع</label>
+        <select class="input" onchange="gdSet('gdBranch',this.value)">
+          <option value="all" ${fBranch==='all'?'selected':''}>الكل</option>
+          ${branches.map(b=>`<option value="${b.id}" ${fBranch===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="input-group" style="margin:0;min-width:160px">
+        <label style="font-size:12px">📌 الحالة</label>
+        <select class="input" onchange="gdSet('gdStatus',this.value)">
+          <option value="all" ${fStatus==='all'?'selected':''}>الكل</option>
+          <option value="expired" ${fStatus==='expired'?'selected':''}>منتهية</option>
+          <option value="soon" ${fStatus==='soon'?'selected':''}>تنتهي قريباً</option>
+          <option value="active" ${fStatus==='active'?'selected':''}>سارية</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="Modals.addGovDoc()">+ إضافة وثيقة</button>
+      <button class="btn btn-secondary btn-sm" onclick="printAllGovDocs()">🖨️ طباعة الكل / PDF</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('gd-table','الوثائق-الحكومية')">📊 CSV</button>
+      ${(fBranch!=='all'||fStatus!=='all')?`<button class="btn btn-secondary btn-sm" onclick="App.go('govDocs')">✕ مسح</button>`:''}
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">🏛️ الوثائق (${filtered.length})</div>
+    <div class="table-wrap"><table id="gd-table">
+      <thead><tr><th>الفرع</th><th>نوع الوثيقة</th><th>رقم الوثيقة</th><th>تاريخ الانتهاء</th><th>الحالة</th><th>المرفق</th><th>أضافها</th><th class="no-print">إجراءات</th></tr></thead>
+      <tbody>
+        ${filtered.length?filtered.map(d=>`<tr>
+          <td><span class="badge badge-blue" style="font-size:10px">🏢 ${esc(DB.branchName(d.branchId))}</span></td>
+          <td>${esc(d.type==='other'?(d.customType||'أخرى'):Views._govDocTypeLabel(d.type))}</td>
+          <td style="font-size:13px">${esc(d.docNumber||'—')}</td>
+          <td style="font-size:13px">${formatDate(d.expiryDate)}</td>
+          <td>${statusBadge(DB.govDocStatus(d))}</td>
+          <td>${attachCell(d)}</td>
+          <td style="font-size:12px;color:#64748b">${esc(d.addedBy||'—')}</td>
+          <td class="no-print">
+            <button class="btn btn-secondary btn-xs" onclick="Modals.editGovDoc('${d.id}')">✏️</button>
+            <button class="btn btn-danger btn-xs" onclick="deleteGovDoc('${d.id}')">🗑</button>
+          </td>
+        </tr>`).join(''):`<tr><td colspan="8"><div class="empty-state"><div class="es-icon">🏛️</div><p>لا توجد وثائق مسجّلة${fBranch!=='all'||fStatus!=='all'?' بهذه الفلاتر':''}</p></div></td></tr>`}
       </tbody>
     </table></div>
   </div>`;
@@ -4235,6 +4365,59 @@ const Modals = {
     </div></div>`);
   },
 
+  addGovDoc(){
+    Modals._renderGovDocModal({});
+  },
+  editGovDoc(id){
+    const d=DB.govDocs().find(x=>x.id===id);
+    if(!d) return;
+    Modals._renderGovDocModal(d);
+  },
+  _renderGovDocModal(d){
+    const branches=DB.branches();
+    const isEdit=!!d.id;
+    const types={commercial_reg:'📜 السجل التجاري',civil_defense:'🧯 رخصة الدفاع المدني',municipality:'🏙️ رخصة البلدية',health_cert:'🩺 الشهادة الصحية',chamber_cert:'🏢 شهادة الغرفة التجارية',lease:'📃 عقد الإيجار',other:'📋 أخرى (حدد الاسم)'};
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal">
+      <div class="modal-header"><h2>${isEdit?'✏️ تعديل وثيقة':'🏛️ إضافة وثيقة حكومية'}</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        ${isEdit?`<input type="hidden" id="gd-id" value="${d.id}">`:''}
+        ${isEdit&&d.fileData?`<input type="hidden" id="gd-file-old" value="${esc(d.fileData)}"><input type="hidden" id="gd-file-old-name" value="${esc(d.fileName||'')}"><input type="hidden" id="gd-file-old-type" value="${esc(d.fileType||'')}">`:''}
+        <div class="input-group">
+          <label>🏢 الفرع *</label>
+          <select class="input" id="gd-branch">
+            ${branches.map(b=>`<option value="${b.id}" ${d.branchId===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="input-group">
+          <label>🏷️ نوع الوثيقة *</label>
+          <select class="input" id="gd-type" onchange="toggleGovDocOther()">
+            ${Object.entries(types).map(([k,l])=>`<option value="${k}" ${d.type===k?'selected':''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <div id="gd-other-wrap" style="display:${d.type==='other'?'':'none'}">
+          <div class="input-group"><label>اسم الوثيقة *</label><input class="input" id="gd-custom-type" value="${esc(d.customType||'')}" placeholder="مثال: شهادة الزكاة والضريبة"></div>
+        </div>
+        <div class="grid-2">
+          <div class="input-group"><label>🔢 رقم الوثيقة (اختياري)</label><input class="input" id="gd-doc-number" value="${esc(d.docNumber||'')}" placeholder="رقم السجل/الرخصة"></div>
+          <div class="input-group"><label>📅 تاريخ الانتهاء *</label><input class="input" id="gd-expiry" type="date" value="${d.expiryDate||''}"></div>
+        </div>
+        <div class="input-group"><label>📝 ملاحظات</label><textarea class="input" id="gd-notes" rows="2" placeholder="أي ملاحظات إضافية...">${esc(d.notes||'')}</textarea></div>
+        <div class="input-group">
+          <label>📎 إرفاق ملف (صورة أو PDF)${isEdit?' — اتركه فارغاً للاحتفاظ بالمرفق الحالي':' *'}</label>
+          <input type="file" accept="image/*,.pdf,application/pdf" class="input" style="padding:6px;font-size:13px" onchange="handleGovDocFile(this,'gd-file','gd-file-preview')">
+          <input type="hidden" id="gd-file" value=""><input type="hidden" id="gd-file-name" value=""><input type="hidden" id="gd-file-type" value="">
+          <div class="receipt-preview" id="gd-file-preview" style="${isEdit&&d.fileData?'display:block':''}">${isEdit&&d.fileData?((d.fileType||'').startsWith('image/')?`<img src="${d.fileData}">`:`<div style="font-size:13px;color:#0f766e">📄 ${esc(d.fileName||'الملف الحالي')}</div>`):''}</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveGovDoc(${isEdit?'true':'false'})">💾 ${isEdit?'حفظ التعديلات':'إضافة الوثيقة'}</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+
   addTeacher(){
     const sid=Auth.schoolId();
     const bid=Auth.user?.branchId||'';
@@ -4565,6 +4748,28 @@ function handleReceiptImg(input,hiddenId,previewId){
     if(h) h.value=e.target.result;
     const p=document.getElementById(previewId);
     if(p){p.style.display='block';p.innerHTML=`<img src="${e.target.result}"><div style="font-size:11px;color:#10b981;margin-top:4px">✅ تم رفع الإيصال</div>`;}
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleGovDocFile(input,hiddenId,previewId){
+  const file=input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const h=document.getElementById(hiddenId);
+    if(h) h.value=e.target.result;
+    const nameH=document.getElementById(hiddenId+'-name');
+    if(nameH) nameH.value=file.name;
+    const typeH=document.getElementById(hiddenId+'-type');
+    if(typeH) typeH.value=file.type;
+    const p=document.getElementById(previewId);
+    if(p){
+      p.style.display='block';
+      p.innerHTML=file.type.startsWith('image/')
+        ?`<img src="${e.target.result}"><div style="font-size:11px;color:#10b981;margin-top:4px">✅ ${esc(file.name)}</div>`
+        :`<div style="font-size:13px;color:#10b981">📄 ✅ ${esc(file.name)}</div>`;
+    }
   };
   reader.readAsDataURL(file);
 }
@@ -5154,6 +5359,64 @@ function deleteExpense(id){
   const exp=DB.expenses().find(e=>e.id===id);
   DB.addAuditLog({action:'حذف مصروف',entity:'مصروف',entityId:id,details:exp?`${exp.amount} ر.س — ${exp.category}`:id,by:Auth.user?.name||'—'});
   DB.deleteExpense(id);
+  toast('✅ تم الحذف');
+  App.refresh();
+}
+
+// =========================================================
+//  GOVERNMENT DOCS HANDLERS
+// =========================================================
+function gdSet(key,value){
+  App.go('govDocs',{...App.params,[key]:value});
+}
+function toggleGovDocOther(){
+  const type=document.getElementById('gd-type')?.value;
+  const wrap=document.getElementById('gd-other-wrap');
+  if(wrap) wrap.style.display=type==='other'?'':'none';
+}
+function printAllGovDocs(){
+  App.go('govDocs',{gdBranch:'all',gdStatus:'all'});
+  setTimeout(()=>window.print(),300);
+}
+function saveGovDoc(isEdit){
+  if(!Auth.isSuperAdmin()){toast('صلاحية المدير العام فقط','error');return;}
+  const branchId=document.getElementById('gd-branch')?.value;
+  const type=document.getElementById('gd-type')?.value;
+  const customType=document.getElementById('gd-custom-type')?.value?.trim()||'';
+  const docNumber=document.getElementById('gd-doc-number')?.value?.trim()||'';
+  const expiryDate=document.getElementById('gd-expiry')?.value;
+  const notes=document.getElementById('gd-notes')?.value?.trim()||'';
+  const newFile=document.getElementById('gd-file')?.value||'';
+  const newFileName=document.getElementById('gd-file-name')?.value||'';
+  const newFileType=document.getElementById('gd-file-type')?.value||'';
+  if(!branchId||!type||!expiryDate){alert('الفرع، نوع الوثيقة، وتاريخ الانتهاء مطلوبة');return;}
+  if(type==='other'&&!customType){alert('يرجى كتابة اسم الوثيقة');return;}
+  const oldFile=document.getElementById('gd-file-old')?.value||'';
+  const oldFileName=document.getElementById('gd-file-old-name')?.value||'';
+  const oldFileType=document.getElementById('gd-file-old-type')?.value||'';
+  const fileData=newFile||oldFile;
+  const fileName=newFile?newFileName:oldFileName;
+  const fileType=newFile?newFileType:oldFileType;
+  if(!isEdit&&!fileData){alert('يرجى إرفاق ملف الوثيقة');return;}
+  if(isEdit){
+    const id=document.getElementById('gd-id')?.value;
+    const orig=DB.govDocs().find(x=>x.id===id);
+    if(!orig){toast('الوثيقة غير موجودة','error');App.closeModal();return;}
+    DB.updateGovDoc({...orig,branchId,type,customType,docNumber,expiryDate,notes,fileData,fileName,fileType});
+  } else {
+    DB.addGovDoc({id:uid(),branchId,type,customType,docNumber,expiryDate,notes,fileData,fileName,fileType,addedBy:Auth.user?.name||'',createdAt:new Date().toISOString()});
+  }
+  DB.addAuditLog({action:isEdit?'تعديل وثيقة حكومية':'إضافة وثيقة حكومية',entity:'وثيقة حكومية',entityId:branchId,details:`${type==='other'?customType:Views._govDocTypeLabel(type)} — ${DB.branchName(branchId)} — تنتهي ${expiryDate}`,by:Auth.user?.name||'—'});
+  toast(isEdit?'✅ تم حفظ التعديلات':'✅ تم إضافة الوثيقة');
+  App.closeModal();
+  if(App.view==='govDocs') App.refresh(); else App.go('govDocs');
+}
+function deleteGovDoc(id){
+  if(!Auth.isSuperAdmin()) return;
+  if(!confirm('هل تريد حذف هذه الوثيقة؟')) return;
+  const d=DB.govDocs().find(x=>x.id===id);
+  DB.addAuditLog({action:'حذف وثيقة حكومية',entity:'وثيقة حكومية',entityId:id,details:d?`${d.type==='other'?d.customType:Views._govDocTypeLabel(d.type)} — ${DB.branchName(d.branchId)}`:id,by:Auth.user?.name||'—'});
+  DB.deleteGovDoc(id);
   toast('✅ تم الحذف');
   App.refresh();
 }
