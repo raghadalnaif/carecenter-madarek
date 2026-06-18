@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-17-v28 -->
+<!-- BUILD: 2026-06-18-v29 -->
 <script>
 (function(){
-  var BUILD='v28-20260617-1';
+  var BUILD='v29-20260618-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -275,6 +275,47 @@ let _fbStatus='connecting'; // 'connecting' | 'ok' | 'error'
 const _mem={};
 const _pendingEcho={}; // key→snapshot لقيمة كتبناها مؤخراً (لتجاهل صدى ذاتي فقط، لا تأخير لتحديثات الأجهزة الأخرى)
 const _writeFails={}; // key→count محاولات فشلت
+const _keyListeners=new Set(); // المفاتيح التي رُبط لها مستمع منفصل
+let _renderScheduled=false;
+
+// مستمع منفصل لكل مفتاح بدل مستمع واحد على كامل الشجرة —
+// فحفظ مفتاح واحد لا يعيد تنزيل/معالجة بقية المجموعات (الإيصالات/الملفات base64)
+function _ensureKeyListener(k){
+  if(!_fdb||_fbStatus!=='ok'||_keyListeners.has(k)) return;
+  _keyListeners.add(k);
+  _fdb.ref('ccs/'+k).on('value',snap=>_onKeyValue(k,snap.val()));
+}
+function _onKeyValue(k,val){
+  if(val===null||val===undefined) return;
+  let incoming; try{incoming=JSON.stringify(val);}catch{return;}
+  // صدى ذاتي لقيمة كتبناها نحن — تجاهله
+  if(_pendingEcho[k]===incoming){delete _pendingEcho[k];return;}
+  let current; try{current=JSON.stringify(_mem[k]);}catch{current=undefined;}
+  if(current===incoming) return;
+  _mem[k]=val;
+  try{localStorage.setItem('ccs_'+k,incoming);}catch{}
+  // ضمان تحديث بيانات المستخدم الحالي إن تغيّر المستخدمون
+  if(k==='users'&&Auth.user&&Auth.user.id){
+    const fresh=val.find(u=>u.id===Auth.user.id);
+    if(fresh){Auth.user=fresh;try{sessionStorage.setItem('ccs_user',JSON.stringify(fresh));}catch{}}
+  }
+  _scheduleRender();
+}
+// تجميع إعادات الرسم — عدة تحديثات متتالية تُنتج إعادة رسم واحدة فقط
+function _scheduleRender(){
+  if(_renderScheduled) return;
+  _renderScheduled=true;
+  requestAnimationFrame(()=>{
+    _renderScheduled=false;
+    if(!Auth.user||App.modal||App.view==='settings') return;
+    const el=document.getElementById('content');
+    if(!el) return;
+    const saved={};
+    el.querySelectorAll('input[id],select[id]').forEach(inp=>{saved[inp.id]=inp.value;});
+    el.innerHTML=App.currentView();
+    Object.entries(saved).forEach(([id,val])=>{const f=document.getElementById(id);if(f&&val!==undefined)f.value=val;});
+  });
+}
 
 // =========================================================
 //  DB
@@ -286,11 +327,15 @@ const DB = {
   },
   set(k,v){
     _mem[k]=v;
-    try{localStorage.setItem('ccs_'+k,JSON.stringify(v))}catch{}
+    // تحويل النص مرة واحدة فقط — يُستخدم للتخزين المحلي ولكشف الصدى الذاتي
+    let serialized=null;
+    try{serialized=JSON.stringify(v);}catch{}
+    try{if(serialized!==null)localStorage.setItem('ccs_'+k,serialized)}catch{}
     if(_fdb&&_fbStatus==='ok'){
       _lastWrite=Date.now();
       // خزّن قيمة ما كتبنا — المستمع يقارن لرفض الصدى الذاتي فقط
-      try{_pendingEcho[k]=JSON.stringify(v);}catch{_pendingEcho[k]=null;}
+      _pendingEcho[k]=serialized;
+      _ensureKeyListener(k); // ربط مستمع لو كان مفتاحاً جديداً
       // نظّف بعد 60 ثانية لتجنب نمو الذاكرة
       setTimeout(()=>{delete _pendingEcho[k];},60000);
       const attempt=(n)=>{
@@ -331,35 +376,9 @@ const DB = {
         });
         if(Object.keys(toMigrate).length) await _fdb.ref('ccs').update(toMigrate);
       }
-      // مستمع التحديثات الفورية — يقارن بالقيمة لا بالوقت، فيرفض صدى ذاتي فقط
-      _fdb.ref('ccs').on('value',snap=>{
-        const d=snap.val();
-        if(!d) return;
-        let changed=false;
-        Object.keys(d).forEach(k=>{
-          const incoming=JSON.stringify(d[k]);
-          // إذا كانت القيمة الواردة هي بالضبط ما كتبناه نحن، فهي صدى ذاتي — تجاهلها
-          if(_pendingEcho[k]===incoming){delete _pendingEcho[k];return;}
-          const current=JSON.stringify(_mem[k]);
-          if(current!==incoming){_mem[k]=d[k];changed=true;}
-        });
-        if(changed&&Auth.user){
-          if(Auth.user.id){
-            const fresh=DB.users().find(u=>u.id===Auth.user.id);
-            if(fresh){Auth.user=fresh;sessionStorage.setItem('ccs_user',JSON.stringify(fresh));}
-          }
-          // لا تُعِد رسم الصفحة إن كان هناك modal مفتوح أو المستخدم في صفحة الإعدادات
-          if(!App.modal&&App.view!=='settings'){
-            const el=document.getElementById('content');
-            if(!el) return;
-            // حفظ قيم البحث والفلاتر قبل إعادة الرسم
-            const saved={};
-            el.querySelectorAll('input[id],select[id]').forEach(inp=>{saved[inp.id]=inp.value;});
-            el.innerHTML=App.currentView();
-            Object.entries(saved).forEach(([id,val])=>{const f=document.getElementById(id);if(f&&val!==undefined)f.value=val;});
-          }
-        }
-      });
+      // مستمعات منفصلة لكل مفتاح — حفظ مجموعة واحدة لا يعيد تنزيل/معالجة الباقي
+      const listenKeys=new Set([...Object.keys(SEED),...Object.keys(fbData||{})]);
+      listenKeys.forEach(k=>_ensureKeyListener(k));
     }catch(e){
       _fdb=null; // أهم سطر: امنع DB.init() من الكتابة على Firebase بعد فشل القراءة
       _fbStatus='error';
