@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-18-v30 -->
+<!-- BUILD: 2026-06-18-v31 -->
 <script>
 (function(){
-  var BUILD='v30-20260618-1';
+  var BUILD='v31-20260618-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -683,6 +683,20 @@ const App = {
   params:{},
   notifFilter:{branch:'all',period:'all'},
   go(view,params={}){this.view=view;this.params=params;this.render()},
+  // بحث حيّ: يحدّث المعطيات فوراً ويؤجّل إعادة رسم المحتوى فقط (دون الشريط الجانبي)
+  // مع الحفاظ على تركيز الحقل وموضع المؤشر — يمنع التعليق أثناء الكتابة
+  liveSearch(view,params,inp){
+    this.view=view;this.params=params;
+    const id=inp&&inp.id;
+    let pos=null;try{pos=inp.selectionStart;}catch(e){}
+    clearTimeout(this._searchT);
+    this._searchT=setTimeout(()=>{
+      if(App.view!==view)return;
+      const el=document.getElementById('content');
+      if(el)el.innerHTML=App.currentView();else App.render();
+      if(id){const f=document.getElementById(id);if(f){f.focus();if(pos!=null){try{f.setSelectionRange(pos,pos);}catch(e){}}}}
+    },200);
+  },
   refresh(){
     // إعادة رسم سريع — لا يلمس الشريط الجانبي ولا الـtopbar، فقط محتوى الصفحة
     const el=document.getElementById('content');
@@ -1287,7 +1301,7 @@ children(){
     <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('kids-table','الأطفال')">📊 تصدير</button>
     <div class="search-bar" style="flex:1;max-width:300px;margin:0">
       <span class="search-icon">🔍</span>
-      <input class="input" placeholder="بحث بالاسم أو ولي الأمر أو الهاتف..." value="${esc(App.params.q||'')}" oninput="App.go('children',{...App.params,q:this.value})">
+      <input id="search-children" class="input" placeholder="بحث بالاسم أو ولي الأمر أو الهاتف..." value="${esc(App.params.q||'')}" oninput="App.liveSearch('children',{...App.params,q:this.value},this)">
     </div>
   </div>
   ${(!bid||!uPeriod)?`<div class="card" style="padding:12px;margin-bottom:12px">
@@ -1395,8 +1409,8 @@ subscriptions(){
   <div class="actions-bar" style="gap:10px;align-items:center;flex-wrap:wrap">
     <div class="search-bar" style="position:relative;flex:1;max-width:280px;margin:0">
       <span class="search-icon">🔍</span>
-      <input class="input" style="padding-right:34px" placeholder="بحث باسم الطالب..." value="${esc(subQ)}"
-        oninput="App.go('subscriptions',{filter:'${filter}',subQ:this.value,sBranch:'${sBranch}',sPeriod:'${sPeriod}'})">
+      <input id="search-subs" class="input" style="padding-right:34px" placeholder="بحث باسم الطالب..." value="${esc(subQ)}"
+        oninput="App.liveSearch('subscriptions',{filter:'${filter}',subQ:this.value,sBranch:'${sBranch}',sPeriod:'${sPeriod}'},this)">
     </div>
     ${chips.map(([v,l])=>`<span class="chip ${filter===v?'active':''}" onclick="App.go('subscriptions',{filter:'${v}',subQ:'${_sp.subQ}',sBranch:'${sBranch}',sPeriod:'${sPeriod}'})">${l}</span>`).join('')}
     <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('subs-table','الاشتراكات')">📊 تصدير</button>
@@ -1540,7 +1554,7 @@ attendance(){
       <label style="font-weight:600;font-size:14px">التاريخ:</label>
       <input type="date" class="input" style="width:160px" value="${date}" onchange="App.go('attendance',{...App.params,date:this.value,schoolId:'${sid||''}'})" max="${T0}">
     </div>
-    <input class="input" placeholder="🔍 بحث بالاسم..." value="${esc(App.params.attQ||'')}" style="width:200px" oninput="App.go('attendance',{...App.params,attQ:this.value})">
+    <input id="search-attendance" class="input" placeholder="🔍 بحث بالاسم..." value="${esc(App.params.attQ||'')}" style="width:200px" oninput="App.liveSearch('attendance',{...App.params,attQ:this.value},this)">
     <button class="btn btn-primary btn-sm" onclick="saveAttendance('${date}','${sid||''}')">💾 حفظ الحضور</button>
     <button class="btn btn-success btn-sm" onclick="markAllPresent('${date}','${sid||''}')">✅ الكل حاضر</button>
     <div style="margin-right:auto;display:flex;gap:8px">
@@ -1689,7 +1703,7 @@ reports(){
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
       <div class="input-group" style="margin:0;flex:1;min-width:180px">
         <label style="font-size:12px">🔍 بحث باسم الطفل</label>
-        <input class="input" id="att-search" placeholder="اكتب الاسم..." value="${esc(App.params.attQ||'')}" oninput="App.go('reports',{tab:'attendance',attQ:this.value,attFrom:document.getElementById('att-from')?.value||'',attTo:document.getElementById('att-to')?.value||''})">
+        <input class="input" id="att-search" placeholder="اكتب الاسم..." value="${esc(App.params.attQ||'')}" oninput="App.liveSearch('reports',{tab:'attendance',attQ:this.value,attFrom:document.getElementById('att-from')?.value||'',attTo:document.getElementById('att-to')?.value||''},this)">
       </div>
       <div class="input-group" style="margin:0;min-width:140px">
         <label style="font-size:12px">📅 من تاريخ</label>
@@ -1768,8 +1782,8 @@ reports(){
   <div class="card no-print" style="margin-bottom:16px">
     <div class="input-group" style="margin:0">
       <label style="font-size:13px;font-weight:600">🔍 ابحث باسم الطالب</label>
-      <input class="input" style="margin-top:6px" placeholder="اكتب اسم الطالب..." value="${esc(stQ)}"
-        oninput="App.go('reports',{tab:'student',stQ:this.value,stId:''})">
+      <input id="search-report-student" class="input" style="margin-top:6px" placeholder="اكتب اسم الطالب..." value="${esc(stQ)}"
+        oninput="App.liveSearch('reports',{tab:'student',stQ:this.value,stId:''},this)">
     </div>
     ${stQ&&!stId?`<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px">
       ${children.filter(c=>c.name.includes(stQ)).map(c=>`
@@ -2358,7 +2372,7 @@ accounting(){
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
       <div class="input-group" style="margin:0;flex:1;min-width:160px">
         <label style="font-size:12px">🔍 بحث</label>
-        <input class="input" placeholder="اسم الطفل أو ولي الأمر..." value="${esc(App.params.accQ||'')}" oninput="accSet('accQ',this.value)">
+        <input id="search-accounting" class="input" placeholder="اسم الطفل أو ولي الأمر..." value="${esc(App.params.accQ||'')}" oninput="App.liveSearch('accounting',{...App.params,accQ:this.value},this)">
       </div>
       <div class="input-group" style="margin:0;min-width:140px">
         <label style="font-size:12px">📅 من تاريخ</label>
@@ -3139,7 +3153,7 @@ auditLog(){
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
       <div class="input-group" style="margin:0;flex:1;min-width:180px">
         <label style="font-size:12px">🔍 بحث</label>
-        <input class="input" placeholder="بحث في التفاصيل أو المستخدم..." value="${esc(App.params.alQ||'')}" oninput="App.go('auditLog',{...App.params,alQ:this.value})">
+        <input id="search-audit" class="input" placeholder="بحث في التفاصيل أو المستخدم..." value="${esc(App.params.alQ||'')}" oninput="App.liveSearch('auditLog',{...App.params,alQ:this.value},this)">
       </div>
       <div class="input-group" style="margin:0;min-width:140px">
         <label style="font-size:12px">🏷️ نوع الإجراء</label>
