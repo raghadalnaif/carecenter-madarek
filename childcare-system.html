@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-18-v29 -->
+<!-- BUILD: 2026-06-18-v30 -->
 <script>
 (function(){
-  var BUILD='v29-20260618-1';
+  var BUILD='v30-20260618-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -31,6 +31,8 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- إعدادات خادم التخزين (يُنشأ على السيرفر فقط، غير موجود في المستودع العام) -->
+<script src="api-config.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Tajawal',sans-serif;background:#f1f5f9;color:#1e293b;direction:rtl}
@@ -318,6 +320,44 @@ function _scheduleRender(){
 }
 
 // =========================================================
+//  TRANSPORT: خادم التخزين (يحل محل Firebase) + SSE
+// =========================================================
+const API_BASE=(typeof window!=='undefined'&&window.MADAREK_API_BASE)||'/api';
+const API_TOKEN=(typeof window!=='undefined'&&window.MADAREK_API_TOKEN)||'';
+let _storageMode='firebase'; // 'backend' | 'firebase'
+let _sse=null;
+let _clientId=(()=>{try{return localStorage.getItem('ccs_clientId')||'';}catch{return '';}})();
+if(!_clientId){
+  _clientId=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2));
+  try{localStorage.setItem('ccs_clientId',_clientId);}catch{}
+}
+function _apiHeaders(){return {'Content-Type':'application/json','Authorization':'Bearer '+API_TOKEN,'X-Client-Id':_clientId};}
+async function _backendGetAll(){
+  const r=await fetch(API_BASE+'/data',{headers:_apiHeaders()});
+  if(!r.ok) throw new Error('backend GET '+r.status);
+  return await r.json();
+}
+async function _backendBulk(obj){
+  const r=await fetch(API_BASE+'/bulk',{method:'POST',headers:_apiHeaders(),body:JSON.stringify(obj)});
+  if(!r.ok) throw new Error('bulk '+r.status);
+  return await r.json();
+}
+function _backendPut(k,serialized){
+  return fetch(API_BASE+'/data/'+encodeURIComponent(k),{method:'PUT',headers:_apiHeaders(),body:serialized});
+}
+function _openSSE(){
+  try{
+    if(_sse){try{_sse.close();}catch{}}
+    const url=API_BASE+'/stream?clientId='+encodeURIComponent(_clientId)+'&token='+encodeURIComponent(API_TOKEN);
+    _sse=new EventSource(url);
+    _sse.onmessage=(ev)=>{
+      try{const m=JSON.parse(ev.data);if(m&&m.key!==undefined)_onKeyValue(m.key,m.value);}catch(e){}
+    };
+    // EventSource يعيد الاتصال تلقائياً عند الانقطاع
+  }catch(e){console.error('[SSE]',e);}
+}
+
+// =========================================================
 //  DB
 // =========================================================
 const DB = {
@@ -331,6 +371,25 @@ const DB = {
     let serialized=null;
     try{serialized=JSON.stringify(v);}catch{}
     try{if(serialized!==null)localStorage.setItem('ccs_'+k,serialized)}catch{}
+    // وضع التخزين على الخادم (الأساسي)
+    if(_storageMode==='backend'){
+      if(serialized===null) return;
+      const attempt=(n)=>{
+        _backendPut(k,serialized)
+          .then(r=>{if(!r.ok)throw new Error('http '+r.status);_writeFails[k]=0;})
+          .catch(err=>{
+            if(n<4){setTimeout(()=>attempt(n+1),1000*n);}
+            else{
+              _writeFails[k]=(_writeFails[k]||0)+1;
+              console.error('[DB] فشل حفظ '+k+':',err?.message||err);
+              if(typeof toast==='function') toast('⚠️ تعذّر حفظ "'+k+'" — تحقق من الاتصال','error');
+            }
+          });
+      };
+      attempt(1);
+      return;
+    }
+    // وضع Firebase (احتياطي)
     if(_fdb&&_fbStatus==='ok'){
       _lastWrite=Date.now();
       // خزّن قيمة ما كتبنا — المستمع يقارن لرفض الصدى الذاتي فقط
@@ -353,6 +412,49 @@ const DB = {
       };
       attempt(1);
     }
+  },
+  // التهيئة الموحّدة: الخادم أولاً، وإلا Firebase احتياطياً، مع نقل تلقائي آمن
+  async initStorage(){
+    let backendData=null;
+    try{
+      backendData=await _backendGetAll();
+      _storageMode='backend';
+    }catch(e){
+      _storageMode='firebase';
+      console.warn('[storage] الخادم غير متاح، نعمل على Firebase مؤقتاً:',e?.message||e);
+      await this.initFirebase();
+      return;
+    }
+    // الخادم متصل
+    const hasData=backendData&&((backendData.children&&backendData.children.length)||(backendData.users&&backendData.users.length)||(backendData.subscriptions&&backendData.subscriptions.length));
+    if(hasData){
+      Object.assign(_mem,backendData);
+    }else{
+      // الخادم فارغ — انقل بياناتك من Firebase (متصفحك موثّق) دفعة واحدة
+      let fb=null;
+      try{fb=await this._loadFirebaseRaw();}catch(e){console.warn('[migrate] تعذّر قراءة Firebase:',e?.message||e);}
+      if(fb&&Object.keys(fb).length){
+        Object.assign(_mem,fb);
+        try{await _backendBulk(fb);if(typeof toast==='function')setTimeout(()=>toast('✅ تم نقل بياناتك إلى السيرفر بنجاح'),900);}
+        catch(e){console.error('[migrate] فشل رفع البيانات للخادم:',e);if(typeof toast==='function')setTimeout(()=>toast('⚠️ تعذّر نقل البيانات للخادم','error'),900);}
+      }else{
+        // لا بيانات في Firebase — حمّل من المخزّن المحلي إن وجد وادفعه للخادم
+        Object.keys(SEED).forEach(k=>{let raw=null;try{raw=JSON.parse(localStorage.getItem('ccs_'+k));}catch{}if(raw!=null)_mem[k]=raw;});
+        const toPush={};Object.keys(_mem).forEach(k=>{toPush[k]=_mem[k];});
+        if(Object.keys(toPush).length){try{await _backendBulk(toPush);}catch(e){}}
+      }
+    }
+    _openSSE();
+    _fbStatus='ok'; // تعطيل شريط خطأ Firebase
+  },
+  // قراءة بيانات Firebase مرة واحدة (للنقل فقط — بدون مستمعات ولا كتابة)
+  async _loadFirebaseRaw(){
+    if(typeof firebase==='undefined') return null;
+    if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    await firebase.auth().signInAnonymously();
+    const fdb=firebase.database();
+    const snap=await fdb.ref('ccs').get();
+    return snap.val();
   },
   async initFirebase(){
     try{
@@ -398,19 +500,20 @@ const DB = {
         if(_fbStatus==='ok') missing[k]=SEED[k];
       }
     });
-    if(_fdb&&_fbStatus==='ok'&&Object.keys(missing).length){
-      _lastWrite=Date.now();
-      _fdb.ref('ccs').update(missing).catch(()=>{});
+    if(Object.keys(missing).length){
+      if(_storageMode==='backend'){
+        _backendBulk(missing).catch(()=>{});
+      }else if(_fdb&&_fbStatus==='ok'){
+        _lastWrite=Date.now();
+        _fdb.ref('ccs').update(missing).catch(()=>{});
+      }
     }
-    // ضمان سلامة دور المدير العام — إصلاح إذا تغيّر في Firebase
+    // ضمان سلامة دور المدير العام — إصلاح إذا تغيّر
     const usrs=_mem['users'];
     if(Array.isArray(usrs)){
       let roleFixed=false;
       usrs.forEach(u=>{if(u.id==='sa1'&&u.role!=='superadmin'){u.role='superadmin';roleFixed=true;}});
-      if(roleFixed){
-        try{localStorage.setItem('ccs_users',JSON.stringify(usrs));}catch{}
-        if(_fdb&&_fbStatus==='ok'){_lastWrite=Date.now();_fdb.ref('ccs/users').set(usrs).catch(()=>{});}
-      }
+      if(roleFixed) this.save('users',usrs);
     }
   },
   users(){return this.get('users')||[]},
@@ -6592,7 +6695,7 @@ function showDataRecovery(){
 // =========================================================
 document.getElementById('app').innerHTML=`<div style="height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Tajawal',sans-serif;background:linear-gradient(150deg,#0f766e,#064e3b)"><img src="logo.png" style="width:90px;height:90px;object-fit:contain;margin-bottom:16px" onerror="this.style.display='none'"><p style="color:#fff;font-size:22px;font-weight:700">مدارك الطفل</p><p style="color:rgba(255,255,255,.7);font-size:14px;margin-top:10px">⏳ جاري الاتصال بقاعدة البيانات...</p></div>`;
 (async()=>{
-  await DB.initFirebase();
+  await DB.initStorage();
   DB.init();
   // تصحيح أسماء الفروع — يُصحَّح الاسم فقط إن كان لا يزال على الاسم الافتراضي القديم
   (()=>{
