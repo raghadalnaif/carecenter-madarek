@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-18-v31 -->
+<!-- BUILD: 2026-06-22-v32 -->
 <script>
 (function(){
-  var BUILD='v31-20260618-1';
+  var BUILD='v32-20260622-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -23,6 +23,7 @@
       location.replace(url);
     }
   }
+  window.MADAREK_BUILD=BUILD;
 })();
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
@@ -5011,6 +5012,15 @@ function saveChild(edit=false){
   const phone=document.getElementById('c-phone')?.value?.trim();
   const schoolId=document.getElementById('c-school')?.value?.trim()||Auth.schoolId()||DB.schools()[0]?.id||'';
   if(!name||!parent||!phone){alert('يرجى ملء الحقول المطلوبة');return}
+  if(!edit){
+    const nm=name.toLowerCase();
+    const dup=DB.children().find(c=>(c.name||'').trim().toLowerCase()===nm&&(c.parentPhone||'').trim()===phone);
+    if(dup){
+      const dupBranch=DB.branches().find(b=>b.id===dup.branchId)?.name||'';
+      alert(`⚠️ هذا الطفل مسجّل مسبقاً!\n\nالاسم: ${dup.name}\nهاتف ولي الأمر: ${dup.parentPhone}\nالفرع: ${dupBranch}\n\nلا يمكن تسجيله مرة أخرى بنفس الاسم ورقم هاتف ولي الأمر.`);
+      return;
+    }
+  }
   const childId=edit?document.getElementById('c-id')?.value:uid();
   const period=document.getElementById('c-period')?.value||'evening';
   const c={
@@ -6727,7 +6737,31 @@ document.getElementById('app').innerHTML=`<div style="height:100vh;display:flex;
   })();
   Auth.init();
   App.render();
+  _watchForNewBuild();
 })();
+
+// تنبيه عند توفر تحديث جديد للنظام — يفحص دورياً (ولا يعيد التحميل تلقائياً
+// كي لا يقطع على المستخدم عمله) حتى لا تبقى علامة مفتوحة عالقة على نسخة
+// قديمة تكتب على Firebase بينما بقية الأجهزة انتقلت للسيرفر الجديد
+function _watchForNewBuild(){
+  let banner=null;
+  const check=async()=>{
+    try{
+      const res=await fetch(location.pathname,{cache:'no-store'});
+      const html=await res.text();
+      const m=html.match(/BUILD='([^']+)'/);
+      if(m&&window.MADAREK_BUILD&&m[1]!==window.MADAREK_BUILD&&!banner){
+        banner=document.createElement('div');
+        banner.style.cssText='position:fixed;bottom:16px;left:16px;right:16px;max-width:420px;margin:0 auto;background:#0f766e;color:#fff;padding:14px 18px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:99999;display:flex;align-items:center;gap:12px;font-family:Tajawal,sans-serif;font-size:14px';
+        banner.innerHTML='<span style="flex:1">🔄 يتوفر تحديث جديد للنظام — يُفضّل التحديث الآن</span><button style="background:#fff;color:#0f766e;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit">تحديث الآن</button>';
+        banner.querySelector('button').onclick=()=>{location.href=location.pathname+'?r='+Date.now();};
+        document.body.appendChild(banner);
+      }
+    }catch(e){}
+  };
+  setInterval(check,120000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')check();});
+}
 </script>
 </body>
 </html>
