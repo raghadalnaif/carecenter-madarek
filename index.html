@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-22-v34 -->
+<!-- BUILD: 2026-06-22-v35 -->
 <script>
 (function(){
-  var BUILD='v34-20260622-1';
+  var BUILD='v35-20260622-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -1577,7 +1577,7 @@ attendance(){
     </div>
     <input id="search-attendance" class="input" placeholder="🔍 بحث بالاسم..." value="${esc(App.params.attQ||'')}" style="width:200px" oninput="App.liveSearch('attendance',{...App.params,attQ:this.value},this)">
     <button class="btn btn-primary btn-sm" onclick="saveAttendance('${date}','${sid||''}')">💾 حفظ الحضور</button>
-    <button class="btn btn-success btn-sm" onclick="markAllPresent('${date}','${sid||''}')">✅ الكل حاضر</button>
+    <button class="btn btn-success btn-sm" onclick="markAllPresent('${date}','${sid||''}','att-all')">✅ الكل حاضر</button>
     <div style="margin-right:auto;display:flex;gap:8px">
       <span class="badge badge-green">✅ ${Object.values(attMap).filter(a=>a.status==='present').length} حاضر</span>
       <span class="badge badge-red">❌ ${Object.values(attMap).filter(a=>a.status==='absent').length} غائب</span>
@@ -1608,8 +1608,24 @@ attendance(){
   </div>`:''}
 
   ${kids.length===0?`<div class="card"><div class="empty-state"><div class="es-icon">👶</div><p>${isTeacher?'لا يوجد أطفال مسجلون في فرعك وفترتك':'لا يوجد أطفال مسجلون في هذا الفرع'}</p></div></div>`:`
-  <div class="attendance-grid" id="att-grid">
-    ${kids.map(c=>renderCard(c)).join('')}
+  <div id="att-all">
+    ${(()=>{
+      const section=(pk,label,icon,badgeCls)=>{
+        const group=kids.filter(c=>(c.period||'evening')===pk);
+        if(!group.length) return '';
+        const pres=group.filter(c=>attMap[c.id]?.status==='present').length;
+        const gid='att-grid-'+pk;
+        return `
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:20px 0 10px;padding:10px 14px;background:${pk==='morning'?'#eff6ff':'#fff7ed'};border-radius:10px;border:1px solid ${pk==='morning'?'#bfdbfe':'#fed7aa'}">
+          <h3 style="font-size:16px;font-weight:800;color:#0f766e;margin:0">${icon} الفترة ${label}</h3>
+          <span class="badge ${badgeCls}">${group.length} طفل</span>
+          <span class="badge badge-green">✅ ${pres} حاضر</span>
+          <button class="btn btn-success btn-xs no-print" style="margin-right:auto" onclick="markAllPresent('${date}','${sid||''}','${gid}')">✅ حضّر كل ${label}</button>
+        </div>
+        <div class="attendance-grid" id="${gid}">${group.map(c=>renderCard(c)).join('')}</div>`;
+      };
+      return section('morning','الصباحية','🌅','badge-blue')+section('evening','المسائية','🌙','badge-orange');
+    })()}
   </div>`}
   `;
 },
@@ -6150,11 +6166,12 @@ function saveAttendance(date,schoolId){
 }
 
 // تعليم جميع الأطفال المعروضين كحاضرين (الحضور الجماعي)
-function markAllPresent(date,schoolId){
-  const grid=document.getElementById('att-grid');
+function markAllPresent(date,schoolId,gridId){
+  const grid=document.getElementById(gridId||'att-all');
   if(!grid){toast('لا توجد قائمة حضور','error');return;}
-  if(!confirm('سيتم تعليم جميع الأطفال المعروضين كحاضرين. متابعة؟')) return;
-  const cards=grid.querySelectorAll('[id^="att-"]');
+  const cards=grid.querySelectorAll('.attendance-card');
+  if(!cards.length){toast('لا يوجد أطفال في هذه القائمة','warn');return;}
+  if(!confirm(`سيتم تعليم ${cards.length} طفل كحاضرين. متابعة؟`)) return;
   let count=0;
   cards.forEach(card=>{
     const id=card.id.replace('att-','');
