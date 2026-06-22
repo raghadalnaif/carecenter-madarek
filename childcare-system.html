@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-22-v33 -->
+<!-- BUILD: 2026-06-22-v34 -->
 <script>
 (function(){
-  var BUILD='v33-20260622-1';
+  var BUILD='v34-20260622-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -295,6 +295,16 @@ function _onKeyValue(k,val){
   if(_pendingEcho[k]===incoming){delete _pendingEcho[k];return;}
   let current; try{current=JSON.stringify(_mem[k]);}catch{current=undefined;}
   if(current===incoming) return;
+  // إشعار جديد وصل من جهاز آخر (مديرة فرع) → نبّه المستخدم الحالي بصرياً
+  if(k==='notifications'&&Array.isArray(val)){
+    const oldLen=Array.isArray(_mem[k])?_mem[k].length:0;
+    if(val.length>oldLen&&Auth.user&&(Auth.user.role==='superadmin'||Auth.user.role==='school_admin')){
+      const newest=val[0];
+      if(newest&&typeof toast==='function'){
+        setTimeout(()=>toast('🔔 '+(newest.title||'إشعار جديد')+(newest.body?' — '+newest.body:'')),120);
+      }
+    }
+  }
   _mem[k]=val;
   try{localStorage.setItem('ccs_'+k,incoming);}catch{}
   // ضمان تحديث بيانات المستخدم الحالي إن تغيّر المستخدمون
@@ -304,13 +314,22 @@ function _onKeyValue(k,val){
   }
   _scheduleRender();
 }
+// تحديث شارة الجرس (عدد غير المقروء) في الشريط العلوي مباشرة عند وصول بيانات جديدة
+function _refreshNotifBadge(){
+  const btn=document.getElementById('notif-btn');
+  if(!btn) return;
+  const unread=DB.unreadCount();
+  btn.innerHTML='🔔'+(unread>0?`<span class="notif-badge">${unread>9?'9+':unread}</span>`:'');
+}
 // تجميع إعادات الرسم — عدة تحديثات متتالية تُنتج إعادة رسم واحدة فقط
 function _scheduleRender(){
   if(_renderScheduled) return;
   _renderScheduled=true;
   requestAnimationFrame(()=>{
     _renderScheduled=false;
-    if(!Auth.user||App.modal||App.view==='settings') return;
+    if(!Auth.user) return;
+    _refreshNotifBadge(); // شارة الجرس تتحدّث دائماً ولو كنا في الإعدادات أو نافذة مفتوحة
+    if(App.modal||App.view==='settings') return;
     const el=document.getElementById('content');
     if(!el) return;
     const saved={};
@@ -1462,6 +1481,7 @@ subscriptions(){
               ${Auth.isSuperAdmin()?`<button class="btn btn-warning btn-xs" onclick="Modals.editSub('${s.id}')" title="تعديل الاشتراك والرسوم">✏️ تعديل</button>`:''}
               <button class="btn btn-secondary btn-xs" onclick="Modals.addSub('${s.childId}')">تجديد</button>
               <button class="btn btn-xs" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0" onclick="openInvoice('${s.id}')" title="فاتورة ضريبية إلكترونية">🧾 فاتورة</button>
+              <button class="btn btn-xs" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5" onclick="deleteSubConfirm('${s.id}')" title="حذف الاشتراك (للمكرر)">🗑 حذف</button>
               ${child?`<a href="https://wa.me/966${child.parentPhone.slice(1)}?text=${encodeURIComponent(`مرحباً، اشتراك ${child.name} ينتهي ${formatDate(s.endDate)}. يرجى التجديد.`)}" target="_blank" class="btn btn-wa btn-xs">واتساب</a>`:''}
             </td>
           </tr>`;
@@ -5787,16 +5807,37 @@ function exportTableCSV(tableId, filename){
   document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 
-// تنظيف الاشتراكات المكررة بالكامل (نفس الطفل/التاريخ/المبلغ/طريقة الدفع) — غالباً نتيجة ضغط الحفظ مرتين
+// حذف اشتراك واحد (متاح للمدير العام ومديرة الفرع — أساساً لحذف المكرر)
+function deleteSubConfirm(id){
+  const s=DB.subscriptions().find(x=>x.id===id);
+  if(!s) return;
+  const child=DB.children().find(c=>c.id===s.childId);
+  const typeMap={daily:'يومي',weekly:'أسبوعي',monthly:'٣٠ يوم',custom:'مخصص'};
+  if(!confirm(`حذف اشتراك «${child?.name||'—'}»؟\n\nالنوع: ${typeMap[s.type]||s.type}\nمن ${formatDate(s.startDate)} إلى ${formatDate(s.endDate)}\nالمبلغ: ${s.price} ر.س\n\nيُستخدم لحذف الاشتراكات المكررة. لا يمكن التراجع.`)) return;
+  DB.deleteSub(id);
+  DB.addAuditLog({action:'حذف اشتراك',entity:'اشتراك',entityId:id,details:`${child?.name||''} — ${s.price} ر.س — ${formatDate(s.startDate)}→${formatDate(s.endDate)}`,by:Auth.user?.name||'—'});
+  toast('✅ تم حذف الاشتراك');
+  App.refresh();
+}
+
+// تنظيف الاشتراكات المكررة — يطابق على هوية الاشتراك الأساسية (الطفل/التاريخ/النوع/المبلغ)
+// ويُبقي النسخة الأكثر دفعاً ويحذف الباقي. غالباً ناتجة عن ضغط الحفظ مرتين.
 function cleanDuplicateSubs(){
   if(!Auth.isSuperAdmin()){alert('هذه الأداة للمدير العام فقط');return}
   const subs=DB.subscriptions();
   const children=DB.children();
-  const seen=new Map();
-  const toRemove=[];
+  const groups=new Map();
   subs.forEach(s=>{
-    const sig=[s.childId,s.startDate,s.endDate,s.type,s.price,s.paidAmount,s.paymentMethod,s.paymentStatus].join('|');
-    if(seen.has(sig)) toRemove.push(s); else seen.set(sig,s);
+    const sig=[s.childId,s.startDate,s.endDate,s.type,s.price].join('|');
+    if(!groups.has(sig)) groups.set(sig,[]);
+    groups.get(sig).push(s);
+  });
+  const toRemove=[];
+  groups.forEach(arr=>{
+    if(arr.length<2) return;
+    // أبقِ النسخة الأكثر دفعاً (حفاظاً على أي دفعة مسجّلة) واحذف الباقي
+    arr.sort((a,b)=>(b.paidAmount||0)-(a.paidAmount||0));
+    toRemove.push(...arr.slice(1));
   });
   if(!toRemove.length){alert('✅ لا توجد اشتراكات مكررة');return}
   const names=toRemove.map(s=>children.find(c=>c.id===s.childId)?.name||'؟');
