@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-22-v32 -->
+<!-- BUILD: 2026-06-22-v33 -->
 <script>
 (function(){
-  var BUILD='v32-20260622-1';
+  var BUILD='v33-20260622-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -3648,6 +3648,11 @@ settings(){
           <button class="btn btn-secondary" onclick="showDataRecovery()">🔧 أداة الاسترداد</button>
         </div>
       </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">🧹 تنظيف الاشتراكات المكررة</div>
+        <div style="font-size:13px;color:#64748b;margin-bottom:12px">يبحث عن اشتراكات مكررة بالكامل لنفس الطفل (نفس التاريخ والمبلغ ونوع الاشتراك وطريقة الدفع) — غالباً ناتجة عن ضغط زر الحفظ مرتين، ويحذف النسخ الزائدة مع إبقاء نسخة واحدة فقط.</div>
+        <button class="btn btn-secondary" onclick="cleanDuplicateSubs()">🧹 افحص ونظّف الاشتراكات المكررة</button>
+      </div>
       <div class="card">
         <div class="card-title" style="color:#ef4444">⚠️ إعادة تعيين</div>
         <div class="alert-box alert-red" style="margin-bottom:16px">خطر: تحذف جميع بيانات الأطفال والاشتراكات والحضور نهائياً ولا يمكن التراجع</div>
@@ -5006,16 +5011,21 @@ function toggleSchool(id){
   App.refresh();
 }
 
+let _savingChild=false;
 function saveChild(edit=false){
+  if(_savingChild) return; // يمنع تسجيل الطفل/الاشتراك مرتين عند الضغط على الحفظ بسرعة
+  _savingChild=true;
+  setTimeout(()=>{_savingChild=false;},1500);
   const name=document.getElementById('c-name')?.value?.trim();
   const parent=document.getElementById('c-parent')?.value?.trim();
   const phone=document.getElementById('c-phone')?.value?.trim();
   const schoolId=document.getElementById('c-school')?.value?.trim()||Auth.schoolId()||DB.schools()[0]?.id||'';
-  if(!name||!parent||!phone){alert('يرجى ملء الحقول المطلوبة');return}
+  if(!name||!parent||!phone){_savingChild=false;alert('يرجى ملء الحقول المطلوبة');return}
   if(!edit){
     const nm=name.toLowerCase();
     const dup=DB.children().find(c=>(c.name||'').trim().toLowerCase()===nm&&(c.parentPhone||'').trim()===phone);
     if(dup){
+      _savingChild=false;
       const dupBranch=DB.branches().find(b=>b.id===dup.branchId)?.name||'';
       alert(`⚠️ هذا الطفل مسجّل مسبقاً!\n\nالاسم: ${dup.name}\nهاتف ولي الأمر: ${dup.parentPhone}\nالفرع: ${dupBranch}\n\nلا يمكن تسجيله مرة أخرى بنفس الاسم ورقم هاتف ولي الأمر.`);
       return;
@@ -5073,7 +5083,11 @@ function saveChild(edit=false){
   if(App.view==='children') App.refresh(); else App.go('children');
 }
 
+let _savingSub=false;
 function saveSub(){
+  if(_savingSub) return; // يمنع إنشاء اشتراكين عند الضغط على الحفظ مرتين بسرعة
+  _savingSub=true;
+  setTimeout(()=>{_savingSub=false;},1500);
   const childId=document.getElementById('sub-child')?.value;
   const schoolId=document.getElementById('sub-school')?.value;
   const period=document.getElementById('sub-period')?.value||'evening';
@@ -5083,7 +5097,7 @@ function saveSub(){
   const price=parseFloat(document.getElementById('sub-price')?.value||0);
   const paidAmount=parseFloat(document.getElementById('sub-paid')?.value||0);
   const paymentStatus=document.getElementById('sub-pay')?.value;
-  if(!childId||!type||!startDate||!endDate||!price){alert('يرجى ملء جميع الحقول');return}
+  if(!childId||!type||!startDate||!endDate||!price){_savingSub=false;alert('يرجى ملء جميع الحقول');return}
   const child=DB.children().find(c=>c.id===childId);
   const allSubs=DB.subscriptions();
   const maxNum=allSubs.reduce((m,s)=>{const n=parseInt((s.invoiceNo||'').replace(/^[A-Za-z]+-/,''));return isNaN(n)?m:Math.max(m,n);},0);
@@ -5771,6 +5785,28 @@ function exportTableCSV(tableId, filename){
   a.href=url;a.download=(filename||'تقرير')+'.csv';
   document.body.appendChild(a);a.click();
   document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+
+// تنظيف الاشتراكات المكررة بالكامل (نفس الطفل/التاريخ/المبلغ/طريقة الدفع) — غالباً نتيجة ضغط الحفظ مرتين
+function cleanDuplicateSubs(){
+  if(!Auth.isSuperAdmin()){alert('هذه الأداة للمدير العام فقط');return}
+  const subs=DB.subscriptions();
+  const children=DB.children();
+  const seen=new Map();
+  const toRemove=[];
+  subs.forEach(s=>{
+    const sig=[s.childId,s.startDate,s.endDate,s.type,s.price,s.paidAmount,s.paymentMethod,s.paymentStatus].join('|');
+    if(seen.has(sig)) toRemove.push(s); else seen.set(sig,s);
+  });
+  if(!toRemove.length){alert('✅ لا توجد اشتراكات مكررة');return}
+  const names=toRemove.map(s=>children.find(c=>c.id===s.childId)?.name||'؟');
+  const summary=[...new Set(names)].map(n=>`• ${n}`).join('\n');
+  if(!confirm(`وُجد ${toRemove.length} اشتراك مكرر للأطفال التالية:\n\n${summary}\n\nسيتم حذف النسخ الزائدة فقط (إبقاء نسخة واحدة من كل اشتراك). متابعة؟`)) return;
+  const removeIds=new Set(toRemove.map(s=>s.id));
+  DB.save('subscriptions',subs.filter(s=>!removeIds.has(s.id)));
+  DB.addAuditLog({action:'تنظيف مكررات',entity:'اشتراك',details:`حذف ${toRemove.length} اشتراك مكرر`,by:Auth.user?.name||'—'});
+  toast(`✅ تم حذف ${toRemove.length} اشتراك مكرر`);
+  App.refresh();
 }
 
 function exportAllData(){
