@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-23-v36 -->
+<!-- BUILD: 2026-06-23-v37 -->
 <script>
 (function(){
-  var BUILD='v36-20260623-1';
+  var BUILD='v37-20260623-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -314,12 +314,18 @@ function _onKeyValue(k,val){
   }
   _scheduleRender();
 }
-// تحديث شارة الجرس (عدد غير المقروء) في الشريط العلوي مباشرة عند وصول بيانات جديدة
+// تحديث شارة الجرس ونقطة المزامنة في الشريط العلوي مباشرة عند وصول بيانات جديدة
 function _refreshNotifBadge(){
   const btn=document.getElementById('notif-btn');
-  if(!btn) return;
-  const unread=DB.unreadCount();
-  btn.innerHTML='🔔'+(unread>0?`<span class="notif-badge">${unread>9?'9+':unread}</span>`:'');
+  if(btn){const unread=DB.unreadCount();btn.innerHTML='🔔'+(unread>0?`<span class="notif-badge">${unread>9?'9+':unread}</span>`:'');}
+  const dot=document.getElementById('sync-dot');
+  if(dot){
+    const sseState=_sse?_sse.readyState:-1;
+    const ok=_storageMode==='backend'&&sseState===1;
+    const warn=_storageMode==='backend'&&sseState!==1;
+    dot.style.background=ok?'#10b981':warn?'#f59e0b':'#ef4444';
+    dot.title=_storageMode==='firebase'?'وضع احتياطي — لا تزامن مع الفروع الأخرى':ok?'متصل بالسيرفر':'اتصال بالسيرفر منقطع — إعادة محاولة...';
+  }
 }
 // تجميع إعادات الرسم — عدة تحديثات متتالية تُنتج إعادة رسم واحدة فقط
 function _scheduleRender(){
@@ -346,6 +352,7 @@ const API_BASE=(typeof window!=='undefined'&&window.MADAREK_API_BASE)||'/api';
 const API_TOKEN=(typeof window!=='undefined'&&window.MADAREK_API_TOKEN)||'';
 let _storageMode='firebase'; // 'backend' | 'firebase'
 let _sse=null;
+let _lastResync=0; // وقت آخر مزامنة ناجحة مع الخادم (Unix ms)
 let _clientId=(()=>{try{return localStorage.getItem('ccs_clientId')||'';}catch{return '';}})();
 if(!_clientId){
   _clientId=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2));
@@ -385,6 +392,7 @@ async function _resyncFromServer(){
   try{
     const fresh=await _backendGetAll();
     Object.entries(fresh).forEach(([k,v])=>_onKeyValue(k,v));
+    _lastResync=Date.now();
   }catch(e){}
 }
 function _ensureSSEAlive(){
@@ -869,6 +877,15 @@ const App = {
         <button class="btn btn-secondary btn-sm" onclick="App.go(App.view,App.params)" title="تحديث البيانات" style="padding:6px 10px;font-size:16px;line-height:1">🔄</button>
         <button class="btn btn-success btn-sm" onclick="exportAllData()" title="تصدير جميع البيانات Excel" style="padding:6px 12px;font-size:13px">⬇️ <span class="export-label">تصدير</span></button>
         <span style="font-size:11px;color:#94a3b8">${hm}</span>
+        ${(()=>{
+          const mode=_storageMode;
+          const sseState=_sse?_sse.readyState:-1; // -1=غير مفتوح, 0=يتصل, 1=متصل, 2=مغلق
+          const ok=mode==='backend'&&sseState===1;
+          const warn=mode==='backend'&&sseState!==1;
+          const dot=ok?'#10b981':warn?'#f59e0b':'#ef4444';
+          const tip=mode==='firebase'?'وضع احتياطي — لا تزامن مع الفروع الأخرى':ok?'متصل بالسيرفر':'اتصال بالسيرفر منقطع — إعادة محاولة...';
+          return `<span id="sync-dot" title="${tip}" style="width:9px;height:9px;border-radius:50%;background:${dot};display:inline-block;flex-shrink:0;cursor:default" onclick="toast('${tip}')"></span>`;
+        })()}
         ${Auth.isSuperAdmin()||Auth.isSchoolAdmin()?`
         <div style="position:relative">
           <button class="btn btn-secondary btn-sm" id="notif-btn" onclick="toggleNotifPanel()" style="padding:6px 10px;font-size:17px;line-height:1;position:relative">
@@ -3699,14 +3716,45 @@ settings(){
     content=`
     <div>
       <div class="card" style="margin-bottom:16px">
-        <div class="card-title">🗄️ حالة قاعدة البيانات</div>
-        <div class="alert-box ${_fbStatus==='ok'?'alert-green':'alert-red'}" style="margin-bottom:16px">
-          ${_fbStatus==='ok'?'✅ Firebase متصل — البيانات تُزامَن تلقائياً':'🔴 Firebase غير متصل — البيانات محلية فقط'}
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+        <div class="card-title">📡 حالة الاتصال والمزامنة</div>
+        ${(()=>{
+          const mode=_storageMode;
+          const sseState=_sse?_sse.readyState:-1;
+          const ok=mode==='backend'&&sseState===1;
+          const warn=mode==='backend'&&sseState!==1;
+          const modeLabel=mode==='backend'?'☁️ الخادم الخاص (وضع مكتمل)':'🔌 Firebase (وضع احتياطي — لا تزامن بين الفروع)';
+          const sseLabel=['⏳ جاري الاتصال...','✅ متصل ويستقبل التحديثات','❌ منقطع (جارٍ إعادة الاتصال)'][sseState]||'—';
+          const syncAgo=_lastResync>0?Math.round((Date.now()-_lastResync)/1000)+'ث':('—');
+          const u=Auth.user||{};
+          const roleDisplay=u.role==='superadmin'?'مدير عام':u.role==='school_admin'?'مدير فرع':u.role==='teacher'?'معلمة':'—';
+          return `
+          <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+            <div style="background:${ok?'#f0fdf4':warn?'#fffbeb':'#fef2f2'};border:1px solid ${ok?'#bbf7d0':warn?'#fde68a':'#fecaca'};border-radius:10px;padding:12px 16px">
+              <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:6px">وضع التخزين</div>
+              <div style="font-size:13px;font-weight:600">${modeLabel}</div>
+            </div>
+            ${mode==='backend'?`
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 16px">
+              <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:6px">اتصال البث اللحظي (SSE)</div>
+              <div style="font-size:13px;font-weight:600">${sseLabel}</div>
+              <div style="font-size:11px;color:#64748b;margin-top:4px">آخر مزامنة: قبل ${syncAgo} · ClientId: ${_clientId.slice(0,8)}...</div>
+            </div>`:'<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px 16px;font-size:13px;color:#c2410c">⚠️ هذا الجهاز في الوضع الاحتياطي — بياناته لا تصل لأجهزة أخرى. تأكد من الاتصال بالإنترنت ثم اضغط «تحديث» أدناه.</div>'}
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px">
+              <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:6px">الحساب الحالي</div>
+              <div style="font-size:13px;font-weight:600">${esc(u.name||'—')} · <span style="color:${u.role==='superadmin'?'#059669':'#0284c7'}">${roleDisplay}</span></div>
+              ${u.role!=='superadmin'&&u.branchId?`<div style="font-size:11px;color:#64748b;margin-top:2px">الفرع: ${esc(DB.branches().find(b=>b.id===u.branchId)?.name||u.branchId)} · الفترة: ${u.period==='morning'?'صباحي':'مسائي'}</div>`:''}
+              ${u.role==='superadmin'?'<div style="font-size:11px;color:#059669;margin-top:2px">✅ مدير عام — يرى جميع الفروع والبيانات</div>':'<div style="font-size:11px;color:#0284c7;margin-top:2px">ℹ️ مدير فرع — يرى فرعه فقط. للوصول الكامل استخدم حساب المدير العام (username: admin)</div>'}
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="_resyncFromServer().then(()=>{toast('✅ تم تحديث البيانات من الخادم');App.go('settings',{tab:'data'})})">🔄 مزامنة الآن من الخادم</button>
+          `;
+        })()}
+        <div style="margin-top:12px">
+        <div class="card-title" style="font-size:13px;margin-bottom:8px">🗄️ سجل البيانات المحلية</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
           ${Object.entries(mem).map(([k,v])=>`<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between"><span style="font-size:13px;color:#374151">${k}</span><span style="font-size:14px;font-weight:700;color:${v>0?'#059669':'#64748b'}">${v}</span></div>`).join('')}
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="App.go('settings',{tab:'data'})">🔄 تحديث</button>
+        </div>
       </div>
       <div class="card" style="margin-bottom:16px">
         <div class="card-title">⬇️ تصدير البيانات</div>
