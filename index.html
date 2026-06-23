@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-22-v35 -->
+<!-- BUILD: 2026-06-23-v36 -->
 <script>
 (function(){
-  var BUILD='v35-20260622-1';
+  var BUILD='v36-20260623-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -376,6 +376,35 @@ function _openSSE(){
     // EventSource يعيد الاتصال تلقائياً عند الانقطاع
   }catch(e){console.error('[SSE]',e);}
 }
+// مزامنة احتياطية بالسحب (pull) — لا نعتمد على SSE وحده للوصول. بعض الأجهزة
+// (خصوصاً الجوال عند تعليق المتصفح بالخلفية أو تبديل الشبكة) تُسقط الاتصال
+// اللحظي بصمت دون أن يُعيد EventSource فتحه فعلياً، فتبقى بيانات الجهاز
+// قديمة (لا تصل إشعارات/حضور/تقارير من فروع أخرى) دون أي خطأ ظاهر للمستخدم.
+async function _resyncFromServer(){
+  if(_storageMode!=='backend') return;
+  try{
+    const fresh=await _backendGetAll();
+    Object.entries(fresh).forEach(([k,v])=>_onKeyValue(k,v));
+  }catch(e){}
+}
+function _ensureSSEAlive(){
+  if(_storageMode!=='backend') return;
+  if(!_sse||_sse.readyState===2) _openSSE(); // 2 = CLOSED
+}
+function _startSyncWatchdog(){
+  // عند عودة التبويب للواجهة، أو عودة الاتصال بالشبكة: تأكد من حيوية SSE واسحب أحدث نسخة فوراً
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible'){_ensureSSEAlive();_resyncFromServer();}
+  });
+  window.addEventListener('online',()=>{_ensureSSEAlive();_resyncFromServer();});
+  window.addEventListener('pageshow',()=>{_ensureSSEAlive();_resyncFromServer();});
+  // فحص دوري احتياطي حتى لو لم يتغيّر ظهور التبويب أو الشبكة صراحةً
+  setInterval(()=>{
+    if(document.visibilityState!=='visible') return;
+    _ensureSSEAlive();
+    _resyncFromServer();
+  },60000);
+}
 
 // =========================================================
 //  DB
@@ -443,6 +472,7 @@ const DB = {
       _storageMode='firebase';
       console.warn('[storage] الخادم غير متاح، نعمل على Firebase مؤقتاً:',e?.message||e);
       await this.initFirebase();
+      _watchForBackendRecovery();
       return;
     }
     // الخادم متصل
@@ -465,6 +495,7 @@ const DB = {
       }
     }
     _openSSE();
+    _startSyncWatchdog();
     _fbStatus='ok'; // تعطيل شريط خطأ Firebase
   },
   // قراءة بيانات Firebase مرة واحدة (للنقل فقط — بدون مستمعات ولا كتابة)
@@ -1478,7 +1509,7 @@ subscriptions(){
             <td><span class="badge ${stMap[st]}">${stLbl[st]}</span></td>
             <td style="white-space:nowrap">
               ${s.paymentStatus!=='paid'?`<button class="btn btn-success btn-xs" onclick="Modals.pay('${s.id}')">دفع</button>`:''}
-              ${Auth.isSuperAdmin()?`<button class="btn btn-warning btn-xs" onclick="Modals.editSub('${s.id}')" title="تعديل الاشتراك والرسوم">✏️ تعديل</button>`:''}
+              ${(Auth.isSuperAdmin()||Auth.isSchoolAdmin())?`<button class="btn btn-warning btn-xs" onclick="Modals.editSub('${s.id}')" title="تعديل الاشتراك والرسوم والتواريخ">✏️ تعديل</button>`:''}
               <button class="btn btn-secondary btn-xs" onclick="Modals.addSub('${s.childId}')">تجديد</button>
               <button class="btn btn-xs" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0" onclick="openInvoice('${s.id}')" title="فاتورة ضريبية إلكترونية">🧾 فاتورة</button>
               <button class="btn btn-xs" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5" onclick="deleteSubConfirm('${s.id}')" title="حذف الاشتراك (للمكرر)">🗑 حذف</button>
@@ -4363,9 +4394,10 @@ const Modals = {
   },
 
   editSub(subId){
-    if(!Auth.isSuperAdmin()) return;
+    if(!Auth.isSuperAdmin()&&!Auth.isSchoolAdmin()) return;
     const s=DB.subscriptions().find(x=>x.id===subId);
     if(!s) return;
+    if(Auth.isSchoolAdmin()&&s.branchId!==Auth.branchId()) return;
     const child=DB.children().find(c=>c.id===s.childId);
     App.showModal(`
     <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
@@ -4374,7 +4406,7 @@ const Modals = {
       <div class="modal-body">
         <input type="hidden" id="edit-sub-id" value="${subId}">
         <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#92400e">
-          ⚠️ صلاحية المدير العام — أي تعديل يُطبَّق فوراً على قاعدة البيانات.
+          ⚠️ أي تعديل يُطبَّق فوراً على قاعدة البيانات.
         </div>
         <div style="background:#f0fdf4;border-radius:8px;padding:12px;margin-bottom:14px;display:flex;gap:20px;flex-wrap:wrap">
           <div><div style="font-size:11px;color:#64748b">الطفل</div><div style="font-weight:700">${esc(child?.name||'—')}</div></div>
@@ -5175,11 +5207,12 @@ function savePay(){
 }
 
 function saveEditSub(){
-  if(!Auth.isSuperAdmin()){alert('هذه الصلاحية للمدير العام فقط');return;}
+  if(!Auth.isSuperAdmin()&&!Auth.isSchoolAdmin()){alert('ليست لديك صلاحية لهذا الإجراء');return;}
   const subId=document.getElementById('edit-sub-id')?.value;
   if(!subId) return;
   const s=DB.subscriptions().find(x=>x.id===subId);
   if(!s){toast('⚠️ الاشتراك غير موجود — قد يكون حُذف','error');App.closeModal();App.refresh();return;}
+  if(Auth.isSchoolAdmin()&&s.branchId!==Auth.branchId()){alert('لا يمكنك تعديل اشتراك فرع آخر');return;}
   const type=document.getElementById('edit-sub-type')?.value;
   const startDate=document.getElementById('edit-sub-start')?.value;
   const endDate=document.getElementById('edit-sub-end')?.value;
@@ -6834,27 +6867,47 @@ document.getElementById('app').innerHTML=`<div style="height:100vh;display:flex;
   _watchForNewBuild();
 })();
 
+// شريط تنبيه عائم قابل لإعادة الاستخدام — يطلب من المستخدم إعادة تحميل الصفحة
+// (لا نعيد التحميل تلقائياً كي لا يُقطع على المستخدم عمله في منتصف إدخال بيانات)
+let _reloadBannerShown=false;
+function _showReloadBanner(msg){
+  if(_reloadBannerShown) return;
+  _reloadBannerShown=true;
+  const banner=document.createElement('div');
+  banner.style.cssText='position:fixed;bottom:16px;left:16px;right:16px;max-width:420px;margin:0 auto;background:#0f766e;color:#fff;padding:14px 18px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:99999;display:flex;align-items:center;gap:12px;font-family:Tajawal,sans-serif;font-size:14px';
+  banner.innerHTML=`<span style="flex:1">${msg}</span><button style="background:#fff;color:#0f766e;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit">تحديث الآن</button>`;
+  banner.querySelector('button').onclick=()=>{location.href=location.pathname+'?r='+Date.now();};
+  document.body.appendChild(banner);
+}
 // تنبيه عند توفر تحديث جديد للنظام — يفحص دورياً (ولا يعيد التحميل تلقائياً
 // كي لا يقطع على المستخدم عمله) حتى لا تبقى علامة مفتوحة عالقة على نسخة
 // قديمة تكتب على Firebase بينما بقية الأجهزة انتقلت للسيرفر الجديد
 function _watchForNewBuild(){
-  let banner=null;
   const check=async()=>{
     try{
       const res=await fetch(location.pathname,{cache:'no-store'});
       const html=await res.text();
       const m=html.match(/BUILD='([^']+)'/);
-      if(m&&window.MADAREK_BUILD&&m[1]!==window.MADAREK_BUILD&&!banner){
-        banner=document.createElement('div');
-        banner.style.cssText='position:fixed;bottom:16px;left:16px;right:16px;max-width:420px;margin:0 auto;background:#0f766e;color:#fff;padding:14px 18px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:99999;display:flex;align-items:center;gap:12px;font-family:Tajawal,sans-serif;font-size:14px';
-        banner.innerHTML='<span style="flex:1">🔄 يتوفر تحديث جديد للنظام — يُفضّل التحديث الآن</span><button style="background:#fff;color:#0f766e;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit">تحديث الآن</button>';
-        banner.querySelector('button').onclick=()=>{location.href=location.pathname+'?r='+Date.now();};
-        document.body.appendChild(banner);
+      if(m&&window.MADAREK_BUILD&&m[1]!==window.MADAREK_BUILD){
+        _showReloadBanner('🔄 يتوفر تحديث جديد للنظام — يُفضّل التحديث الآن');
       }
     }catch(e){}
   };
   setInterval(check,120000);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')check();});
+}
+// شفاء ذاتي: جهاز عالق على Firebase (لأن الخادم كان متعطلاً لحظة فتح الصفحة)
+// يُعاد فحصه دورياً — فور توفر الخادم نطلب من المستخدم تحديثاً بسيطاً
+// لإعادة الإقلاع على وضع الخادم الموثوق بدل البقاء معزولاً عن بقية الفروع
+function _watchForBackendRecovery(){
+  if(_storageMode==='backend') return;
+  const check=async()=>{
+    try{
+      await _backendGetAll();
+      _showReloadBanner('🔄 الاتصال بالخادم عاد — يُرجى التحديث الآن لمزامنة بياناتك مع بقية الفروع');
+    }catch(e){}
+  };
+  setInterval(check,30000);
 }
 </script>
 </body>
