@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-23-v37 -->
+<!-- BUILD: 2026-06-24-v38 -->
 <script>
 (function(){
-  var BUILD='v37-20260623-1';
+  var BUILD='v38-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -603,6 +603,30 @@ const DB = {
   addGovDoc(d){const a=this.govDocs();a.push(d);this.save('govDocs',a)},
   updateGovDoc(d){const a=this.govDocs();const i=a.findIndex(x=>x.id===d.id);if(i>=0)a[i]=d;else a.push(d);this.save('govDocs',a)},
   deleteGovDoc(id){this.save('govDocs',this.govDocs().filter(x=>x.id!==id))},
+  // ===== الموارد البشرية =====
+  hrEmployees(){return this.get('hr_employees')||[]},
+  addHrEmployee(e){const a=this.hrEmployees();a.push(e);this.save('hr_employees',a)},
+  updateHrEmployee(e){const a=this.hrEmployees();const i=a.findIndex(x=>x.id===e.id);if(i>=0)a[i]=e;else a.push(e);this.save('hr_employees',a)},
+  deleteHrEmployee(id){this.save('hr_employees',this.hrEmployees().filter(x=>x.id!==id))},
+  hrLeaves(){return this.get('hr_leaves')||[]},
+  addHrLeave(l){const a=this.hrLeaves();a.push(l);this.save('hr_leaves',a)},
+  updateHrLeave(l){const a=this.hrLeaves();const i=a.findIndex(x=>x.id===l.id);if(i>=0)a[i]=l;else a.push(l);this.save('hr_leaves',a)},
+  deleteHrLeave(id){this.save('hr_leaves',this.hrLeaves().filter(x=>x.id!==id))},
+  hrAttendance(){return this.get('hr_attendance')||[]},
+  saveHrAttendance(list){this.save('hr_attendance',list)},
+  hrPayroll(){return this.get('hr_payroll')||[]},
+  addHrPayroll(p){const a=this.hrPayroll();a.push(p);this.save('hr_payroll',a)},
+  updateHrPayroll(p){const a=this.hrPayroll();const i=a.findIndex(x=>x.id===p.id);if(i>=0)a[i]=p;else a.push(p);this.save('hr_payroll',a)},
+  deleteHrPayroll(id){this.save('hr_payroll',this.hrPayroll().filter(x=>x.id!==id))},
+  // حالة وثيقة موظف: ok | soon60 (شهرين) | soon7 (أسبوع أخير) | expired
+  hrDocStatus(expiryDate){
+    if(!expiryDate) return 'ok';
+    const days=diffDays(expiryDate,T0);
+    if(days<0) return 'expired';
+    if(days<=7) return 'soon7';
+    if(days<=60) return 'soon60';
+    return 'ok';
+  },
   // سجل الدفعات لكل اشتراك (تاريخ كل دفعة جزئية)
   payments(){return this.get('payments')||[]},
   addPayment(p){const a=this.payments();a.push(p);this.save('payments',a)},
@@ -799,6 +823,7 @@ const App = {
       {v:'expenses',icon:'💸',label:'المصروفات'},
       {v:'accounting',icon:'🧾',label:'المحاسبة'},
       {v:'govDocs',icon:'🏛️',label:'الوثائق الحكومية'},
+      {v:'hr',icon:'👥',label:'الموارد البشرية'},
       {v:'tasks',icon:'📌',label:'مهام اليوم'},
       {v:'cashClosing',icon:'💰',label:'تقفيل الصندوق'},
       {v:'messages',icon:'💬',label:'الرسائل الداخلية'},
@@ -820,6 +845,7 @@ const App = {
       {v:'whatsapp',icon:'💬',label:'رسائل واتساب'},
       {v:'activities',icon:'🎯',label:'الأنشطة الأسبوعية'},
       {v:'sales',icon:'🛍️',label:'المبيعات'},
+      {v:'hr',icon:'👥',label:'الموارد البشرية'},
     ] : [
       {v:'attendance',icon:'✅',label:'تسجيل الحضور'},
       {v:'my_reports',icon:'📊',label:'تقارير الحضور'},
@@ -840,7 +866,7 @@ const App = {
     </div>`;
   },
   topbar(){
-    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات',accounting:'🧾 المحاسبة',branchReport:'📈 تقرير الفرع الشهري',childNotes:'📝 ملاحظات الأطفال',expenses:'💸 مصروفات الفرع',messages:'💬 الرسائل الداخلية',auditLog:'🔍 سجل النشاط',govDocs:'🏛️ الوثائق الحكومية'};
+    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات',accounting:'🧾 المحاسبة',branchReport:'📈 تقرير الفرع الشهري',childNotes:'📝 ملاحظات الأطفال',expenses:'💸 مصروفات الفرع',messages:'💬 الرسائل الداخلية',auditLog:'🔍 سجل النشاط',govDocs:'🏛️ الوثائق الحكومية',hr:'👥 الموارد البشرية'};
     const now=new Date();
     const hm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
     const unread=DB.unreadCount();
@@ -968,10 +994,11 @@ const App = {
       messages:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
       settings:()=>Auth.isSuperAdmin(),
       govDocs:()=>Auth.isSuperAdmin(),
+      hr:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
     };
     const guard=guards[App.view];
     if(guard&&!guard()) return Views._forbidden();
-    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,childNotes:Views.childNotes,messages:Views.messages,settings:Views.settings,govDocs:Views.govDocs};
+    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,childNotes:Views.childNotes,messages:Views.messages,settings:Views.settings,govDocs:Views.govDocs,hr:Views.hr};
     const fn=map[App.view]||Views.dashboard;
     try{return fn();}
     catch(e){console.error('[CCS]',App.view,e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة: ${App.view}</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
@@ -1087,6 +1114,7 @@ _superDash(){
   </div>
   ${Views._alertBanners(al)}
   ${Views._govDocAlertBanner()}
+  ${Views._hrDocAlertBanner()}
   <div class="card">
     <div class="card-title">🏢 توزيع الأطفال على الفروع</div>
     <div style="display:flex;gap:16px;flex-wrap:wrap">
@@ -1196,6 +1224,30 @@ _alertBanners(al,schoolId=null){
   return html;
 },
 
+// تنبيهات وثائق الموظفين (إقامة / عقد / صحية) — مبني على نظام العمل السعودي
+_hrDocAlertBanner(){
+  const bid=Auth.branchId();
+  let emps=DB.hrEmployees().filter(e=>(e.status||'active')==='active');
+  if(bid) emps=emps.filter(e=>e.branchId===bid);
+  const fields=[{k:'iqamaExpiry',lbl:'إقامة'},{k:'contractEnd',lbl:'عقد'},{k:'healthCertExpiry',lbl:'شهادة صحية'}];
+  const expired=[],urgent=[],warn=[];
+  emps.forEach(e=>{
+    fields.forEach(f=>{
+      if(!e[f.k]) return;
+      const st=DB.hrDocStatus(e[f.k]);
+      const days=diffDays(e[f.k],T0);
+      if(st==='expired') expired.push(`${esc(e.name)} (${f.lbl})`);
+      else if(st==='soon7') urgent.push(`${esc(e.name)} — ${f.lbl} يوم ${days}`);
+      else if(st==='soon60') warn.push(`${esc(e.name)} — ${f.lbl}: ${days} يوم`);
+    });
+  });
+  if(!expired.length&&!urgent.length&&!warn.length) return '';
+  let html='';
+  if(expired.length) html+=`<div class="alert-box alert-red" style="cursor:pointer" onclick="App.go('hr',{hrTab:'employees'})">👷 <div><strong>وثائق موظفين منتهية (${expired.length})</strong><br>${expired.join(' · ')}</div></div>`;
+  if(urgent.length) html+=`<div class="alert-box alert-red" style="cursor:pointer" onclick="App.go('hr',{hrTab:'employees'})">🚨 <div><strong>أسبوع أخير لانتهاء وثائق موظفين (${urgent.length})</strong><br>${urgent.join(' · ')}</div></div>`;
+  if(warn.length) html+=`<div class="alert-box alert-orange" style="cursor:pointer" onclick="App.go('hr',{hrTab:'employees'})">⏳ <div><strong>وثائق موظفين تنتهي قريباً — ${warn.length} تنبيه</strong><br><small>العد التنازلي لشهرين قبل انتهاء العقود (نظام العمل السعودي المادة 75)</small><br>${warn.slice(0,5).join(' · ')}${warn.length>5?` · +${warn.length-5} آخرين`:''}</div></div>`;
+  return html;
+},
 _govDocAlertBanner(){
   const docs=DB.govDocs();
   const expired=docs.filter(d=>DB.govDocStatus(d)==='expired');
@@ -3918,6 +3970,254 @@ sales(){
   </div>`}`;
 },
 
+// ===== الموارد البشرية =====
+hr(){
+  if(!Auth.isSuperAdmin()&&!Auth.isSchoolAdmin()) return Views._forbidden();
+  const tab=App.params.hrTab||'employees';
+  const bid=Auth.branchId();
+  const branches=DB.branches();
+  const tabs=[
+    {k:'employees',icon:'👥',label:'الموظفون'},
+    {k:'attendance',icon:'✅',label:'الحضور'},
+    {k:'leaves',icon:'🏖️',label:'الإجازات'},
+    {k:'payroll',icon:'💰',label:'مسير الرواتب'},
+  ];
+  let emps=DB.hrEmployees().filter(e=>e.status!=='deleted');
+  if(bid) emps=emps.filter(e=>e.branchId===bid);
+  const filterBranch=App.params.hrBranch||'all';
+  if(!bid&&filterBranch!=='all') emps=emps.filter(e=>e.branchId===filterBranch);
+  const statusBadge=(s)=>({active:'<span class="badge badge-green">نشط</span>',on_leave:'<span class="badge badge-yellow">إجازة</span>',resigned:'<span class="badge" style="background:#e2e8f0;color:#64748b">استقال</span>',terminated:'<span class="badge badge-red">منتهي الخدمة</span>'})[s]||'';
+  const docAlert=(e)=>{
+    const fields=[{label:'الإقامة',d:e.iqamaExpiry},{label:'العقد',d:e.contractEnd},{label:'الصحية',d:e.healthCertExpiry}];
+    let alerts=[];
+    fields.forEach(f=>{
+      if(!f.d) return;
+      const st=DB.hrDocStatus(f.d);
+      const days=diffDays(f.d,T0);
+      if(st==='expired') alerts.push(`<span style="color:#ef4444;font-size:11px">🔴 ${f.label} منتهية</span>`);
+      else if(st==='soon7') alerts.push(`<span style="color:#ef4444;font-size:11px">🚨 ${f.label}: ${days} يوم</span>`);
+      else if(st==='soon60') alerts.push(`<span style="color:#f59e0b;font-size:11px">⏳ ${f.label}: ${days} يوم</span>`);
+    });
+    return alerts.join(' · ');
+  };
+  // رصيد الإجازة السنوية (نظام العمل السعودي: أقل من 5 سنوات 21 يوم، 5 سنوات فأكثر 30 يوم)
+  const annualBalance=(e)=>{
+    if(!e.contractStart) return {entitled:21,used:0,remaining:21};
+    const years=Math.max(0,(new Date(T0)-new Date(e.contractStart))/31557600000);
+    const entitled=years>=5?30:21;
+    const yearStart=T0.slice(0,4)+'-01-01';
+    const yearEnd=T0.slice(0,4)+'-12-31';
+    const used=DB.hrLeaves().filter(l=>l.employeeId===e.id&&l.type==='annual'&&l.status==='approved'&&l.startDate>=yearStart&&l.startDate<=yearEnd).reduce((a,l)=>a+(+l.days||0),0);
+    return {entitled,used,remaining:Math.max(0,entitled-used),years:Math.round(years*10)/10};
+  };
+  let content='';
+  if(tab==='employees'){
+    const q=(App.params.hrQ||'').trim();
+    let list=emps;
+    if(q) list=list.filter(e=>e.name.includes(q)||e.jobTitle?.includes(q)||(e.nationalId||e.iqamaNo||'').includes(q));
+    const statusFilter=App.params.hrSt||'active';
+    if(statusFilter!=='all') list=list.filter(e=>(e.status||'active')===statusFilter);
+    const alertCount=emps.filter(e=>{
+      return ['iqamaExpiry','contractEnd','healthCertExpiry'].some(k=>e[k]&&['soon7','soon60','expired'].includes(DB.hrDocStatus(e[k])));
+    }).length;
+    content=`
+    <div>
+      <div class="stats-grid" style="margin-bottom:16px">
+        <div class="stat-card blue"><div class="stat-val">${emps.length}</div><div class="stat-lbl">إجمالي الموظفين</div></div>
+        <div class="stat-card green"><div class="stat-val">${emps.filter(e=>(e.status||'active')==='active').length}</div><div class="stat-lbl">موظف نشط</div></div>
+        <div class="stat-card yellow"><div class="stat-val">${emps.filter(e=>e.status==='on_leave').length}</div><div class="stat-lbl">في إجازة</div></div>
+        <div class="stat-card red"><div class="stat-val">${alertCount}</div><div class="stat-lbl">تنبيهات وثائق</div></div>
+      </div>
+      ${alertCount>0?`<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#c2410c">
+        ⚠️ <strong>${alertCount} موظف</strong> لديهم وثائق تستحق الانتباه (إقامة / عقد / شهادة صحية)
+      </div>`:''}
+      <div class="actions-bar">
+        <input class="input" style="flex:1;max-width:260px" placeholder="🔍 بحث..." value="${esc(q)}" oninput="App.liveSearch('hr',{hrTab:'employees',hrBranch:'${filterBranch}',hrSt:'${statusFilter}'},this)">
+        ${!bid?`<select class="input" style="width:auto" onchange="App.go('hr',{hrTab:'employees',hrBranch:this.value,hrSt:'${statusFilter}'})">
+          <option value="all" ${filterBranch==='all'?'selected':''}>جميع الفروع</option>
+          ${branches.map(b=>`<option value="${b.id}" ${filterBranch===b.id?'selected':''}>${esc(b.name.split(' - ')[0])}</option>`).join('')}
+        </select>`:''}
+        <select class="input" style="width:auto" onchange="App.go('hr',{hrTab:'employees',hrBranch:'${filterBranch}',hrSt:this.value})">
+          <option value="active" ${statusFilter==='active'?'selected':''}>نشط</option>
+          <option value="all" ${statusFilter==='all'?'selected':''}>الكل</option>
+          <option value="on_leave" ${statusFilter==='on_leave'?'selected':''}>في إجازة</option>
+          <option value="resigned" ${statusFilter==='resigned'?'selected':''}>استقال</option>
+          <option value="terminated" ${statusFilter==='terminated'?'selected':''}>منتهي الخدمة</option>
+        </select>
+        <button class="btn btn-primary" onclick="Modals.addHrEmployee()">+ إضافة موظف</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap"><table>
+          <thead><tr><th>الاسم</th><th>المسمى الوظيفي</th><th>الفرع</th><th>الراتب</th><th>نهاية العقد</th><th>الحالة</th><th>تنبيهات</th><th>إجراءات</th></tr></thead>
+          <tbody>
+          ${list.length===0?`<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:32px">لا يوجد موظفون</td></tr>`:''}
+          ${list.map(e=>{
+            const bal=annualBalance(e);
+            const cdSt=DB.hrDocStatus(e.contractEnd);
+            const cdDays=e.contractEnd?diffDays(e.contractEnd,T0):'';
+            const cdBadge=cdSt==='expired'?'<span style="color:#ef4444;font-size:11px">🔴 منتهي</span>':cdSt==='soon7'?`<span style="color:#ef4444;font-size:11px">🚨 ${cdDays} يوم</span>`:cdSt==='soon60'?`<span style="color:#f59e0b;font-size:11px">⏳ ${cdDays} يوم</span>`:formatDate(e.contractEnd);
+            return `<tr>
+              <td><strong>${esc(e.name)}</strong><br><span style="font-size:11px;color:#64748b">${esc(e.nationality||'')}</span></td>
+              <td>${esc(e.jobTitle||'—')}</td>
+              <td>${esc(branches.find(b=>b.id===e.branchId)?.name.split(' - ')[0]||'—')}</td>
+              <td style="font-weight:600;color:#059669">${(+e.basicSalary||0).toLocaleString()} ر.س</td>
+              <td>${cdBadge||'—'}</td>
+              <td>${statusBadge(e.status||'active')}</td>
+              <td style="font-size:11px;max-width:140px">${docAlert(e)||'<span style="color:#10b981">✓ سليم</span>'}</td>
+              <td>
+                <button class="btn btn-secondary btn-xs" onclick="Modals.viewHrEmployee('${e.id}')">📋 ملف</button>
+                <button class="btn btn-secondary btn-xs" onclick="Modals.editHrEmployee('${e.id}')">✏️</button>
+                <button class="btn btn-xs" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5" onclick="deleteHrEmployee('${e.id}')">🗑️</button>
+              </td>
+            </tr>`;
+          }).join('')}
+          </tbody>
+        </table></div>
+      </div>
+    </div>`;
+  } else if(tab==='attendance'){
+    const date=App.params.hrDate||T0;
+    const attList=DB.hrAttendance().filter(a=>a.date===date);
+    const attMap={};
+    attList.forEach(a=>{attMap[a.employeeId]=a;});
+    const activeEmps=emps.filter(e=>(e.status||'active')==='active'||(e.status||'active')==='on_leave');
+    const presentCnt=Object.values(attMap).filter(a=>a.status==='present').length;
+    const absentCnt=Object.values(attMap).filter(a=>a.status==='absent').length;
+    const lateCnt=Object.values(attMap).filter(a=>a.status==='late').length;
+    content=`
+    <div>
+      <div class="stats-grid" style="margin-bottom:16px">
+        <div class="stat-card green"><div class="stat-val">${presentCnt}</div><div class="stat-lbl">حاضر</div></div>
+        <div class="stat-card red"><div class="stat-val">${absentCnt}</div><div class="stat-lbl">غائب</div></div>
+        <div class="stat-card yellow"><div class="stat-val">${lateCnt}</div><div class="stat-lbl">متأخر</div></div>
+        <div class="stat-card blue"><div class="stat-val">${activeEmps.length-presentCnt-absentCnt-lateCnt}</div><div class="stat-lbl">لم يُسجَّل</div></div>
+      </div>
+      <div class="actions-bar">
+        <input type="date" class="input" style="width:180px" value="${date}" max="${T0}" onchange="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:this.value})">
+        <button class="btn btn-primary" onclick="markAllHrPresent('${date}')">✅ تسجيل الكل حاضر</button>
+      </div>
+      <div class="card">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${activeEmps.length===0?'<p style="color:#94a3b8;text-align:center;padding:32px">لا يوجد موظفون نشطون</p>':''}
+          ${activeEmps.map(e=>{
+            const a=attMap[e.id]||{status:''};
+            const st=a.status||'';
+            const opts=[['present','حاضر','#10b981'],['late','متأخر','#f59e0b'],['absent','غائب','#ef4444'],['leave','إجازة','#8b5cf6']];
+            return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0">
+              <div style="flex:1;font-size:14px;font-weight:600">${esc(e.name)}<span style="font-size:11px;color:#64748b;font-weight:400;margin-right:8px">${esc(e.jobTitle||'')}</span></div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                ${opts.map(([v,l,c])=>`<button class="btn btn-xs" style="background:${st===v?c:'#fff'};color:${st===v?'#fff':c};border:2px solid ${c};font-size:12px" onclick="setHrAtt('${e.id}','${date}','${v}')">${l}</button>`).join('')}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>`;
+  } else if(tab==='leaves'){
+    const empFilter=App.params.hrLeaveEmp||'all';
+    const typeFilter=App.params.hrLeaveType||'all';
+    let leaves=DB.hrLeaves();
+    if(bid){const myEmpIds=new Set(emps.map(e=>e.id));leaves=leaves.filter(l=>myEmpIds.has(l.employeeId));}
+    if(empFilter!=='all') leaves=leaves.filter(l=>l.employeeId===empFilter);
+    if(typeFilter!=='all') leaves=leaves.filter(l=>l.type===typeFilter);
+    leaves.sort((a,b)=>b.startDate>a.startDate?1:-1);
+    const typeLabel={annual:'سنوية',sick:'مرضية',haj:'حج',maternity:'أمومة',emergency:'طارئة',unpaid:'بدون راتب',official:'إذن رسمي'};
+    const typeColor={annual:'#059669',sick:'#ef4444',haj:'#0284c7',maternity:'#c026d3',emergency:'#f59e0b',unpaid:'#64748b',official:'#8b5cf6'};
+    content=`
+    <div>
+      <div class="actions-bar">
+        <select class="input" style="width:auto" onchange="App.go('hr',{hrTab:'leaves',hrLeaveEmp:this.value,hrLeaveType:'${typeFilter}'})">
+          <option value="all">كل الموظفين</option>
+          ${emps.map(e=>`<option value="${e.id}" ${empFilter===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}
+        </select>
+        <select class="input" style="width:auto" onchange="App.go('hr',{hrTab:'leaves',hrLeaveEmp:'${empFilter}',hrLeaveType:this.value})">
+          <option value="all">كل الأنواع</option>
+          ${Object.entries(typeLabel).map(([k,v])=>`<option value="${k}" ${typeFilter===k?'selected':''}>${v}</option>`).join('')}
+        </select>
+        <button class="btn btn-primary" onclick="Modals.addHrLeave()">+ إضافة إجازة</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap"><table>
+          <thead><tr><th>الموظف</th><th>نوع الإجازة</th><th>من</th><th>إلى</th><th>أيام</th><th>حالة</th><th>السبب</th><th>إجراءات</th></tr></thead>
+          <tbody>
+          ${leaves.length===0?`<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:32px">لا توجد إجازات</td></tr>`:''}
+          ${leaves.map(l=>{
+            const emp=emps.find(e=>e.id===l.employeeId)||DB.hrEmployees().find(e=>e.id===l.employeeId);
+            const stBadge=l.status==='approved'?'<span class="badge badge-green">موافق</span>':l.status==='rejected'?'<span class="badge badge-red">مرفوض</span>':'<span class="badge badge-yellow">معلق</span>';
+            const tc=typeColor[l.type]||'#475569';
+            return `<tr>
+              <td><strong>${esc(emp?.name||'—')}</strong></td>
+              <td><span style="color:${tc};font-weight:600;font-size:12px">${typeLabel[l.type]||l.type}</span></td>
+              <td>${formatDate(l.startDate)}</td>
+              <td>${formatDate(l.endDate)}</td>
+              <td style="font-weight:700;text-align:center">${l.days}</td>
+              <td>${stBadge}</td>
+              <td style="font-size:12px;color:#64748b;max-width:160px">${esc(l.reason||'—')}</td>
+              <td>
+                <button class="btn btn-xs" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5" onclick="deleteHrLeave('${l.id}')">🗑️</button>
+              </td>
+            </tr>`;
+          }).join('')}
+          </tbody>
+        </table></div>
+      </div>
+    </div>`;
+  } else if(tab==='payroll'){
+    const month=App.params.hrMonth||(T0.slice(0,7));
+    let payList=DB.hrPayroll().filter(p=>p.month===month);
+    if(bid){const myEmpIds=new Set(emps.map(e=>e.id));payList=payList.filter(p=>myEmpIds.has(p.employeeId));}
+    const totalNet=payList.reduce((a,p)=>a+(+p.netSalary||0),0);
+    const paidCount=payList.filter(p=>p.paymentStatus==='paid').length;
+    // أيام العمل في الشهر (استثناء أيام الإجازة الرسمية — حساب تقريبي على أساس 26 يوم عمل/شهر)
+    const ym=month;
+    const daysInMonth=new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate();
+    content=`
+    <div>
+      <div class="actions-bar">
+        <input type="month" class="input" style="width:180px" value="${month}" onchange="App.go('hr',{hrTab:'payroll',hrMonth:this.value})">
+        <button class="btn btn-primary" onclick="Modals.runPayroll('${month}')">⚙️ إنشاء مسير الشهر</button>
+      </div>
+      <div class="stats-grid" style="margin-bottom:16px">
+        <div class="stat-card green"><div class="stat-val">${totalNet.toLocaleString()}</div><div class="stat-lbl">ر.س إجمالي الصرف</div></div>
+        <div class="stat-card blue"><div class="stat-val">${paidCount}/${payList.length}</div><div class="stat-lbl">تم الصرف</div></div>
+        <div class="stat-card yellow"><div class="stat-val">${daysInMonth}</div><div class="stat-lbl">أيام الشهر</div></div>
+      </div>
+      <div class="card">
+        <div class="table-wrap"><table>
+          <thead><tr><th>الموظف</th><th>الأساسي</th><th>البدلات</th><th>الغياب (أيام)</th><th>الخصومات</th><th>صافي الراتب</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+          <tbody>
+          ${payList.length===0?`<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:32px">لا يوجد مسير لهذا الشهر — اضغط «إنشاء مسير الشهر» لتوليده تلقائياً</td></tr>`:''}
+          ${payList.map(p=>{
+            const emp=DB.hrEmployees().find(e=>e.id===p.employeeId);
+            const allowances=(+p.housingAllowance||0)+(+p.transportAllowance||0)+(+p.otherAllowances||0)+(+p.bonus||0);
+            const deductions=(+p.absenceDeduction||0)+(+p.loanDeduction||0)+(+p.otherDeductions||0)+(+p.gosiDeduction||0);
+            const stBadge=p.paymentStatus==='paid'?'<span class="badge badge-green">مُصرَّف</span>':'<span class="badge badge-yellow">معلق</span>';
+            return `<tr>
+              <td><strong>${esc(emp?.name||'—')}</strong></td>
+              <td style="font-weight:600">${(+p.basicSalary||0).toLocaleString()}</td>
+              <td style="color:#059669">${allowances.toLocaleString()}</td>
+              <td style="color:#ef4444;text-align:center">${p.absenceDays||0}</td>
+              <td style="color:#ef4444">${deductions.toLocaleString()}</td>
+              <td style="font-weight:700;color:#0f766e;font-size:15px">${(+p.netSalary||0).toLocaleString()} ر.س</td>
+              <td>${stBadge}</td>
+              <td style="display:flex;gap:4px;flex-wrap:wrap">
+                <button class="btn btn-secondary btn-xs" onclick="Modals.viewPayslip('${p.id}')">📄 كشف</button>
+                ${p.paymentStatus!=='paid'?`<button class="btn btn-xs" style="background:#dcfce7;color:#166534;border:1px solid #86efac" onclick="markHrPaid('${p.id}')">✅ صُرِّف</button>`:''}
+                <button class="btn btn-xs" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5" onclick="DB.deleteHrPayroll('${p.id}');App.refresh()">🗑️</button>
+              </td>
+            </tr>`;
+          }).join('')}
+          </tbody>
+        </table></div>
+      </div>
+    </div>`;
+  }
+  return `
+  <div class="tabs no-print">
+    ${tabs.map(t=>`<div class="tab ${tab===t.k?'active':''}" onclick="App.go('hr',{hrTab:'${t.k}'})">${t.icon} ${t.label}</div>`).join('')}
+  </div>
+  ${content}`;
+},
 };// end Views
 
 // =========================================================
@@ -4898,6 +5198,302 @@ const Modals = {
       </div>
     </div></div>`);
   },
+
+  // ===== الموارد البشرية =====
+  _hrEmployeeForm(e=null){
+    const branches=DB.branches();
+    const bid=Auth.branchId()||e?.branchId||branches[0]?.id||'';
+    return `
+    <input type="hidden" id="hr-id" value="${e?.id||''}">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 14px;font-size:12px;color:#166534;font-weight:600">
+        👷 بيانات الموظف (وفق نظام العمل السعودي)
+      </div>
+      <div class="grid-2">
+        <div class="input-group"><label>الاسم الكامل *</label><input class="input" id="hr-name" value="${esc(e?.name||'')}"></div>
+        <div class="input-group"><label>المسمى الوظيفي *</label><input class="input" id="hr-job" value="${esc(e?.jobTitle||'')}"></div>
+      </div>
+      <div class="grid-2">
+        <div class="input-group"><label>الفرع</label><select class="input" id="hr-branch">${branches.map(b=>`<option value="${b.id}" ${(e?.branchId||bid)===b.id?'selected':''}>${esc(b.name.split(' - ')[0])}</option>`).join('')}</select></div>
+        <div class="input-group"><label>الجنسية</label><input class="input" id="hr-nat" value="${esc(e?.nationality||'')}"></div>
+      </div>
+      <div class="grid-2">
+        <div class="input-group"><label>رقم الهوية / الإقامة</label><input class="input" id="hr-nid" value="${esc(e?.nationalId||e?.iqamaNo||'')}"></div>
+        <div class="input-group"><label>📅 انتهاء الإقامة</label><input class="input" id="hr-iqama-exp" type="date" value="${e?.iqamaExpiry||''}"></div>
+      </div>
+      <div class="grid-2">
+        <div class="input-group"><label>📅 تاريخ التوظيف *</label><input class="input" id="hr-start" type="date" value="${e?.contractStart||T0}"></div>
+        <div class="input-group"><label>📅 نهاية العقد</label><input class="input" id="hr-end" type="date" value="${e?.contractEnd||''}">
+          <small style="font-size:11px;color:#64748b;margin-top:2px;display:block">⚠️ سيبدأ التنبيه قبل نهاية العقد بشهرين</small>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="input-group"><label>📅 الشهادة الصحية (انتهاء)</label><input class="input" id="hr-health-exp" type="date" value="${e?.healthCertExpiry||''}"></div>
+        <div class="input-group"><label>نوع التوظيف</label><select class="input" id="hr-ctype">
+          <option value="full" ${(e?.contractType||'full')==='full'?'selected':''}>دوام كامل (8 ساعات)</option>
+          <option value="part" ${e?.contractType==='part'?'selected':''}>دوام جزئي</option>
+        </select></div>
+      </div>
+      <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;font-size:12px;color:#1d4ed8;font-weight:600">💰 الراتب والبدلات</div>
+      <div class="grid-2">
+        <div class="input-group"><label>الراتب الأساسي (ر.س) *</label><input class="input" id="hr-basic" type="number" min="0" value="${e?.basicSalary||0}" oninput="hrCalcTotal()"></div>
+        <div class="input-group"><label>بدل السكن (ر.س)</label><input class="input" id="hr-housing" type="number" min="0" value="${e?.housingAllowance||0}" oninput="hrCalcTotal()"></div>
+      </div>
+      <div class="grid-2">
+        <div class="input-group"><label>بدل النقل (ر.س)</label><input class="input" id="hr-transport" type="number" min="0" value="${e?.transportAllowance||0}" oninput="hrCalcTotal()"></div>
+        <div class="input-group"><label>بدلات أخرى (ر.س)</label><input class="input" id="hr-other" type="number" min="0" value="${e?.otherAllowances||0}" oninput="hrCalcTotal()"></div>
+      </div>
+      <div class="grid-2">
+        <div class="input-group"><label>نسبة التأمينات (GOSI) %</label><input class="input" id="hr-gosi" type="number" min="0" max="20" step="0.5" value="${e?.gosiRate??9}">
+          <small style="font-size:11px;color:#64748b;margin-top:2px;display:block">سعودي: 9% · غير سعودي: 2%</small>
+        </div>
+        <div class="input-group"><label>الراتب الإجمالي</label>
+          <div id="hr-total" style="font-size:18px;font-weight:700;color:#059669;padding:10px">${((+e?.basicSalary||0)+(+e?.housingAllowance||0)+(+e?.transportAllowance||0)+(+e?.otherAllowances||0)).toLocaleString()} ر.س</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="input-group"><label>رقم الجوال</label><input class="input" id="hr-phone" value="${esc(e?.phone||'')}"></div>
+        <div class="input-group"><label>رقم الحساب البنكي (IBAN)</label><input class="input" id="hr-bank" value="${esc(e?.bankAccount||'')}"></div>
+      </div>
+      <div class="grid-2">
+        <div class="input-group"><label>شخص الطوارئ</label><input class="input" id="hr-ec" value="${esc(e?.emergencyContact||'')}"></div>
+        <div class="input-group"><label>جوال الطوارئ</label><input class="input" id="hr-ep" value="${esc(e?.emergencyPhone||'')}"></div>
+      </div>
+      <div class="input-group"><label>الحالة الوظيفية</label><select class="input" id="hr-status">
+        <option value="active" ${(e?.status||'active')==='active'?'selected':''}>✅ نشط</option>
+        <option value="on_leave" ${e?.status==='on_leave'?'selected':''}>🏖️ في إجازة</option>
+        <option value="resigned" ${e?.status==='resigned'?'selected':''}>👋 استقال</option>
+        <option value="terminated" ${e?.status==='terminated'?'selected':''}>❌ منتهي الخدمة</option>
+      </select></div>
+      <div class="input-group"><label>ملاحظات</label><textarea class="input" id="hr-notes" rows="2">${esc(e?.notes||'')}</textarea></div>
+    </div>`;
+  },
+  addHrEmployee(){
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-header"><h2>👷 إضافة موظف جديد</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">${this._hrEmployeeForm()}</div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveHrEmployee(false)">💾 حفظ الموظف</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+  editHrEmployee(id){
+    const e=DB.hrEmployees().find(x=>x.id===id);
+    if(!e) return;
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-header"><h2>✏️ تعديل بيانات الموظف — ${esc(e.name)}</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">${this._hrEmployeeForm(e)}</div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveHrEmployee(true)">💾 حفظ التعديلات</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+  viewHrEmployee(id){
+    const e=DB.hrEmployees().find(x=>x.id===id);
+    if(!e) return;
+    const branches=DB.branches();
+    // رصيد الإجازة (نظام العمل السعودي)
+    const years=e.contractStart?Math.max(0,(new Date(T0)-new Date(e.contractStart))/31557600000):0;
+    const entitled=years>=5?30:21;
+    const yearStart=T0.slice(0,4)+'-01-01';
+    const yearEnd=T0.slice(0,4)+'-12-31';
+    const usedAnnual=DB.hrLeaves().filter(l=>l.employeeId===id&&l.type==='annual'&&l.status==='approved'&&l.startDate>=yearStart&&l.startDate<=yearEnd).reduce((a,l)=>a+(+l.days||0),0);
+    const usedSick=DB.hrLeaves().filter(l=>l.employeeId===id&&l.type==='sick'&&l.status==='approved'&&l.startDate>=yearStart&&l.startDate<=yearEnd).reduce((a,l)=>a+(+l.days||0),0);
+    // مكافأة نهاية الخدمة (م. العمل السعودي)
+    const gratYears=Math.floor(years);
+    const gratFull=Math.min(gratYears,5)*((+e.basicSalary||0)/2)+Math.max(0,gratYears-5)*(+e.basicSalary||0);
+    // سلوك الخصم حسب حالة الإنهاء
+    const gratNote=years<2?'أقل من سنتين — لا مكافأة إن استقال':years<5?`استقالة 2-5 سنوات: ${Math.round(gratFull/3).toLocaleString()} ر.س (ثلث المكافأة)`:years<10?`استقالة 5-10 سنوات: ${Math.round(gratFull*2/3).toLocaleString()} ر.س (ثلثان)`:null;
+    const docRows=[
+      {label:'الإقامة',d:e.iqamaExpiry},
+      {label:'نهاية العقد',d:e.contractEnd},
+      {label:'الشهادة الصحية',d:e.healthCertExpiry},
+    ].filter(r=>r.d);
+    const recentLeaves=DB.hrLeaves().filter(l=>l.employeeId===id).sort((a,b)=>b.startDate>a.startDate?1:-1).slice(0,5);
+    const recentPay=DB.hrPayroll().filter(p=>p.employeeId===id).sort((a,b)=>b.month>a.month?1:-1).slice(0,3);
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal" style="max-width:640px">
+      <div class="modal-header"><h2>📋 ملف الموظف — ${esc(e.name)}</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div style="flex:1;min-width:220px;background:#f0fdf4;border-radius:10px;padding:14px">
+            <div style="font-size:12px;color:#64748b;font-weight:700;margin-bottom:8px">بيانات أساسية</div>
+            <div style="font-size:14px;font-weight:700;margin-bottom:4px">${esc(e.name)}</div>
+            <div style="font-size:12px;color:#475569">${esc(e.jobTitle||'—')} · ${esc(branches.find(b=>b.id===e.branchId)?.name.split(' - ')[0]||'—')}</div>
+            <div style="font-size:12px;color:#475569;margin-top:4px">📱 ${esc(e.phone||'—')}</div>
+            <div style="font-size:12px;color:#475569">🌍 ${esc(e.nationality||'—')} · هوية: ${esc(e.nationalId||e.iqamaNo||'—')}</div>
+            <div style="font-size:12px;color:#475569;margin-top:4px">📅 تاريخ التوظيف: ${formatDate(e.contractStart)} (${Math.round(years*10)/10} سنوات)</div>
+          </div>
+          <div style="flex:1;min-width:220px;background:#eff6ff;border-radius:10px;padding:14px">
+            <div style="font-size:12px;color:#64748b;font-weight:700;margin-bottom:8px">💰 الراتب</div>
+            <div style="font-size:18px;font-weight:700;color:#059669">${((+e.basicSalary||0)+(+e.housingAllowance||0)+(+e.transportAllowance||0)+(+e.otherAllowances||0)).toLocaleString()} ر.س</div>
+            <div style="font-size:11px;color:#475569;margin-top:4px">أساسي: ${(+e.basicSalary||0).toLocaleString()} · سكن: ${(+e.housingAllowance||0).toLocaleString()} · نقل: ${(+e.transportAllowance||0).toLocaleString()}</div>
+            <div style="margin-top:10px;padding-top:8px;border-top:1px solid #dbeafe;font-size:12px;color:#1d4ed8;font-weight:600">مكافأة نهاية الخدمة (تقديرية)</div>
+            <div style="font-size:14px;font-weight:700;color:#1d4ed8">${gratFull.toLocaleString()} ر.س</div>
+            ${gratNote?`<div style="font-size:11px;color:#7c3aed;margin-top:4px">${gratNote}</div>`:'<div style="font-size:11px;color:#059669;margin-top:4px">✅ مستحقة كاملة عند الإنهاء / الاستقالة بعد 10 سنوات</div>'}
+          </div>
+        </div>
+        <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:14px">
+          <div style="font-size:12px;color:#64748b;font-weight:700;margin-bottom:10px">🏖️ رصيد الإجازات (${T0.slice(0,4)}) — نظام العمل السعودي</div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <div style="text-align:center">
+              <div style="font-size:22px;font-weight:700;color:#0f766e">${entitled-usedAnnual}</div>
+              <div style="font-size:11px;color:#475569">متبقي سنوية<br><small>${entitled} يوم ${years>=5?'(5+ سنوات)':'(أقل من 5 سنوات)'}</small></div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:22px;font-weight:700;color:#f59e0b">${usedAnnual}</div>
+              <div style="font-size:11px;color:#475569">مستخدم سنوية</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:22px;font-weight:700;color:#ef4444">${usedSick}</div>
+              <div style="font-size:11px;color:#475569">مرضية مستخدمة<br><small>30 براتب كامل · 60 بـ75% · 30 بدون</small></div>
+            </div>
+          </div>
+        </div>
+        ${docRows.length?`<div style="background:#f8fafc;border-radius:10px;padding:14px">
+          <div style="font-size:12px;color:#64748b;font-weight:700;margin-bottom:10px">📑 الوثائق وتواريخ الانتهاء</div>
+          ${docRows.map(r=>{
+            const st=DB.hrDocStatus(r.d);
+            const days=diffDays(r.d,T0);
+            const color=st==='expired'?'#ef4444':st==='soon7'?'#ef4444':st==='soon60'?'#f59e0b':'#10b981';
+            const label=st==='expired'?'🔴 منتهية':st==='soon7'?`🚨 أسبوع أخير (${days} يوم)`:st==='soon60'?`⏳ ${days} يوم متبقي`:' ✅ سليم';
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9">
+              <span style="font-size:13px">${r.label}</span>
+              <span style="font-size:13px;font-weight:600">${formatDate(r.d)} <span style="color:${color};font-size:11px">${label}</span></span>
+            </div>`;
+          }).join('')}
+        </div>`:''}
+        ${recentLeaves.length?`<div>
+          <div style="font-size:12px;color:#64748b;font-weight:700;margin-bottom:8px">آخر الإجازات</div>
+          ${recentLeaves.map(l=>`<div style="font-size:12px;color:#475569;padding:4px 0;border-bottom:1px solid #f1f5f9">${l.type} · ${formatDate(l.startDate)} — ${formatDate(l.endDate)} (${l.days} يوم) · ${l.status==='approved'?'✅':'⏳'}</div>`).join('')}
+        </div>`:''}
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="App.closeModal();Modals.editHrEmployee('${e.id}')">✏️ تعديل</button>
+        <button class="btn btn-secondary" onclick="Modals.addHrLeave('${e.id}');/* keep open */">🏖️ إضافة إجازة</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إغلاق</button>
+      </div>
+    </div></div>`);
+  },
+  addHrLeave(preEmpId=''){
+    const emps=DB.hrEmployees().filter(e=>e.status!=='deleted');
+    const typeLabel={annual:'سنوية (21-30 يوم/سنة وفق نظام العمل)',sick:'مرضية (30 كامل + 60 بـ75% + 30 بدون راتب)',haj:'حج (10 أيام مدفوعة — مرة واحدة)',maternity:'أمومة (12 أسبوع)',emergency:'طارئة',unpaid:'بدون راتب',official:'إذن رسمي'};
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal">
+      <div class="modal-header"><h2>🏖️ تسجيل إجازة</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <div class="input-group"><label>الموظف *</label>
+          <select class="input" id="hl-emp">${emps.map(e=>`<option value="${e.id}" ${preEmpId===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select>
+        </div>
+        <div class="input-group"><label>نوع الإجازة *</label>
+          <select class="input" id="hl-type">${Object.entries(typeLabel).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select>
+        </div>
+        <div class="grid-2">
+          <div class="input-group"><label>من *</label><input class="input" id="hl-start" type="date" value="${T0}" onchange="hrCalcLeaveDays()"></div>
+          <div class="input-group"><label>إلى *</label><input class="input" id="hl-end" type="date" value="${T0}" onchange="hrCalcLeaveDays()"></div>
+        </div>
+        <div class="input-group"><label>عدد الأيام</label>
+          <div id="hl-days" style="font-size:18px;font-weight:700;color:#0f766e;padding:8px">1 يوم</div>
+        </div>
+        <div class="input-group"><label>الحالة</label>
+          <select class="input" id="hl-status">
+            <option value="approved">✅ موافق</option>
+            <option value="pending">⏳ معلق</option>
+          </select>
+        </div>
+        <div class="input-group"><label>السبب / الملاحظات</label><textarea class="input" id="hl-reason" rows="2"></textarea></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveHrLeave()">💾 حفظ الإجازة</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+  runPayroll(month){
+    const emps=DB.hrEmployees().filter(e=>(e.status||'active')==='active'||(e.status||'active')==='on_leave');
+    const bid=Auth.branchId();
+    const list=bid?emps.filter(e=>e.branchId===bid):emps;
+    const existing=new Set(DB.hrPayroll().filter(p=>p.month===month).map(p=>p.employeeId));
+    const toAdd=list.filter(e=>!existing.has(e.id));
+    if(toAdd.length===0){toast('ℹ️ المسير موجود لجميع الموظفين هذا الشهر');return;}
+    // حساب الغياب من سجل الحضور
+    const daysInMonth=new Date(+month.slice(0,4),+month.slice(5,7),0).getDate();
+    const workingDays=Math.round(daysInMonth*26/31); // تقريب 26 يوم عمل/شهر (م. العمل السعودي)
+    const newRecords=toAdd.map(e=>{
+      const absences=DB.hrAttendance().filter(a=>a.employeeId===e.id&&a.date.startsWith(month)&&a.status==='absent').length;
+      const dailyRate=(+e.basicSalary||0)/workingDays;
+      const absenceDeduction=Math.round(dailyRate*absences*100)/100;
+      const gosiDeduction=Math.round((+e.basicSalary||0)*(+e.gosiRate||9)/100*100)/100;
+      const netSalary=(+e.basicSalary||0)+(+e.housingAllowance||0)+(+e.transportAllowance||0)+(+e.otherAllowances||0)-absenceDeduction-gosiDeduction;
+      return {id:uid(),employeeId:e.id,month,basicSalary:+e.basicSalary||0,housingAllowance:+e.housingAllowance||0,transportAllowance:+e.transportAllowance||0,otherAllowances:+e.otherAllowances||0,gosiRate:+e.gosiRate||9,gosiDeduction,absenceDays:absences,absenceDeduction,loanDeduction:0,otherDeductions:0,bonus:0,netSalary,paymentStatus:'pending',paymentDate:'',notes:'',generatedAt:T0,generatedBy:Auth.user?.name||'—'};
+    });
+    const existing2=DB.hrPayroll();
+    newRecords.forEach(r=>existing2.push(r));
+    DB.save('hr_payroll',existing2);
+    toast(`✅ تم إنشاء مسير ${newRecords.length} موظف لشهر ${month}`);
+    App.go('hr',{hrTab:'payroll',hrMonth:month});
+  },
+  viewPayslip(payId){
+    const p=DB.hrPayroll().find(x=>x.id===payId);
+    if(!p) return;
+    const e=DB.hrEmployees().find(x=>x.id===p.employeeId);
+    const school=DB.schools()[0]||{};
+    const branch=DB.branches().find(b=>b.id===e?.branchId);
+    const monthName=new Date(p.month+'-15').toLocaleString('ar-SA',{month:'long',year:'numeric'});
+    const allowances=(+p.housingAllowance||0)+(+p.transportAllowance||0)+(+p.otherAllowances||0)+(+p.bonus||0);
+    const deductions=(+p.absenceDeduction||0)+(+p.loanDeduction||0)+(+p.otherDeductions||0)+(+p.gosiDeduction||0);
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal" style="max-width:540px">
+      <div class="modal-header"><h2>📄 كشف الراتب</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body" id="payslip-body">
+        <div class="print-cover" style="display:none"><h1>${esc(school.name||'مدارك الطفل')}</h1><p>كشف الراتب · ${monthName}</p></div>
+        <div style="text-align:center;margin-bottom:16px;padding:14px;background:linear-gradient(135deg,#0f766e,#065f46);border-radius:12px;color:#fff">
+          <div style="font-size:16px;font-weight:700">${esc(school.name||'مدارك الطفل')}</div>
+          <div style="font-size:13px;opacity:.85">${esc(branch?.name||'')} · كشف الراتب — ${monthName}</div>
+        </div>
+        <div style="background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:14px">
+          <div style="font-size:14px;font-weight:700;margin-bottom:4px">${esc(e?.name||'—')}</div>
+          <div style="font-size:12px;color:#64748b">${esc(e?.jobTitle||'—')} · هوية: ${esc(e?.nationalId||e?.iqamaNo||'—')}</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="background:#0f766e;color:#fff">
+            <th style="padding:8px 12px;text-align:right">البيان</th>
+            <th style="padding:8px 12px;text-align:left">المبلغ (ر.س)</th>
+          </tr></thead>
+          <tbody>
+            <tr style="background:#f0fdf4"><td style="padding:8px 12px;font-weight:600">الراتب الأساسي</td><td style="padding:8px 12px;text-align:left">${(+p.basicSalary||0).toLocaleString()}</td></tr>
+            ${p.housingAllowance?`<tr><td style="padding:6px 12px">بدل السكن</td><td style="padding:6px 12px;text-align:left">+ ${(+p.housingAllowance||0).toLocaleString()}</td></tr>`:''}
+            ${p.transportAllowance?`<tr><td style="padding:6px 12px">بدل النقل</td><td style="padding:6px 12px;text-align:left">+ ${(+p.transportAllowance||0).toLocaleString()}</td></tr>`:''}
+            ${p.otherAllowances?`<tr><td style="padding:6px 12px">بدلات أخرى</td><td style="padding:6px 12px;text-align:left">+ ${(+p.otherAllowances||0).toLocaleString()}</td></tr>`:''}
+            ${p.bonus?`<tr style="background:#fef9c3"><td style="padding:6px 12px">حوافز / مكافآت</td><td style="padding:6px 12px;text-align:left">+ ${(+p.bonus||0).toLocaleString()}</td></tr>`:''}
+            ${p.absenceDeduction?`<tr style="background:#fef2f2"><td style="padding:6px 12px;color:#ef4444">خصم غياب (${p.absenceDays} يوم)</td><td style="padding:6px 12px;text-align:left;color:#ef4444">- ${(+p.absenceDeduction||0).toLocaleString()}</td></tr>`:''}
+            ${p.gosiDeduction?`<tr style="background:#fef2f2"><td style="padding:6px 12px;color:#ef4444">تأمينات GOSI (${p.gosiRate}%)</td><td style="padding:6px 12px;text-align:left;color:#ef4444">- ${(+p.gosiDeduction||0).toLocaleString()}</td></tr>`:''}
+            ${p.loanDeduction?`<tr style="background:#fef2f2"><td style="padding:6px 12px;color:#ef4444">خصم سلفة</td><td style="padding:6px 12px;text-align:left;color:#ef4444">- ${(+p.loanDeduction||0).toLocaleString()}</td></tr>`:''}
+            ${p.otherDeductions?`<tr style="background:#fef2f2"><td style="padding:6px 12px;color:#ef4444">خصومات أخرى</td><td style="padding:6px 12px;text-align:left;color:#ef4444">- ${(+p.otherDeductions||0).toLocaleString()}</td></tr>`:''}
+            <tr style="background:#0f766e;color:#fff;font-size:16px">
+              <td style="padding:10px 12px;font-weight:700">صافي الراتب</td>
+              <td style="padding:10px 12px;text-align:left;font-weight:700">${(+p.netSalary||0).toLocaleString()} ر.س</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="margin-top:12px;font-size:11px;color:#94a3b8;text-align:center">تم الإنشاء: ${formatDate(p.generatedAt)} · بواسطة: ${esc(p.generatedBy||'—')} · ${p.paymentStatus==='paid'?'✅ تم الصرف بتاريخ '+formatDate(p.paymentDate):'⏳ في الانتظار'}</div>
+      </div>
+      <div class="modal-footer no-print">
+        <button class="btn btn-primary" onclick="window.print()">🖨️ طباعة</button>
+        ${p.paymentStatus!=='paid'?`<button class="btn btn-success" onclick="markHrPaid('${p.id}');App.closeModal()">✅ تأكيد الصرف</button>`:''}
+        <button class="btn btn-secondary" onclick="App.closeModal()">إغلاق</button>
+      </div>
+    </div></div>`);
+  },
 };
 
 // =========================================================
@@ -5128,6 +5724,107 @@ function toggleSchool(id){
 }
 
 let _savingChild=false;
+// ===== دوال الموارد البشرية =====
+function hrCalcTotal(){
+  const basic=+(document.getElementById('hr-basic')?.value||0);
+  const housing=+(document.getElementById('hr-housing')?.value||0);
+  const transport=+(document.getElementById('hr-transport')?.value||0);
+  const other=+(document.getElementById('hr-other')?.value||0);
+  const el=document.getElementById('hr-total');
+  if(el) el.textContent=(basic+housing+transport+other).toLocaleString()+' ر.س';
+}
+function hrCalcLeaveDays(){
+  const s=document.getElementById('hl-start')?.value;
+  const e=document.getElementById('hl-end')?.value;
+  if(!s||!e) return;
+  const days=Math.max(1,diffDays(e,s)+1);
+  const el=document.getElementById('hl-days');
+  if(el) el.textContent=days+' يوم';
+}
+function saveHrEmployee(edit=false){
+  const id=document.getElementById('hr-id')?.value;
+  const name=(document.getElementById('hr-name')?.value||'').trim();
+  const jobTitle=(document.getElementById('hr-job')?.value||'').trim();
+  if(!name||!jobTitle){alert('الاسم والمسمى الوظيفي مطلوبان');return;}
+  const obj={
+    id:edit&&id?id:uid(),
+    name,jobTitle,
+    branchId:document.getElementById('hr-branch')?.value||'',
+    nationality:document.getElementById('hr-nat')?.value||'',
+    nationalId:document.getElementById('hr-nid')?.value||'',
+    iqamaExpiry:document.getElementById('hr-iqama-exp')?.value||'',
+    contractStart:document.getElementById('hr-start')?.value||T0,
+    contractEnd:document.getElementById('hr-end')?.value||'',
+    healthCertExpiry:document.getElementById('hr-health-exp')?.value||'',
+    contractType:document.getElementById('hr-ctype')?.value||'full',
+    basicSalary:+(document.getElementById('hr-basic')?.value||0),
+    housingAllowance:+(document.getElementById('hr-housing')?.value||0),
+    transportAllowance:+(document.getElementById('hr-transport')?.value||0),
+    otherAllowances:+(document.getElementById('hr-other')?.value||0),
+    gosiRate:+(document.getElementById('hr-gosi')?.value||9),
+    phone:document.getElementById('hr-phone')?.value||'',
+    bankAccount:document.getElementById('hr-bank')?.value||'',
+    emergencyContact:document.getElementById('hr-ec')?.value||'',
+    emergencyPhone:document.getElementById('hr-ep')?.value||'',
+    status:document.getElementById('hr-status')?.value||'active',
+    notes:document.getElementById('hr-notes')?.value||'',
+    addedAt:edit?(DB.hrEmployees().find(e=>e.id===id)?.addedAt||T0):T0,
+  };
+  if(edit) DB.updateHrEmployee(obj); else DB.addHrEmployee(obj);
+  DB.addAuditLog({action:edit?'تعديل موظف':'إضافة موظف',entity:'HR',entityId:obj.id,details:`${name} · ${jobTitle}`,by:Auth.user?.name||'—'});
+  toast('✅ '+(edit?'تم تحديث بيانات الموظف':'تمت إضافة الموظف بنجاح'));
+  App.closeModal();App.go('hr',{hrTab:'employees'});
+}
+function saveHrLeave(){
+  const empId=document.getElementById('hl-emp')?.value;
+  const type=document.getElementById('hl-type')?.value;
+  const startDate=document.getElementById('hl-start')?.value;
+  const endDate=document.getElementById('hl-end')?.value;
+  const status=document.getElementById('hl-status')?.value||'approved';
+  const reason=document.getElementById('hl-reason')?.value||'';
+  if(!empId||!type||!startDate||!endDate){alert('يرجى تعبئة جميع الحقول المطلوبة');return;}
+  if(endDate<startDate){alert('تاريخ الانتهاء يجب أن يكون بعد تاريخ البداية');return;}
+  const days=diffDays(endDate,startDate)+1;
+  DB.addHrLeave({id:uid(),employeeId:empId,type,startDate,endDate,days,reason,status,addedAt:T0,addedBy:Auth.user?.name||'—'});
+  // تحديث حالة الموظف تلقائياً إن كانت إجازة موافق عليها تشمل اليوم
+  if(status==='approved'&&startDate<=T0&&endDate>=T0){
+    const e=DB.hrEmployees().find(x=>x.id===empId);
+    if(e&&e.status==='active'){DB.updateHrEmployee({...e,status:'on_leave'});}
+  }
+  toast('✅ تم تسجيل الإجازة');App.closeModal();App.go('hr',{hrTab:'leaves'});
+}
+function setHrAtt(empId,date,status){
+  const list=DB.hrAttendance().filter(a=>!(a.employeeId===empId&&a.date===date));
+  list.push({id:uid(),employeeId:empId,date,status});
+  DB.saveHrAttendance(list);App.refresh();
+}
+function markAllHrPresent(date){
+  const bid=Auth.branchId();
+  let emps=DB.hrEmployees().filter(e=>(e.status||'active')==='active'||(e.status||'active')==='on_leave');
+  if(bid) emps=emps.filter(e=>e.branchId===bid);
+  const existing=DB.hrAttendance().filter(a=>a.date!==date||!emps.find(e=>e.id===a.employeeId));
+  emps.forEach(e=>existing.push({id:uid(),employeeId:e.id,date,status:'present'}));
+  DB.saveHrAttendance(existing);App.refresh();
+}
+function deleteHrEmployee(id){
+  const e=DB.hrEmployees().find(x=>x.id===id);
+  if(!confirm(`هل تريد حذف الموظف "${e?.name}"؟`)) return;
+  DB.updateHrEmployee({...e,status:'deleted'});
+  DB.addAuditLog({action:'حذف موظف',entity:'HR',entityId:id,details:e?.name||'',by:Auth.user?.name||'—'});
+  toast('✅ تم حذف الموظف');App.refresh();
+}
+function deleteHrLeave(id){
+  if(!confirm('هل تريد حذف هذه الإجازة؟')) return;
+  DB.deleteHrLeave(id);toast('✅ تم حذف الإجازة');App.refresh();
+}
+function markHrPaid(payId){
+  const p=DB.hrPayroll().find(x=>x.id===payId);
+  if(!p) return;
+  DB.updateHrPayroll({...p,paymentStatus:'paid',paymentDate:T0});
+  DB.addAuditLog({action:'صرف راتب',entity:'HR',entityId:payId,details:`${DB.hrEmployees().find(e=>e.id===p.employeeId)?.name||''} · ${p.month} · ${p.netSalary} ر.س`,by:Auth.user?.name||'—'});
+  toast('✅ تم تسجيل صرف الراتب');App.refresh();
+}
+
 function saveChild(edit=false){
   if(_savingChild) return; // يمنع تسجيل الطفل/الاشتراك مرتين عند الضغط على الحفظ بسرعة
   _savingChild=true;
