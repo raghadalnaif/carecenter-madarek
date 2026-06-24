@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v38 -->
+<!-- BUILD: 2026-06-24-v39 -->
 <script>
 (function(){
-  var BUILD='v38-20260624-1';
+  var BUILD='v39-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -48,7 +48,7 @@ body{font-family:'Tajawal',sans-serif;background:#f1f5f9;color:#1e293b;direction
 .nav-item{display:flex;align-items:center;gap:8px;padding:7px 10px;color:rgba(255,255,255,.75);cursor:pointer;border-radius:7px;margin:0;transition:.2s;font-size:13px;font-weight:500}
 .nav-item:hover,.nav-item.active{background:rgba(255,255,255,.15);color:#fff}
 .nav-item .ni{width:18px;height:18px;flex-shrink:0}
-.main{margin-right:200px;min-height:100vh;display:flex;flex-direction:column}
+.main{margin-right:200px;min-height:100vh;display:flex;flex-direction:column;width:calc(100% - 200px)}
 .topbar{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
 .topbar-title{font-size:18px;font-weight:700;color:#0f766e}
 .topbar-user{display:flex;align-items:center;gap:10px;cursor:pointer}
@@ -128,12 +128,12 @@ details[open]>summary span:last-child{transform:rotate(180deg)}
 .sidebar-overlay.open{display:block}
 @media(max-width:1024px){
   .sidebar{width:200px}
-  .main{margin-right:200px}
+  .main{margin-right:200px;width:calc(100% - 200px)}
 }
 @media(max-width:768px){
   .sidebar{transform:translateX(110%);width:270px;z-index:200}
   .sidebar.open{transform:translateX(0)}
-  .main{margin-right:0}
+  .main{margin-right:0;width:100%}
   .hamburger{display:block}
   .stats-grid{grid-template-columns:repeat(2,1fr)}
   .grid-2{grid-template-columns:1fr}
@@ -198,6 +198,8 @@ details[open]>summary span:last-child{transform:rotate(180deg)}
 .notif-item:hover{filter:brightness(0.97)}
 .notif-item.unread::before{content:'';position:absolute;top:8px;left:8px;width:7px;height:7px;border-radius:50%;background:#ef4444;box-shadow:0 0 0 2px #fff}
 .notif-badge{position:absolute;top:-5px;left:-5px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;border-radius:50%;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;padding:0 3px;pointer-events:none}
+.nav-msg-dot{display:inline-block;width:8px;height:8px;background:#ef4444;border-radius:50%;margin-right:auto;flex-shrink:0;box-shadow:0 0 0 2px rgba(255,255,255,.25);animation:pulse-dot 1.5s ease-in-out infinite}
+@keyframes pulse-dot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.8}}
 .export-label{display:inline}
 @media(max-width:768px){
   .notif-panel{position:fixed;top:60px;left:8px;right:8px;width:auto;max-height:70vh;border-radius:12px}
@@ -858,7 +860,7 @@ const App = {
         <p>نظام إدارة متكامل</p>
       </div>
       <div class="nav-section">
-        ${links.map(l=>`<div class="nav-item ${App.view===l.v?'active':''}" onclick="App.go('${l.v}');closeSidebar()">${l.icon} ${l.label}</div>`).join('')}
+        ${(()=>{const u=Auth.user;const unreadMsg=u?DB.unreadInternalCount(u.id,u.role,Auth.branchId()):0;return links.map(l=>{const isMsg=l.v==='messages';const dot=isMsg&&unreadMsg>0?`<span class="nav-msg-dot" title="${unreadMsg} رسالة غير مقروءة"></span>`:'';return `<div class="nav-item ${App.view===l.v?'active':''}" style="position:relative" onclick="App.go('${l.v}');closeSidebar()">${l.icon} ${l.label}${dot}</div>`;}).join('')})()}
       </div>
       <div style="flex-shrink:0;padding:6px 6px;border-top:1px solid rgba(255,255,255,.15)">
         <div class="nav-item" onclick="Auth.logout()">🚪 تسجيل الخروج</div>
@@ -3607,6 +3609,11 @@ messages(){
                 ${fromBranch&&!mine&&m.fromRole!=='superadmin'?`<span style="background:${c.bg};color:${c.fg};padding:1px 6px;border-radius:6px;font-size:10px">${esc(fromBranch.name.split(' - ')[0]||fromBranch.name)}</span>`:''}
               </div>
               <div style="font-size:13px;line-height:1.6;white-space:pre-wrap">${esc(m.message)}</div>
+              ${m.attachment?`<div style="margin-top:6px;padding:6px 10px;background:${mine?'rgba(255,255,255,.15)':'#f1f5f9'};border-radius:8px;display:flex;align-items:center;gap:8px">
+                <span style="font-size:14px">📎</span>
+                <a href="${m.attachment.data}" download="${esc(m.attachment.name||'مرفق.pdf')}" style="font-size:12px;color:${mine?'#fff':'#1d4ed8'};text-decoration:underline;font-weight:600">${esc(m.attachment.name||'مرفق.pdf')}</a>
+                <span style="font-size:11px;color:${mine?'rgba(255,255,255,.6)':'#94a3b8'}">(${m.attachment.size||''})</span>
+              </div>`:''}
               <div style="font-size:10px;${mine?'color:rgba(255,255,255,.7)':'color:#94a3b8'};margin-top:5px;text-align:left">
                 ${formatRelTime(m.at)} ${mine&&(m.readBy||[]).length>1?'· ✓✓ مقروء':mine?'· ✓ مُرسَلة':''}
               </div>
@@ -3614,9 +3621,19 @@ messages(){
           </div>`;
         }).join('')}
       </div>
-      ${(isSA&&!activeBranchInfo)?'':`<div style="padding:12px 14px;border-top:1px solid #e2e8f0;background:#fff;display:flex;gap:8px">
-        <textarea id="msg-input" class="input" rows="2" placeholder="اكتب رسالتك هنا..." style="flex:1;resize:none;font-family:inherit"></textarea>
-        <button class="btn btn-primary" onclick="sendInternalMessage('${isSA?activeThread:''}')">📤 إرسال</button>
+      ${(isSA&&!activeBranchInfo)?'':`<div style="padding:12px 14px;border-top:1px solid #e2e8f0;background:#fff;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:8px">
+          <textarea id="msg-input" class="input" rows="2" placeholder="اكتب رسالتك هنا... (Ctrl+Enter للإرسال)" style="flex:1;resize:none;font-family:inherit" onkeydown="if(event.ctrlKey&&event.key==='Enter'){event.preventDefault();sendInternalMessage('${isSA?activeThread:''}');}"></textarea>
+          <button class="btn btn-primary" onclick="sendInternalMessage('${isSA?activeThread:''}')">📤 إرسال</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;color:#64748b;padding:6px 10px;border:1px dashed #cbd5e1;border-radius:8px;background:#f8fafc">
+            📎 إرفاق PDF
+            <input type="file" id="msg-attachment" accept=".pdf,.PDF" style="display:none" onchange="handleMsgAttachment(this)">
+          </label>
+          <span id="msg-att-name" style="font-size:12px;color:#0f766e"></span>
+          <span id="msg-att-clear" style="display:none;font-size:12px;color:#ef4444;cursor:pointer" onclick="clearMsgAttachment()">✕ إلغاء المرفق</span>
+        </div>
       </div>`}
     </div>
   </div>
@@ -3973,10 +3990,13 @@ sales(){
 // ===== الموارد البشرية =====
 hr(){
   if(!Auth.isSuperAdmin()&&!Auth.isSchoolAdmin()) return Views._forbidden();
-  const tab=App.params.hrTab||'employees';
+  const isSchAdmin=Auth.isSchoolAdmin()&&!Auth.isSuperAdmin();
+  const tab=App.params.hrTab||(isSchAdmin?'attendance':'employees');
   const bid=Auth.branchId();
   const branches=DB.branches();
-  const tabs=[
+  const tabs=isSchAdmin?[
+    {k:'attendance',icon:'✅',label:'الحضور'},
+  ]:[
     {k:'employees',icon:'👥',label:'الموظفون'},
     {k:'attendance',icon:'✅',label:'الحضور'},
     {k:'leaves',icon:'🏖️',label:'الإجازات'},
@@ -4084,6 +4104,7 @@ hr(){
     const presentCnt=Object.values(attMap).filter(a=>a.status==='present').length;
     const absentCnt=Object.values(attMap).filter(a=>a.status==='absent').length;
     const lateCnt=Object.values(attMap).filter(a=>a.status==='late').length;
+    const workingDays=26;
     content=`
     <div>
       <div class="stats-grid" style="margin-bottom:16px">
@@ -4095,19 +4116,56 @@ hr(){
       <div class="actions-bar">
         <input type="date" class="input" style="width:180px" value="${date}" max="${T0}" onchange="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:this.value})">
         <button class="btn btn-primary" onclick="markAllHrPresent('${date}')">✅ تسجيل الكل حاضر</button>
+        <button class="btn btn-secondary" onclick="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:'${date}',hrAttReport:'1'})" style="${App.params.hrAttReport?'background:#0f766e;color:#fff':''}">📊 تقرير الحضور</button>
       </div>
+      ${App.params.hrAttReport?`<div class="card">
+        <div class="card-title">📊 تقرير تفصيلي — ${formatDate(date)}</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>الموظف</th><th>المسمى</th><th>الحالة</th><th>دقائق التأخر</th><th>خصم التأخر (ر.س)</th></tr></thead>
+          <tbody>
+          ${activeEmps.map(e=>{
+            const a=attMap[e.id]||{};
+            const st=a.status||'—';
+            const stLabel={present:'✅ حاضر',absent:'❌ غائب',late:'⏰ متأخر',leave:'🏖️ إجازة'}[st]||'—';
+            const lateMin=+(a.lateMinutes||0);
+            const dailyRate=(+e.basicSalary||0)/workingDays;
+            const lateDeduct=st==='late'?Math.round(lateMin/(8*60)*dailyRate*100)/100:0;
+            return `<tr>
+              <td><strong>${esc(e.name)}</strong></td>
+              <td>${esc(e.jobTitle||'—')}</td>
+              <td style="font-weight:600">${stLabel}</td>
+              <td style="text-align:center">${st==='late'?lateMin+' دقيقة':'—'}</td>
+              <td style="color:#ef4444">${st==='late'&&lateDeduct>0?lateDeduct.toLocaleString()+' ر.س':'—'}</td>
+            </tr>`;
+          }).join('')}
+          </tbody>
+        </table></div>
+        <div style="margin-top:12px;padding:10px 14px;background:#fef3c7;border-radius:8px;font-size:13px">
+          <strong>حاسبة التأخر:</strong> كل دقيقة تأخر = راتب يومي ÷ (8 ساعات × 60 دقيقة). الراتب اليومي = الأساسي ÷ 26 يوم عمل.
+        </div>
+      </div>`:''}
       <div class="card">
         <div style="display:flex;flex-direction:column;gap:8px">
           ${activeEmps.length===0?'<p style="color:#94a3b8;text-align:center;padding:32px">لا يوجد موظفون نشطون</p>':''}
           ${activeEmps.map(e=>{
             const a=attMap[e.id]||{status:''};
             const st=a.status||'';
+            const lateMin=+(a.lateMinutes||0);
+            const dailyRate=(+e.basicSalary||0)/workingDays;
+            const lateDeduct=lateMin>0?Math.round(lateMin/(8*60)*dailyRate*100)/100:0;
             const opts=[['present','حاضر','#10b981'],['late','متأخر','#f59e0b'],['absent','غائب','#ef4444'],['leave','إجازة','#8b5cf6']];
-            return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0">
-              <div style="flex:1;font-size:14px;font-weight:600">${esc(e.name)}<span style="font-size:11px;color:#64748b;font-weight:400;margin-right:8px">${esc(e.jobTitle||'')}</span></div>
-              <div style="display:flex;gap:6px;flex-wrap:wrap">
-                ${opts.map(([v,l,c])=>`<button class="btn btn-xs" style="background:${st===v?c:'#fff'};color:${st===v?'#fff':c};border:2px solid ${c};font-size:12px" onclick="setHrAtt('${e.id}','${date}','${v}')">${l}</button>`).join('')}
+            return `<div style="background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;padding:10px 14px">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <div style="flex:1;min-width:140px;font-size:14px;font-weight:600">${esc(e.name)}<span style="font-size:11px;color:#64748b;font-weight:400;margin-right:8px">${esc(e.jobTitle||'')}</span></div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                  ${opts.map(([v,l,c])=>`<button class="btn btn-xs" style="background:${st===v?c:'#fff'};color:${st===v?'#fff':c};border:2px solid ${c};font-size:12px" onclick="setHrAtt('${e.id}','${date}','${v}')">${l}</button>`).join('')}
+                </div>
               </div>
+              ${st==='late'?`<div style="display:flex;align-items:center;gap:10px;margin-top:8px;padding-top:8px;border-top:1px solid #fde68a;flex-wrap:wrap">
+                <span style="font-size:12px;color:#92400e;font-weight:600">⏱️ دقائق التأخر:</span>
+                <input type="number" min="0" max="480" class="input" style="width:80px;padding:4px 8px;font-size:13px" value="${lateMin}" oninput="setHrLateMin('${e.id}','${date}',this.value)" placeholder="0">
+                ${lateDeduct>0?`<span style="font-size:12px;color:#dc2626;font-weight:600">خصم: ${lateDeduct.toLocaleString()} ر.س</span>`:'<span style="font-size:12px;color:#94a3b8">أدخل الدقائق لحساب الخصم</span>'}
+              </div>`:''}
             </div>`;
           }).join('')}
         </div>
@@ -5378,24 +5436,26 @@ const Modals = {
       <div class="modal-footer">
         <button class="btn btn-primary" onclick="App.closeModal();Modals.editHrEmployee('${e.id}')">✏️ تعديل</button>
         <button class="btn btn-secondary" onclick="Modals.addHrLeave('${e.id}');/* keep open */">🏖️ إضافة إجازة</button>
+        <button class="btn" style="background:#1d4ed8;color:#fff" onclick="printHrEmployee('${e.id}')">🖨️ طباعة / PDF</button>
         <button class="btn btn-secondary" onclick="App.closeModal()">إغلاق</button>
       </div>
     </div></div>`);
   },
   addHrLeave(preEmpId=''){
     const emps=DB.hrEmployees().filter(e=>e.status!=='deleted');
-    const typeLabel={annual:'سنوية (21-30 يوم/سنة وفق نظام العمل)',sick:'مرضية (30 كامل + 60 بـ75% + 30 بدون راتب)',haj:'حج (10 أيام مدفوعة — مرة واحدة)',maternity:'أمومة (12 أسبوع)',emergency:'طارئة',unpaid:'بدون راتب',official:'إذن رسمي'};
+    const typeLabel={annual:'سنوية (21-30 يوم/سنة)',sick:'مرضية',haj:'حج (10 أيام مدفوعة)',maternity:'أمومة (12 أسبوع)',emergency:'طارئة',unpaid:'بدون راتب',official:'إذن رسمي'};
     App.showModal(`
     <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
     <div class="modal">
       <div class="modal-header"><h2>🏖️ تسجيل إجازة</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
       <div class="modal-body">
         <div class="input-group"><label>الموظف *</label>
-          <select class="input" id="hl-emp">${emps.map(e=>`<option value="${e.id}" ${preEmpId===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select>
+          <select class="input" id="hl-emp" onchange="hrShowLeaveInfo()">${emps.map(e=>`<option value="${e.id}" ${preEmpId===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select>
         </div>
         <div class="input-group"><label>نوع الإجازة *</label>
-          <select class="input" id="hl-type">${Object.entries(typeLabel).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select>
+          <select class="input" id="hl-type" onchange="hrShowLeaveInfo()">${Object.entries(typeLabel).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select>
         </div>
+        <div id="hl-leave-info"></div>
         <div class="grid-2">
           <div class="input-group"><label>من *</label><input class="input" id="hl-start" type="date" value="${T0}" onchange="hrCalcLeaveDays()"></div>
           <div class="input-group"><label>إلى *</label><input class="input" id="hl-end" type="date" value="${T0}" onchange="hrCalcLeaveDays()"></div>
@@ -5740,6 +5800,166 @@ function hrCalcLeaveDays(){
   const days=Math.max(1,diffDays(e,s)+1);
   const el=document.getElementById('hl-days');
   if(el) el.textContent=days+' يوم';
+  hrShowLeaveInfo();
+}
+function hrShowLeaveInfo(){
+  const type=document.getElementById('hl-type')?.value;
+  const empId=document.getElementById('hl-emp')?.value;
+  const el=document.getElementById('hl-leave-info');
+  if(!el) return;
+  if(type==='sick'){
+    const yearStart=T0.slice(0,4)+'-01-01';
+    const yearEnd=T0.slice(0,4)+'-12-31';
+    const usedSick=empId?DB.hrLeaves().filter(l=>l.employeeId===empId&&l.type==='sick'&&l.status==='approved'&&l.startDate>=yearStart&&l.startDate<=yearEnd).reduce((a,l)=>a+(+l.days||0),0):0;
+    const emp=empId?DB.hrEmployees().find(x=>x.id===empId):null;
+    const basic=+(emp?.basicSalary||0);
+    const phase1Rem=Math.max(0,30-usedSick);
+    const phase2Rem=usedSick<30?60:Math.max(0,90-usedSick);
+    const phase3Rem=usedSick<90?30:Math.max(0,120-usedSick);
+    el.innerHTML=`<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:14px;margin-bottom:12px;font-size:13px">
+      <div style="font-weight:700;color:#dc2626;margin-bottom:10px">🏥 الإجازة المرضية — نظام العمل السعودي</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:140px;background:#fff;border-radius:8px;padding:10px;text-align:center;border:2px solid ${usedSick<30?'#10b981':'#e2e8f0'}">
+          <div style="font-size:20px;font-weight:700;color:#10b981">${phase1Rem}</div>
+          <div style="font-size:11px;color:#475569;margin-top:2px">يوم متبقي</div>
+          <div style="font-size:12px;font-weight:700;color:#10b981;margin-top:4px">100% راتب</div>
+          <div style="font-size:10px;color:#64748b">(الـ30 يوم الأولى)</div>
+        </div>
+        <div style="flex:1;min-width:140px;background:#fff;border-radius:8px;padding:10px;text-align:center;border:2px solid ${usedSick>=30&&usedSick<90?'#f59e0b':'#e2e8f0'}">
+          <div style="font-size:20px;font-weight:700;color:#f59e0b">${phase2Rem}</div>
+          <div style="font-size:11px;color:#475569;margin-top:2px">يوم متبقي</div>
+          <div style="font-size:12px;font-weight:700;color:#f59e0b;margin-top:4px">75% راتب</div>
+          <div style="font-size:10px;color:#64748b">(اليوم 31-90)</div>
+          ${basic>0?`<div style="font-size:10px;color:#dc2626;margin-top:4px">خصم ${Math.round(basic*0.25).toLocaleString()} ر.س/شهر</div>`:''}
+        </div>
+        <div style="flex:1;min-width:140px;background:#fff;border-radius:8px;padding:10px;text-align:center;border:2px solid ${usedSick>=90?'#ef4444':'#e2e8f0'}">
+          <div style="font-size:20px;font-weight:700;color:#ef4444">${phase3Rem}</div>
+          <div style="font-size:11px;color:#475569;margin-top:2px">يوم متبقي</div>
+          <div style="font-size:12px;font-weight:700;color:#ef4444;margin-top:4px">0% بدون راتب</div>
+          <div style="font-size:10px;color:#64748b">(اليوم 91-120)</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:#92400e">مستخدم هذا العام: ${usedSick} يوم مرضية · المرحلة الحالية: ${usedSick<30?'الأولى (100%)':usedSick<90?'الثانية (75%)':'الثالثة (0%)'}</div>
+    </div>`;
+  } else if(type==='annual'){
+    const empId2=document.getElementById('hl-emp')?.value;
+    const emp2=empId2?DB.hrEmployees().find(x=>x.id===empId2):null;
+    const years=emp2?.contractStart?Math.max(0,(new Date(T0)-new Date(emp2.contractStart))/31557600000):0;
+    const entitled=years>=5?30:21;
+    const yearStart=T0.slice(0,4)+'-01-01';
+    const yearEnd=T0.slice(0,4)+'-12-31';
+    const used=empId2?DB.hrLeaves().filter(l=>l.employeeId===empId2&&l.type==='annual'&&l.status==='approved'&&l.startDate>=yearStart&&l.startDate<=yearEnd).reduce((a,l)=>a+(+l.days||0),0):0;
+    el.innerHTML=`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#166534">
+      📅 رصيد الإجازة السنوية: <strong>${entitled-used} يوم متبقي</strong> من ${entitled} يوم (${years>=5?'5+ سنوات: 30 يوم':'أقل من 5 سنوات: 21 يوم'}) · مستخدم: ${used} يوم
+    </div>`;
+  } else {
+    el.innerHTML='';
+  }
+}
+function setHrLateMin(empId,date,minutes){
+  const mins=Math.max(0,Math.min(480,+minutes||0));
+  const list=DB.hrAttendance();
+  const idx=list.findIndex(a=>a.employeeId===empId&&a.date===date);
+  if(idx>=0) list[idx]={...list[idx],lateMinutes:mins};
+  else list.push({id:uid(),employeeId:empId,date,status:'late',lateMinutes:mins});
+  DB.saveHrAttendance(list);
+}
+function printHrEmployee(id){
+  const e=DB.hrEmployees().find(x=>x.id===id);
+  if(!e) return;
+  const branches=DB.branches();
+  const branch=branches.find(b=>b.id===e.branchId);
+  const school=DB.schools()[0]||{};
+  const years=e.contractStart?Math.max(0,(new Date(T0)-new Date(e.contractStart))/31557600000):0;
+  const entitled=years>=5?30:21;
+  const yearStart=T0.slice(0,4)+'-01-01';
+  const yearEnd=T0.slice(0,4)+'-12-31';
+  const usedAnnual=DB.hrLeaves().filter(l=>l.employeeId===id&&l.type==='annual'&&l.status==='approved'&&l.startDate>=yearStart&&l.startDate<=yearEnd).reduce((a,l)=>a+(+l.days||0),0);
+  const usedSick=DB.hrLeaves().filter(l=>l.employeeId===id&&l.type==='sick'&&l.status==='approved'&&l.startDate>=yearStart&&l.startDate<=yearEnd).reduce((a,l)=>a+(+l.days||0),0);
+  const gratYears=Math.floor(years);
+  const gratFull=Math.min(gratYears,5)*((+e.basicSalary||0)/2)+Math.max(0,gratYears-5)*(+e.basicSalary||0);
+  const totalSalary=(+e.basicSalary||0)+(+e.housingAllowance||0)+(+e.transportAllowance||0)+(+e.otherAllowances||0);
+  const recentLeaves=DB.hrLeaves().filter(l=>l.employeeId===id&&l.status==='approved').sort((a,b)=>b.startDate>a.startDate?1:-1).slice(0,8);
+  const typeLabel={annual:'سنوية',sick:'مرضية',haj:'حج',maternity:'أمومة',emergency:'طارئة',unpaid:'بدون راتب',official:'إذن رسمي'};
+  const win=window.open('','_blank','width=800,height=900');
+  win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>ملف الموظف - ${esc(e.name)}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Tajawal',Tahoma,sans-serif;background:#fff;color:#1e293b;direction:rtl;padding:20px;font-size:13px}
+    .header{background:linear-gradient(135deg,#0f766e,#065f46);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:16px;text-align:center}
+    .header h1{font-size:20px;font-weight:900;margin-bottom:4px}
+    .header p{opacity:.85;font-size:13px}
+    .section{background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:12px}
+    .section-title{font-size:13px;font-weight:700;color:#475569;margin-bottom:10px;border-bottom:1px solid #e2e8f0;padding-bottom:6px}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .field{margin-bottom:8px}
+    .field label{display:block;font-size:11px;color:#64748b;font-weight:600;margin-bottom:2px}
+    .field span{font-size:13px;font-weight:600;color:#1e293b}
+    .balance-box{display:flex;gap:10px;text-align:center;flex-wrap:wrap}
+    .bal-item{flex:1;min-width:100px;background:#fff;border-radius:8px;padding:10px;border:1px solid #e2e8f0}
+    .bal-num{font-size:22px;font-weight:700;color:#0f766e}
+    .bal-lbl{font-size:11px;color:#475569;margin-top:2px}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th{background:#0f766e;color:#fff;padding:6px 10px;text-align:right}
+    td{padding:6px 10px;border-bottom:1px solid #f1f5f9}
+    tr:nth-child(even) td{background:#f8fafc}
+    .footer{text-align:center;margin-top:16px;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
+    @media print{body{padding:10px}.no-print{display:none}}
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;900&display=swap" rel="stylesheet">
+  </head><body>
+  <div class="no-print" style="text-align:center;margin-bottom:14px">
+    <button onclick="window.print()" style="background:#0f766e;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit">🖨️ طباعة / حفظ PDF</button>
+  </div>
+  <div class="header">
+    <h1>${esc(school.name||'مدارك الطفل')}</h1>
+    <p>ملف الموظف — تاريخ الإصدار: ${formatDate(T0)}</p>
+  </div>
+  <div class="section">
+    <div class="section-title">👤 البيانات الشخصية والوظيفية</div>
+    <div class="grid-2">
+      <div class="field"><label>الاسم الكامل</label><span>${esc(e.name)}</span></div>
+      <div class="field"><label>المسمى الوظيفي</label><span>${esc(e.jobTitle||'—')}</span></div>
+      <div class="field"><label>الفرع</label><span>${esc(branch?.name||'—')}</span></div>
+      <div class="field"><label>الجنسية</label><span>${esc(e.nationality||'—')}</span></div>
+      <div class="field"><label>رقم الهوية / الإقامة</label><span>${esc(e.nationalId||e.iqamaNo||'—')}</span></div>
+      <div class="field"><label>تاريخ انتهاء الإقامة</label><span>${formatDate(e.iqamaExpiry||'')||'—'}</span></div>
+      <div class="field"><label>الهاتف</label><span>${esc(e.phone||'—')}</span></div>
+      <div class="field"><label>تاريخ التوظيف</label><span>${formatDate(e.contractStart||'')||'—'} (${Math.round(years*10)/10} سنوات)</span></div>
+      <div class="field"><label>نهاية العقد</label><span>${formatDate(e.contractEnd||'')||'—'}</span></div>
+      <div class="field"><label>الحالة</label><span>${{active:'نشط',on_leave:'في إجازة',resigned:'استقال',terminated:'منتهي الخدمة'}[e.status||'active']||'—'}</span></div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">💰 الراتب والمستحقات</div>
+    <div class="grid-2">
+      <div class="field"><label>الراتب الأساسي</label><span style="color:#0f766e;font-size:15px">${(+e.basicSalary||0).toLocaleString()} ر.س</span></div>
+      <div class="field"><label>إجمالي الراتب</label><span style="color:#0f766e;font-size:15px;font-weight:700">${totalSalary.toLocaleString()} ر.س</span></div>
+      <div class="field"><label>بدل السكن</label><span>${(+e.housingAllowance||0).toLocaleString()} ر.س</span></div>
+      <div class="field"><label>بدل النقل</label><span>${(+e.transportAllowance||0).toLocaleString()} ر.س</span></div>
+      <div class="field"><label>مكافأة نهاية الخدمة (تقديرية)</label><span style="color:#1d4ed8;font-weight:700">${gratFull.toLocaleString()} ر.س</span></div>
+      <div class="field"><label>اشتراك التأمينات (GOSI)</label><span>${Math.round((+e.basicSalary||0)*(+e.gosiRate||9)/100).toLocaleString()} ر.س</span></div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">🏖️ رصيد الإجازات (${T0.slice(0,4)}) — نظام العمل السعودي</div>
+    <div class="balance-box">
+      <div class="bal-item"><div class="bal-num" style="color:#0f766e">${entitled-usedAnnual}</div><div class="bal-lbl">إجازة سنوية متبقية<br><small>من ${entitled} يوم</small></div></div>
+      <div class="bal-item"><div class="bal-num" style="color:#f59e0b">${usedAnnual}</div><div class="bal-lbl">سنوية مستخدمة</div></div>
+      <div class="bal-item"><div class="bal-num" style="color:#ef4444">${usedSick}</div><div class="bal-lbl">مرضية مستخدمة<br><small>من 120 يوم</small></div></div>
+      <div class="bal-item"><div class="bal-num" style="color:#8b5cf6">${Math.max(0,30-usedSick)}</div><div class="bal-lbl">مرضية 100% متبقي</div></div>
+    </div>
+  </div>
+  ${recentLeaves.length?`<div class="section">
+    <div class="section-title">📋 سجل الإجازات</div>
+    <table>
+      <thead><tr><th>النوع</th><th>من</th><th>إلى</th><th>أيام</th><th>الحالة</th></tr></thead>
+      <tbody>${recentLeaves.map(l=>`<tr><td>${typeLabel[l.type]||l.type}</td><td>${formatDate(l.startDate)}</td><td>${formatDate(l.endDate)}</td><td style="text-align:center;font-weight:700">${l.days}</td><td>${l.status==='approved'?'✅ موافق':'⏳ معلق'}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>`:''}
+  <div class="footer">مدارك الطفل — نظام إدارة الموارد البشرية · تم الإصدار بتاريخ ${formatDate(T0)}</div>
+  </body></html>`);
+  win.document.close();
 }
 function saveHrEmployee(edit=false){
   const id=document.getElementById('hr-id')?.value;
@@ -7066,11 +7286,36 @@ function deleteChildNote(noteId){
 }
 
 // إرسال رسالة داخلية
+let _msgAttachment=null;
+function handleMsgAttachment(input){
+  const file=input.files[0];
+  if(!file) return;
+  if(file.size>5*1024*1024){toast('حجم الملف يجب أن لا يتجاوز 5 ميجابايت','error');input.value='';return;}
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    _msgAttachment={name:file.name,data:ev.target.result,size:Math.round(file.size/1024)+'KB'};
+    const nm=document.getElementById('msg-att-name');
+    const cl=document.getElementById('msg-att-clear');
+    if(nm) nm.textContent='📄 '+file.name;
+    if(cl) cl.style.display='inline';
+    toast('✅ تم رفع الملف — اضغط إرسال');
+  };
+  reader.readAsDataURL(file);
+}
+function clearMsgAttachment(){
+  _msgAttachment=null;
+  const inp=document.getElementById('msg-attachment');
+  if(inp) inp.value='';
+  const nm=document.getElementById('msg-att-name');
+  const cl=document.getElementById('msg-att-clear');
+  if(nm) nm.textContent='';
+  if(cl) cl.style.display='none';
+}
 function sendInternalMessage(targetBranchId){
   const me=Auth.user;
   if(!me) return;
   const text=document.getElementById('msg-input')?.value?.trim();
-  if(!text){toast('اكتب رسالة أولاً','error');return;}
+  if(!text&&!_msgAttachment){toast('اكتب رسالة أو أرفق ملفاً','error');return;}
   const isSA=Auth.isSuperAdmin();
   let msg;
   if(isSA){
@@ -7079,20 +7324,22 @@ function sendInternalMessage(targetBranchId){
     msg={
       fromUserId:me.id,fromName:me.name,fromRole:'superadmin',fromBranchId:null,
       toUserId:branchAdmin?.id||null,toRole:'school_admin',toBranchId:targetBranchId,
-      message:text,
+      message:text||'',
     };
   } else {
     msg={
       fromUserId:me.id,fromName:me.name,fromRole:'school_admin',fromBranchId:me.branchId,
       toUserId:'all_superadmins',toRole:'superadmin',toBranchId:null,
-      message:text,
+      message:text||'',
     };
   }
   msg.fromId=me.id;
+  if(_msgAttachment) msg.attachment=_msgAttachment;
   DB.addInternalMessage(msg);
-  DB.addAuditLog({action:'رسالة داخلية',entity:'رسائل',entityId:msg.fromUserId,details:`من ${me.name} إلى ${isSA?DB.branchName(targetBranchId):'المدير العام'}: ${text.slice(0,80)}${text.length>80?'...':''}`,by:me.name});
+  DB.addAuditLog({action:'رسالة داخلية',entity:'رسائل',entityId:msg.fromUserId,details:`من ${me.name} إلى ${isSA?DB.branchName(targetBranchId):'المدير العام'}: ${(text||'').slice(0,80)}${(text||'').length>80?'...':''}${_msgAttachment?' [مع مرفق]':''}`,by:me.name});
   const inp=document.getElementById('msg-input');
   if(inp) inp.value='';
+  clearMsgAttachment();
   toast('✅ تم إرسال الرسالة');
   App.refresh();
 }
