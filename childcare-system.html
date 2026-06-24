@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v39 -->
+<!-- BUILD: 2026-06-24-v40 -->
 <script>
 (function(){
-  var BUILD='v39-20260624-1';
+  var BUILD='v40-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -101,6 +101,18 @@ details[open]>summary span:last-child{transform:rotate(180deg)}
 .input-group label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:5px}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
 .modal{background:#fff;border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+/* البحث السريع Ctrl+K */
+#quick-search-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;display:none;align-items:flex-start;justify-content:center;padding-top:80px}
+#quick-search-overlay.open{display:flex}
+#qs-box{background:#fff;border-radius:16px;width:100%;max-width:600px;box-shadow:0 24px 80px rgba(0,0,0,.4);overflow:hidden}
+#qs-input{width:100%;border:none;outline:none;font-size:18px;padding:18px 20px;font-family:inherit;direction:rtl;background:#f8fafc;border-bottom:2px solid #e2e8f0}
+#qs-input:focus{background:#fff;border-bottom-color:#0f766e}
+#qs-results{max-height:420px;overflow-y:auto}
+.qs-item{display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;border-bottom:1px solid #f1f5f9;transition:.12s}
+.qs-item:hover{background:#f0fdf4}.qs-item:last-child{border-bottom:none}
+.qs-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.qs-label{font-size:14px;font-weight:600;color:#1e293b}.qs-sub{font-size:12px;color:#64748b;margin-top:1px}
+.qs-type{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;margin-right:auto;flex-shrink:0}
 .modal-header{padding:20px 24px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1}
 .modal-header h2{font-size:17px;font-weight:700}
 .modal-body{padding:24px}
@@ -208,6 +220,12 @@ details[open]>summary span:last-child{transform:rotate(180deg)}
 </style>
 </head>
 <body>
+<div id="quick-search-overlay" onclick="if(event.target===this)closeQuickSearch()">
+  <div id="qs-box">
+    <input id="qs-input" placeholder="🔍 ابحث عن طفل، موظف، اشتراك..." autocomplete="off" oninput="runQuickSearch(this.value)" onkeydown="qsKeyNav(event)">
+    <div id="qs-results"><div style="padding:32px;text-align:center;color:#94a3b8;font-size:14px">اكتب للبحث... أو اضغط Esc للإغلاق</div></div>
+  </div>
+</div>
 <div id="app"></div>
 
 <script>
@@ -902,6 +920,7 @@ const App = {
         <div class="topbar-title">${titles[App.view]||''}</div>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn btn-secondary btn-sm" onclick="openQuickSearch()" title="بحث سريع (Ctrl+K)" style="padding:6px 12px;font-size:13px;color:#64748b">🔍 <span class="export-label">بحث</span> <kbd style="font-size:10px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;padding:1px 4px;color:#64748b;font-family:monospace">⌃K</kbd></button>
         <button class="btn btn-secondary btn-sm" onclick="App.go(App.view,App.params)" title="تحديث البيانات" style="padding:6px 10px;font-size:16px;line-height:1">🔄</button>
         <button class="btn btn-success btn-sm" onclick="exportAllData()" title="تصدير جميع البيانات Excel" style="padding:6px 12px;font-size:13px">⬇️ <span class="export-label">تصدير</span></button>
         <span style="font-size:11px;color:#94a3b8">${hm}</span>
@@ -1088,7 +1107,39 @@ _superDash(){
   const pendingCnt=subs.filter(s=>Views._paymentState(s)==='pending').length;
   const expiringCnt=subs.filter(s=>s.isActive&&s.endDate>=T0&&s.endDate<=addDays(T0,7)).length;
 
+  // بيانات "اليوم" للوحة السريعة
+  const todayAtt=DB.attendance().filter(a=>a.date===T0);
+  const todayPresent=todayAtt.filter(a=>a.status==='present').length;
+  const todayAbsent=todayAtt.filter(a=>a.status==='absent').length;
+  const todayTotal=children.length;
+  const attPct=todayTotal>0?Math.round((todayPresent/todayTotal)*100):0;
+  const unreadMsgs=DB.unreadInternalCount(Auth.user?.id,'superadmin',null);
+  const hrAlerts=DB.hrEmployees().filter(e=>e.status!=='deleted'&&['iqamaExpiry','contractEnd','healthCertExpiry'].some(k=>e[k]&&['soon7','expired'].includes(DB.hrDocStatus(e[k])))).length;
   return `
+  <!-- لوحة اليوم السريعة -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px">
+    <div style="background:linear-gradient(135deg,#0f766e,#0d9488);color:#fff;border-radius:14px;padding:16px;cursor:pointer" onclick="App.go('attendance')">
+      <div style="font-size:11px;opacity:.8;margin-bottom:6px">✅ حضور اليوم (${T0})</div>
+      <div style="font-size:28px;font-weight:900">${attPct}%</div>
+      <div style="font-size:12px;opacity:.9;margin-top:4px">${todayPresent} حاضر · ${todayAbsent} غائب · ${todayTotal} إجمالي</div>
+      <div style="margin-top:8px;background:rgba(255,255,255,.2);border-radius:6px;height:6px"><div style="background:#fff;height:6px;border-radius:6px;width:${attPct}%"></div></div>
+    </div>
+    <div style="background:${unreadMsgs>0?'linear-gradient(135deg,#dc2626,#b91c1c)':'#fff'};color:${unreadMsgs>0?'#fff':'#1e293b'};border-radius:14px;padding:16px;border:2px solid ${unreadMsgs>0?'transparent':'#e2e8f0'};cursor:pointer" onclick="App.go('messages')">
+      <div style="font-size:11px;opacity:${unreadMsgs>0?'.85':'.6'};margin-bottom:6px">💬 الرسائل الداخلية</div>
+      <div style="font-size:28px;font-weight:900">${unreadMsgs}</div>
+      <div style="font-size:12px;opacity:.8;margin-top:4px">${unreadMsgs>0?'رسالة غير مقروءة — انقر للقراءة':'لا توجد رسائل جديدة'}</div>
+    </div>
+    <div style="background:${expiringCnt>0?'linear-gradient(135deg,#f59e0b,#d97706)':'#fff'};color:${expiringCnt>0?'#fff':'#1e293b'};border-radius:14px;padding:16px;border:2px solid ${expiringCnt>0?'transparent':'#e2e8f0'};cursor:pointer" onclick="App.go('tasks')">
+      <div style="font-size:11px;opacity:${expiringCnt>0?'.85':'.6'};margin-bottom:6px">📋 اشتراكات تنتهي خلال 7 أيام</div>
+      <div style="font-size:28px;font-weight:900">${expiringCnt}</div>
+      <div style="font-size:12px;opacity:.8;margin-top:4px">${defaulterCnt} متأخر · ${pendingCnt} معلق</div>
+    </div>
+    <div style="background:${hrAlerts>0?'linear-gradient(135deg,#ef4444,#dc2626)':'#fff'};color:${hrAlerts>0?'#fff':'#1e293b'};border-radius:14px;padding:16px;border:2px solid ${hrAlerts>0?'transparent':'#e2e8f0'};cursor:pointer" onclick="App.go('hr')">
+      <div style="font-size:11px;opacity:${hrAlerts>0?'.85':'.6'};margin-bottom:6px">👥 تنبيهات الموارد البشرية</div>
+      <div style="font-size:28px;font-weight:900">${hrAlerts}</div>
+      <div style="font-size:12px;opacity:.8;margin-top:4px">${hrAlerts>0?'وثائق منتهية أو تنتهي قريباً':'جميع الوثائق سليمة ✅'}</div>
+    </div>
+  </div>
   <div style="margin-bottom:16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
     <button class="btn" onclick="App.go('tasks')" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;font-size:14px;font-weight:700;padding:10px 20px;border:none;border-radius:10px;cursor:pointer;font-family:inherit">📌 مهام اليوم (${defaulterCnt+pendingCnt+expiringCnt})</button>
     <button class="btn" onclick="App.go('settings')" style="background:linear-gradient(135deg,#0f766e,#0d9488);color:#fff;font-size:14px;font-weight:700;padding:10px 20px;border:none;border-radius:10px;cursor:pointer;font-family:inherit">⚙️ لوحة التحكم</button>
@@ -1680,6 +1731,7 @@ attendance(){
     <input id="search-attendance" class="input" placeholder="🔍 بحث بالاسم..." value="${esc(App.params.attQ||'')}" style="width:200px" oninput="App.liveSearch('attendance',{...App.params,attQ:this.value},this)">
     <button class="btn btn-primary btn-sm" onclick="saveAttendance('${date}','${sid||''}')">💾 حفظ الحضور</button>
     <button class="btn btn-success btn-sm" onclick="markAllPresent('${date}','${sid||''}','att-all')">✅ الكل حاضر</button>
+    <button class="btn btn-secondary btn-sm" onclick="printAttendanceSheet('${date}','${sid||''}')" title="طباعة ورقة الحضور">🖨️ طباعة</button>
     <div style="margin-right:auto;display:flex;gap:8px">
       <span class="badge badge-green">✅ ${Object.values(attMap).filter(a=>a.status==='present').length} حاضر</span>
       <span class="badge badge-red">❌ ${Object.values(attMap).filter(a=>a.status==='absent').length} غائب</span>
@@ -4117,6 +4169,7 @@ hr(){
         <input type="date" class="input" style="width:180px" value="${date}" max="${T0}" onchange="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:this.value})">
         <button class="btn btn-primary" onclick="markAllHrPresent('${date}')">✅ تسجيل الكل حاضر</button>
         <button class="btn btn-secondary" onclick="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:'${date}',hrAttReport:'1'})" style="${App.params.hrAttReport?'background:#0f766e;color:#fff':''}">📊 تقرير الحضور</button>
+        <button class="btn btn-secondary" onclick="exportHrAttendanceExcel('${date.slice(0,7)}','${filterBranch}')">📤 تصدير الشهر Excel</button>
       </div>
       ${App.params.hrAttReport?`<div class="card">
         <div class="card-title">📊 تقرير تفصيلي — ${formatDate(date)}</div>
@@ -5489,11 +5542,24 @@ const Modals = {
     const workingDays=Math.round(daysInMonth*26/31); // تقريب 26 يوم عمل/شهر (م. العمل السعودي)
     const newRecords=toAdd.map(e=>{
       const absences=DB.hrAttendance().filter(a=>a.employeeId===e.id&&a.date.startsWith(month)&&a.status==='absent').length;
+      const lateMinTotal=DB.hrAttendance().filter(a=>a.employeeId===e.id&&a.date.startsWith(month)&&a.status==='late').reduce((s,a)=>s+(+a.lateMinutes||0),0);
       const dailyRate=(+e.basicSalary||0)/workingDays;
       const absenceDeduction=Math.round(dailyRate*absences*100)/100;
+      const lateDeduction=Math.round(lateMinTotal/(8*60)*dailyRate*100)/100;
+      // خصم الإجازة المرضية: اليوم 31-90 خصم 25% من الراتب اليومي (نظام العمل السعودي)
+      const yearStart=month.slice(0,4)+'-01-01';
+      const yearEnd=month.slice(0,4)+'-12-31';
+      const sickLeaves=DB.hrLeaves().filter(l=>l.employeeId===e.id&&l.type==='sick'&&l.status==='approved');
+      const totalSickYTD=sickLeaves.filter(l=>l.startDate>=yearStart&&l.startDate<=yearEnd).reduce((s,l)=>s+(+l.days||0),0);
+      const monthSickDays=sickLeaves.filter(l=>l.startDate.startsWith(month)).reduce((s,l)=>s+(+l.days||0),0);
+      // حساب أيام في النطاق 75% (31-90) للشهر
+      const prevSick=totalSickYTD-monthSickDays;
+      let sick75Days=0;
+      for(let i=0;i<monthSickDays;i++){const dayNum=prevSick+i+1;if(dayNum>=31&&dayNum<=90) sick75Days++;}
+      const sickDeduction=Math.round(sick75Days*dailyRate*0.25*100)/100;
       const gosiDeduction=Math.round((+e.basicSalary||0)*(+e.gosiRate||9)/100*100)/100;
-      const netSalary=(+e.basicSalary||0)+(+e.housingAllowance||0)+(+e.transportAllowance||0)+(+e.otherAllowances||0)-absenceDeduction-gosiDeduction;
-      return {id:uid(),employeeId:e.id,month,basicSalary:+e.basicSalary||0,housingAllowance:+e.housingAllowance||0,transportAllowance:+e.transportAllowance||0,otherAllowances:+e.otherAllowances||0,gosiRate:+e.gosiRate||9,gosiDeduction,absenceDays:absences,absenceDeduction,loanDeduction:0,otherDeductions:0,bonus:0,netSalary,paymentStatus:'pending',paymentDate:'',notes:'',generatedAt:T0,generatedBy:Auth.user?.name||'—'};
+      const netSalary=(+e.basicSalary||0)+(+e.housingAllowance||0)+(+e.transportAllowance||0)+(+e.otherAllowances||0)-absenceDeduction-lateDeduction-sickDeduction-gosiDeduction;
+      return {id:uid(),employeeId:e.id,month,basicSalary:+e.basicSalary||0,housingAllowance:+e.housingAllowance||0,transportAllowance:+e.transportAllowance||0,otherAllowances:+e.otherAllowances||0,gosiRate:+e.gosiRate||9,gosiDeduction,absenceDays:absences,absenceDeduction,lateDeduction,sickDeduction,sick75Days,loanDeduction:0,otherDeductions:0,bonus:0,netSalary,paymentStatus:'pending',paymentDate:'',notes:'',generatedAt:T0,generatedBy:Auth.user?.name||'—'};
     });
     const existing2=DB.hrPayroll();
     newRecords.forEach(r=>existing2.push(r));
@@ -6036,6 +6102,94 @@ function deleteHrEmployee(id){
 function deleteHrLeave(id){
   if(!confirm('هل تريد حذف هذه الإجازة؟')) return;
   DB.deleteHrLeave(id);toast('✅ تم حذف الإجازة');App.refresh();
+}
+function printAttendanceSheet(date,schoolId){
+  const bid=Auth.branchId();
+  let kids=DB.children();
+  if(schoolId) kids=kids.filter(c=>c.schoolId===schoolId);
+  if(bid) kids=kids.filter(c=>c.branchId===bid);
+  const attMap={};
+  DB.attendance().filter(a=>a.date===date).forEach(a=>{attMap[a.childId]=a;});
+  const school=DB.schools()[0]||{};
+  const branch=bid?DB.branches().find(b=>b.id===bid):null;
+  const statusAr={present:'✅ حاضر',absent:'❌ غائب',late:'⏰ متأخر'};
+  const morning=kids.filter(c=>(c.period||'morning')==='morning');
+  const evening=kids.filter(c=>c.period==='evening');
+  const renderSection=(list,title)=>list.length?`
+    <div class="section-title">${title} (${list.length} طفل)</div>
+    <table>
+      <thead><tr><th style="width:30px">م</th><th>اسم الطفل</th><th>اسم ولي الأمر</th><th>الحالة</th><th style="width:80px">التوقيع</th></tr></thead>
+      <tbody>${list.map((c,i)=>`<tr><td>${i+1}</td><td>${esc(c.name)}</td><td>${esc(c.parentName||'—')}</td><td style="font-size:13px">${statusAr[attMap[c.id]?.status]||'—'}</td><td></td></tr>`).join('')}</tbody>
+    </table>`:'' ;
+  const win=window.open('','_blank','width=800,height=900');
+  win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>ورقة الحضور — ${formatDate(date)}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}body{font-family:Tahoma,sans-serif;padding:14px;font-size:12px;direction:rtl}
+    .header{text-align:center;margin-bottom:12px;border-bottom:2px solid #0f766e;padding-bottom:10px}
+    .header h1{font-size:16px;color:#0f766e;margin-bottom:3px}.header p{font-size:11px;color:#475569}
+    .section-title{font-size:13px;font-weight:700;background:#0f766e;color:#fff;padding:6px 12px;margin:12px 0 6px;border-radius:4px}
+    table{width:100%;border-collapse:collapse;margin-bottom:8px}
+    th{background:#f1f5f9;padding:6px 8px;text-align:right;font-size:11px;border:1px solid #cbd5e1}
+    td{padding:6px 8px;border:1px solid #e2e8f0;font-size:12px}
+    tr:nth-child(even) td{background:#f8fafc}
+    .footer{margin-top:16px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;display:flex;justify-content:space-between}
+    .stats{display:flex;gap:16px;font-size:11px;margin-bottom:10px;padding:8px 12px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0}
+    .stats span{font-weight:700}
+    @media print{body{padding:6px}@page{size:A4;margin:10mm}}
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700&display=swap" rel="stylesheet">
+  </head><body>
+  <div style="text-align:center;margin-bottom:10px" class="no-print">
+    <button onclick="window.print()" style="background:#0f766e;color:#fff;border:none;padding:8px 20px;border-radius:6px;font-size:13px;cursor:pointer">🖨️ طباعة</button>
+  </div>
+  <div class="header">
+    <h1>${esc(school.name||'مدارك الطفل')}${branch?' — '+esc(branch.name):''}</h1>
+    <p>ورقة الحضور اليومي — ${formatDate(date)} | إجمالي الأطفال: ${kids.length}</p>
+  </div>
+  <div class="stats">
+    <div>✅ حاضر: <span style="color:#10b981">${Object.values(attMap).filter(a=>a.status==='present').length}</span></div>
+    <div>❌ غائب: <span style="color:#ef4444">${Object.values(attMap).filter(a=>a.status==='absent').length}</span></div>
+    <div>⏰ متأخر: <span style="color:#f59e0b">${Object.values(attMap).filter(a=>a.status==='late').length}</span></div>
+    <div>⬜ لم يُسجَّل: <span style="color:#94a3b8">${kids.filter(c=>!attMap[c.id]).length}</span></div>
+  </div>
+  ${renderSection(morning,'🌅 الفترة الصباحية')}
+  ${renderSection(evening,'🌙 الفترة المسائية')}
+  <div class="footer">
+    <span>مدارك الطفل — نظام الإدارة المتكامل</span>
+    <span>تاريخ الطباعة: ${new Date().toLocaleDateString('ar-SA')}</span>
+  </div>
+  </body></html>`);
+  win.document.close();
+}
+function exportHrAttendanceExcel(month,branchFilter){
+  if(!window.XLSX){toast('مكتبة Excel غير محملة','error');return;}
+  const bid=Auth.branchId();
+  let emps=DB.hrEmployees().filter(e=>e.status!=='deleted');
+  if(bid) emps=emps.filter(e=>e.branchId===bid);
+  else if(branchFilter&&branchFilter!=='all') emps=emps.filter(e=>e.branchId===branchFilter);
+  const daysInMonth=new Date(+month.slice(0,4),+month.slice(5,7),0).getDate();
+  const days=Array.from({length:daysInMonth},(_,i)=>{const d=i+1;return `${month}-${String(d).padStart(2,'0')}`;});
+  const attAll=DB.hrAttendance().filter(a=>a.date.startsWith(month));
+  const attMap={};
+  attAll.forEach(a=>{if(!attMap[a.employeeId]) attMap[a.employeeId]={};attMap[a.employeeId][a.date]=a;});
+  const workingDays=26;
+  const statusAr={present:'حاضر',absent:'غائب',late:'متأخر',leave:'إجازة','':'—'};
+  const header=['م','الاسم','المسمى','الفرع',...days.map(d=>d.slice(8)),'أيام حضور','أيام غياب','دقائق تأخر','خصم تأخر (ر.س)'];
+  const rows=emps.map((e,i)=>{
+    const ea=attMap[e.id]||{};
+    const dailyRate=(+e.basicSalary||0)/workingDays;
+    let pres=0,abs=0,lateMin=0;
+    const dayVals=days.map(d=>{const a=ea[d];if(!a) return '—';if(a.status==='present') pres++;else if(a.status==='absent') abs++;else if(a.status==='late'){pres++;lateMin+=(+a.lateMinutes||0);}return statusAr[a.status||'']+(a.status==='late'&&a.lateMinutes?` (${a.lateMinutes}د)`:'');});
+    const lateDeduct=Math.round(lateMin/(8*60)*dailyRate*100)/100;
+    const branch=DB.branches().find(b=>b.id===e.branchId);
+    return [i+1,e.name,e.jobTitle||'—',branch?.name.split(' - ')[0]||'—',...dayVals,pres,abs,lateMin,lateDeduct];
+  });
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([header,...rows]);
+  ws['!cols']=[{wch:4},{wch:20},{wch:16},{wch:14},...days.map(()=>({wch:8})),{wch:10},{wch:10},{wch:10},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws,`حضور ${month}`);
+  XLSX.writeFile(wb,`حضور_موظفين_${month}.xlsx`);
+  toast('✅ تم تصدير بيانات الحضور');
 }
 function markHrPaid(payId){
   const p=DB.hrPayroll().find(x=>x.id===payId);
@@ -7900,6 +8054,81 @@ function _watchForBackendRecovery(){
     }catch(e){}
   };
   setInterval(check,30000);
+}
+
+// ===== البحث السريع الشامل (Ctrl+K) =====
+let _qsActive=-1;
+document.addEventListener('keydown',function(e){
+  if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openQuickSearch();}
+  if(e.key==='Escape'){closeQuickSearch();}
+});
+function openQuickSearch(){
+  const ov=document.getElementById('quick-search-overlay');
+  const inp=document.getElementById('qs-input');
+  if(!ov||!inp) return;
+  ov.classList.add('open');
+  inp.value='';
+  inp.focus();
+  runQuickSearch('');
+}
+function closeQuickSearch(){
+  document.getElementById('quick-search-overlay')?.classList.remove('open');
+  _qsActive=-1;
+}
+function runQuickSearch(q){
+  const el=document.getElementById('qs-results');
+  if(!el) return;
+  q=(q||'').trim();
+  _qsActive=-1;
+  if(!q){el.innerHTML='<div style="padding:32px;text-align:center;color:#94a3b8;font-size:14px">اكتب للبحث... أو اضغط Esc للإغلاق</div>';return;}
+  const results=[];
+  // بحث في الأطفال
+  DB.children().filter(c=>{
+    const n=(c.name||'').toLowerCase();
+    const p=(c.parentName||'').toLowerCase();
+    const qL=q.toLowerCase();
+    return n.includes(qL)||p.includes(qL);
+  }).slice(0,5).forEach(c=>{
+    const sub=DB.subscriptions().find(s=>s.childId===c.id&&s.isActive);
+    results.push({type:'child',icon:'👶',bg:'#dcfce7',label:c.name,sub:`${esc(c.parentName||'')} · ${DB.branchName(c.branchId)||''} · ${c.period==='morning'?'صباحي':'مسائي'}${sub?' · اشتراك فعال':' · بدون اشتراك'}`,action:()=>{App.go('children',{search:c.name});closeQuickSearch();},typeLbl:'طفل',typeCls:'background:#dcfce7;color:#166534'});
+  });
+  // بحث في الاشتراكات
+  DB.subscriptions().filter(s=>{
+    const c=DB.children().find(x=>x.id===s.childId);
+    return (c?.name||'').toLowerCase().includes(q.toLowerCase())&&s.isActive;
+  }).slice(0,3).forEach(s=>{
+    const c=DB.children().find(x=>x.id===s.childId);
+    results.push({type:'sub',icon:'📋',bg:'#dbeafe',label:`اشتراك: ${c?.name||''}`,sub:`${formatDate(s.startDate)} → ${formatDate(s.endDate)} · ${s.isActive?'فعال':'منتهي'}`,action:()=>{App.go('subscriptions',{childId:s.childId});closeQuickSearch();},typeLbl:'اشتراك',typeCls:'background:#dbeafe;color:#1e40af'});
+  });
+  // بحث في الموظفين
+  if(Auth.isSuperAdmin()){
+    DB.hrEmployees().filter(e=>e.status!=='deleted'&&((e.name||'').toLowerCase().includes(q.toLowerCase())||(e.jobTitle||'').toLowerCase().includes(q.toLowerCase()))).slice(0,4).forEach(e=>{
+      results.push({type:'emp',icon:'👤',bg:'#fef3c7',label:e.name,sub:`${esc(e.jobTitle||'—')} · ${DB.branchName(e.branchId)||''} · ${(+e.basicSalary||0).toLocaleString()} ر.س`,action:()=>{closeQuickSearch();Modals.viewHrEmployee(e.id);},typeLbl:'موظف',typeCls:'background:#fef3c7;color:#92400e'});
+    });
+  }
+  if(!results.length){el.innerHTML=`<div style="padding:32px;text-align:center;color:#94a3b8;font-size:14px">لا توجد نتائج لـ «${esc(q)}»</div>`;return;}
+  el.innerHTML=results.map((r,i)=>`<div class="qs-item" data-idx="${i}" onclick="qsSelect(${i})" onmouseenter="_qsActive=${i}">
+    <div class="qs-icon" style="background:${r.bg}">${r.icon}</div>
+    <div style="flex:1;min-width:0">
+      <div class="qs-label">${esc(r.label)}</div>
+      <div class="qs-sub">${r.sub}</div>
+    </div>
+    <span class="qs-type" style="${r.typeCls}">${r.typeLbl}</span>
+  </div>`).join('');
+  window._qsResults=results;
+}
+function qsSelect(i){
+  const r=window._qsResults?.[i];
+  if(r) r.action();
+}
+function qsKeyNav(e){
+  const items=document.querySelectorAll('.qs-item');
+  if(!items.length) return;
+  if(e.key==='ArrowDown'){e.preventDefault();_qsActive=Math.min(_qsActive+1,items.length-1);}
+  else if(e.key==='ArrowUp'){e.preventDefault();_qsActive=Math.max(_qsActive-1,0);}
+  else if(e.key==='Enter'){e.preventDefault();if(_qsActive>=0) qsSelect(_qsActive);return;}
+  items.forEach((el,i)=>el.style.background=i===_qsActive?'#f0fdf4':'');
+  if(_qsActive>=0) items[_qsActive].scrollIntoView({block:'nearest'});
 }
 </script>
 </body>
