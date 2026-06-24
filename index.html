@@ -1261,9 +1261,23 @@ _alertBanners(al,schoolId=null){
     const c=children.find(x=>x.id===sub.childId);
     return c?c.name:sub.childId;
   };
+  // الاشتراكات المنتهية: تظهر فقط إذا انتهت خلال آخر 5 أيام
+  const dismissedAlerts=JSON.parse(localStorage.getItem('_dismissed_alerts')||'{}');
+  const recentExpired=al.expired.filter(s=>diffDays(T0,s.endDate)<=5&&!dismissedAlerts[s.id]);
+  const hiddenCount=al.expired.length-recentExpired.length;
   let html='';
-  if(al.expired.length){
-    html+=`<div class="alert-box alert-red">🔴 <div><strong>اشتراكات منتهية (${al.expired.length})</strong><br>${al.expired.map(s=>`${getName(s)} — انتهى ${formatDate(s.endDate)}`).join(' | ')}</div></div>`;
+  if(recentExpired.length){
+    html+=`<div class="alert-box alert-red" style="position:relative">
+      🔴 <div style="flex:1">
+        <strong>اشتراكات منتهية (${recentExpired.length})</strong>
+        ${hiddenCount>0?`<span style="font-size:11px;color:#f87171;margin-right:8px">· ${hiddenCount} مخفية (أكثر من 5 أيام)</span>`:''}
+        <br>
+        ${recentExpired.map(s=>`<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 0">
+          ${getName(s)} — انتهى ${formatDate(s.endDate)} (${diffDays(T0,s.endDate)} يوم)
+          <button onclick="dismissSubAlert('${s.id}')" style="background:#ef4444;color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:10px;cursor:pointer;line-height:1;flex-shrink:0;font-family:inherit" title="إخفاء">✕</button>
+        </span>`).join(' &nbsp;|&nbsp; ')}
+      </div>
+    </div>`;
   }
   if(al.today.length){
     html+=`<div class="alert-box alert-yellow">🟡 <div><strong>تنتهي اليوم (${al.today.length})</strong><br>${al.today.map(s=>getName(s)).join(' | ')}</div></div>`;
@@ -8056,6 +8070,16 @@ function _watchForBackendRecovery(){
   setInterval(check,30000);
 }
 
+// إخفاء تنبيه اشتراك منتهي من الرئيسية (يُحفظ محلياً — يختفي تلقائياً بعد 5 أيام من الانتهاء)
+function dismissSubAlert(subId){
+  const key='_dismissed_alerts';
+  const map=JSON.parse(localStorage.getItem(key)||'{}');
+  map[subId]=T0;
+  // تنظيف القديم (أكثر من 10 أيام)
+  Object.keys(map).forEach(k=>{if(diffDays(T0,map[k])>10) delete map[k];});
+  localStorage.setItem(key,JSON.stringify(map));
+  App.refresh();
+}
 // ===== البحث السريع الشامل (Ctrl+K) =====
 let _qsActive=-1;
 document.addEventListener('keydown',function(e){
