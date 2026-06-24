@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v42 -->
+<!-- BUILD: 2026-06-24-v43 -->
 <script>
 (function(){
-  var BUILD='v42-20260624-1';
+  var BUILD='v43-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -1598,6 +1598,15 @@ children(){
   if(q) kids=kids.filter(c=>(c.name||'').includes(q)||(c.parentName||'').toLowerCase().includes(q)||(c.parentPhone||'').includes(q));
   if(!bid&&bFilter!=='all') kids=kids.filter(c=>c.branchId===bFilter);
   if(!uPeriod&&pFilter!=='all') kids=kids.filter(c=>c.period===pFilter);
+  const childSort=App.params.childSort||'name';
+  kids=[...kids];
+  if(childSort==='name') kids.sort((a,b)=>(a.name||'').localeCompare(b.name||'','ar'));
+  else if(childSort==='sub_end') kids.sort((a,b)=>{const sa=DB.activeSub(a.id);const sb=DB.activeSub(b.id);const da=sa?.endDate||'9999';const db=sb?.endDate||'9999';return da.localeCompare(db);});
+  else if(childSort==='reg_new') kids.sort((a,b)=>(b.createdAt||b.id||'').localeCompare(a.createdAt||a.id||''));
+  else if(childSort==='reg_old') kids.sort((a,b)=>(a.createdAt||a.id||'').localeCompare(b.createdAt||b.id||''));
+  else if(childSort==='status'){const order={today:0,soon3:1,soon7:2,active:3,none:4,expired:5};kids.sort((a,b)=>(order[DB.subStatus(DB.activeSub(a.id))]??9)-(order[DB.subStatus(DB.activeSub(b.id))]??9));}
+  else if(childSort==='period') kids.sort((a,b)=>(a.period||'').localeCompare(b.period||''));
+  else if(childSort==='branch') kids.sort((a,b)=>(branches.find(x=>x.id===a.branchId)?.name||'').localeCompare(branches.find(x=>x.id===b.branchId)?.name||'','ar'));
   const branchColors=['badge-blue','badge-green','badge-orange','badge-red'];
   return `
   <div class="actions-bar" style="flex-wrap:wrap">
@@ -1608,6 +1617,15 @@ children(){
       <span class="search-icon">🔍</span>
       <input id="search-children" class="input" placeholder="بحث بالاسم أو ولي الأمر أو الهاتف..." value="${esc(App.params.q||'')}" oninput="App.liveSearch('children',{...App.params,q:this.value},this)">
     </div>
+    <select class="input" style="width:auto" onchange="App.go('children',{...App.params,childSort:this.value})">
+      <option value="name" ${childSort==='name'?'selected':''}>↕ الاسم</option>
+      <option value="sub_end" ${childSort==='sub_end'?'selected':''}>⏳ انتهاء الاشتراك</option>
+      <option value="reg_new" ${childSort==='reg_new'?'selected':''}>📅 أحدث تسجيلاً</option>
+      <option value="reg_old" ${childSort==='reg_old'?'selected':''}>📅 أقدم تسجيلاً</option>
+      <option value="status" ${childSort==='status'?'selected':''}>🔴 حالة الاشتراك</option>
+      <option value="period" ${childSort==='period'?'selected':''}>⏰ الفترة</option>
+      <option value="branch" ${childSort==='branch'?'selected':''}>🏢 الفرع</option>
+    </select>
   </div>
   ${(!bid||!uPeriod)?`<div class="card" style="padding:12px;margin-bottom:12px">
     ${!bid?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
@@ -4180,6 +4198,7 @@ hr(){
   const branches=DB.branches();
   const tabs=isSchAdmin?[
     {k:'attendance',icon:'✅',label:'الحضور'},
+    {k:'leaves',icon:'🏖️',label:'الإجازات'},
   ]:[
     {k:'employees',icon:'👥',label:'الموظفون'},
     {k:'attendance',icon:'✅',label:'الحضور'},
@@ -4221,6 +4240,15 @@ hr(){
     if(q) list=list.filter(e=>e.name.includes(q)||e.jobTitle?.includes(q)||(e.nationalId||e.iqamaNo||'').includes(q));
     const statusFilter=App.params.hrSt||'active';
     if(statusFilter!=='all') list=list.filter(e=>(e.status||'active')===statusFilter);
+    const hrSort=App.params.hrSort||'name';
+    list=[...list];
+    if(hrSort==='name') list.sort((a,b)=>(a.name||'').localeCompare(b.name||'','ar'));
+    else if(hrSort==='hire_new') list.sort((a,b)=>(b.contractStart||'').localeCompare(a.contractStart||''));
+    else if(hrSort==='hire_old') list.sort((a,b)=>(a.contractStart||'').localeCompare(b.contractStart||''));
+    else if(hrSort==='salary_high') list.sort((a,b)=>(+b.basicSalary||0)-(+a.basicSalary||0));
+    else if(hrSort==='salary_low') list.sort((a,b)=>(+a.basicSalary||0)-(+b.basicSalary||0));
+    else if(hrSort==='contract') list.sort((a,b)=>{const da=a.contractEnd||'9999';const db=b.contractEnd||'9999';return da.localeCompare(db);});
+    else if(hrSort==='branch') list.sort((a,b)=>(branches.find(x=>x.id===a.branchId)?.name||'').localeCompare(branches.find(x=>x.id===b.branchId)?.name||'','ar'));
     const alertCount=emps.filter(e=>{
       return ['iqamaExpiry','contractEnd','healthCertExpiry'].some(k=>e[k]&&['soon7','soon60','expired'].includes(DB.hrDocStatus(e[k])));
     }).length;
@@ -4236,17 +4264,26 @@ hr(){
         ⚠️ <strong>${alertCount} موظف</strong> لديهم وثائق تستحق الانتباه (إقامة / عقد / شهادة صحية)
       </div>`:''}
       <div class="actions-bar">
-        <input class="input" style="flex:1;max-width:260px" placeholder="🔍 بحث..." value="${esc(q)}" oninput="App.liveSearch('hr',{hrTab:'employees',hrBranch:'${filterBranch}',hrSt:'${statusFilter}'},this)">
-        ${!bid?`<select class="input" style="width:auto" onchange="App.go('hr',{hrTab:'employees',hrBranch:this.value,hrSt:'${statusFilter}'})">
+        <input class="input" style="flex:1;max-width:260px" placeholder="🔍 بحث..." value="${esc(q)}" oninput="App.liveSearch('hr',{hrTab:'employees',hrBranch:'${filterBranch}',hrSt:'${statusFilter}',hrSort:'${hrSort}'},this)">
+        ${!bid?`<select class="input" style="width:auto" onchange="App.go('hr',{hrTab:'employees',hrBranch:this.value,hrSt:'${statusFilter}',hrSort:'${hrSort}'})">
           <option value="all" ${filterBranch==='all'?'selected':''}>جميع الفروع</option>
           ${branches.map(b=>`<option value="${b.id}" ${filterBranch===b.id?'selected':''}>${esc(b.name.split(' - ')[0])}</option>`).join('')}
         </select>`:''}
-        <select class="input" style="width:auto" onchange="App.go('hr',{hrTab:'employees',hrBranch:'${filterBranch}',hrSt:this.value})">
+        <select class="input" style="width:auto" onchange="App.go('hr',{hrTab:'employees',hrBranch:'${filterBranch}',hrSt:this.value,hrSort:'${hrSort}'})">
           <option value="active" ${statusFilter==='active'?'selected':''}>نشط</option>
           <option value="all" ${statusFilter==='all'?'selected':''}>الكل</option>
           <option value="on_leave" ${statusFilter==='on_leave'?'selected':''}>في إجازة</option>
           <option value="resigned" ${statusFilter==='resigned'?'selected':''}>استقال</option>
           <option value="terminated" ${statusFilter==='terminated'?'selected':''}>منتهي الخدمة</option>
+        </select>
+        <select class="input" style="width:auto" onchange="App.go('hr',{hrTab:'employees',hrBranch:'${filterBranch}',hrSt:'${statusFilter}',hrSort:this.value})">
+          <option value="name" ${hrSort==='name'?'selected':''}>↕ الاسم</option>
+          <option value="hire_new" ${hrSort==='hire_new'?'selected':''}>📅 أحدث توظيفاً</option>
+          <option value="hire_old" ${hrSort==='hire_old'?'selected':''}>📅 أقدم توظيفاً</option>
+          <option value="salary_high" ${hrSort==='salary_high'?'selected':''}>💰 الراتب الأعلى</option>
+          <option value="salary_low" ${hrSort==='salary_low'?'selected':''}>💰 الراتب الأقل</option>
+          <option value="contract" ${hrSort==='contract'?'selected':''}>⏳ نهاية العقد (الأقرب)</option>
+          <option value="branch" ${hrSort==='branch'?'selected':''}>🏢 الفرع</option>
         </select>
         <button class="btn btn-primary" onclick="Modals.addHrEmployee()">+ إضافة موظف</button>
       </div>
