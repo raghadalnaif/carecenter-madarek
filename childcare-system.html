@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v40 -->
+<!-- BUILD: 2026-06-24-v42 -->
 <script>
 (function(){
-  var BUILD='v40-20260624-1';
+  var BUILD='v42-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -1140,11 +1140,38 @@ _superDash(){
       <div style="font-size:12px;opacity:.8;margin-top:4px">${hrAlerts>0?'وثائق منتهية أو تنتهي قريباً':'جميع الوثائق سليمة ✅'}</div>
     </div>
   </div>
-  <div style="margin-bottom:16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
-    <button class="btn" onclick="App.go('tasks')" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;font-size:14px;font-weight:700;padding:10px 20px;border:none;border-radius:10px;cursor:pointer;font-family:inherit">📌 مهام اليوم (${defaulterCnt+pendingCnt+expiringCnt})</button>
-    <button class="btn" onclick="App.go('settings')" style="background:linear-gradient(135deg,#0f766e,#0d9488);color:#fff;font-size:14px;font-weight:700;padding:10px 20px;border:none;border-radius:10px;cursor:pointer;font-family:inherit">⚙️ لوحة التحكم</button>
+  <!-- إجراءات سريعة للمدير العام -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+    <button class="btn" onclick="App.go('tasks')" style="flex:1;min-width:130px;justify-content:center;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;font-weight:700;border:none">📌 مهام اليوم (${defaulterCnt+pendingCnt+expiringCnt})</button>
+    <button class="btn" onclick="App.go('attendance')" style="flex:1;min-width:130px;justify-content:center;background:linear-gradient(135deg,#0f766e,#0d9488);color:#fff;font-weight:700;border:none">✅ الحضور الكلي</button>
+    <button class="btn" onclick="App.go('hr')" style="flex:1;min-width:130px;justify-content:center;background:${hrAlerts>0?'linear-gradient(135deg,#ef4444,#dc2626)':'linear-gradient(135deg,#475569,#334155)'};color:#fff;font-weight:700;border:none">👥 الموارد البشرية${hrAlerts>0?' ('+hrAlerts+')':''}</button>
+    <button class="btn" onclick="App.go('messages')" style="flex:1;min-width:130px;justify-content:center;background:${unreadMsgs>0?'linear-gradient(135deg,#7c3aed,#6d28d9)':'linear-gradient(135deg,#475569,#334155)'};color:#fff;font-weight:700;border:none">💬 الرسائل${unreadMsgs>0?' ('+unreadMsgs+')':''}</button>
+    <button class="btn" onclick="App.go('settings')" style="flex:1;min-width:130px;justify-content:center;background:linear-gradient(135deg,#334155,#1e293b);color:#fff;font-weight:700;border:none">⚙️ الإعدادات</button>
   </div>
 
+  <!-- غائبو اليوم — المدير العام -->
+  ${(()=>{
+    const allKids=DB.children();
+    const todayAttAll=DB.attendance().filter(a=>a.date===T0);
+    const attMapAll={};todayAttAll.forEach(a=>{attMapAll[a.childId]=a;});
+    const absentAll=allKids.filter(c=>attMapAll[c.id]?.status==='absent');
+    const branches=DB.branches();
+    if(!absentAll.length) return '';
+    const byBranch={};
+    absentAll.forEach(c=>{if(!byBranch[c.branchId]) byBranch[c.branchId]=[];byBranch[c.branchId].push(c);});
+    return `<div class="card" style="border-right:4px solid #ef4444;padding:14px 16px;margin-bottom:14px">
+      <div style="font-size:14px;font-weight:700;color:#dc2626;margin-bottom:10px">❌ غائبون اليوم — كل الفروع (${absentAll.length})</div>
+      ${Object.entries(byBranch).map(([bid2,kids])=>{
+        const b=branches.find(x=>x.id===bid2);
+        return `<div style="margin-bottom:8px">
+          <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:5px">🏢 ${esc(b?.name.split(' - ')[0]||'فرع')} (${kids.length})</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${kids.map(c=>`<span style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:4px 8px;font-size:12px;font-weight:600">${esc(c.name)}</span>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  })()}
   <div class="card" style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);color:#fff;border:0;margin-bottom:16px">
     <div style="font-size:14px;opacity:.8;margin-bottom:8px">📊 ملخّص الشهر الحالي (${monthKey})</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px">
@@ -1214,44 +1241,135 @@ _superDash(){
 _schoolDash(){
   const sid=Auth.schoolId();
   const bid=Auth.branchId();
+  const me=Auth.user;
   const children=DB.children().filter(c=>c.schoolId===sid&&(!bid||c.branchId===bid));
   const childIds=new Set(children.map(c=>c.id));
   const subs=DB.subscriptions().filter(s=>s.schoolId===sid&&(!bid||s.branchId===bid));
   const al=DB.alerts(sid,bid);
-  const todayAtt=DB.attendance().filter(a=>a.schoolId===sid&&a.date===T0&&(!bid||childIds.has(a.childId)));
-  return `
-  <div class="stats-grid">
-    <div class="stat-card blue"><div class="stat-val">${children.length}</div><div class="stat-lbl">👶 الأطفال المسجلون</div></div>
-    <div class="stat-card green"><div class="stat-val">${subs.filter(s=>s.isActive).length}</div><div class="stat-lbl">📋 اشتراكات فعالة</div></div>
-    <div class="stat-card yellow"><div class="stat-val">${todayAtt.filter(a=>a.status==='present').length}</div><div class="stat-lbl">✅ حضور اليوم</div></div>
-    <div class="stat-card red"><div class="stat-val">${al.expired.length+al.today.length+al.in3.length}</div><div class="stat-lbl">⚠️ تحتاج متابعة</div></div>
-  </div>
-  ${Views._alertBanners(al,sid)}
-  <div class="card">
-    <div class="section-header">
-      <div class="card-title" style="margin:0">👶 قائمة الأطفال مع حالة الاشتراك</div>
-      <button class="btn btn-primary btn-sm" onclick="App.go('children')">إدارة الأطفال</button>
+  const allAtt=DB.attendance();
+  const todayAtt=allAtt.filter(a=>a.schoolId===sid&&a.date===T0&&(!bid||childIds.has(a.childId)));
+  const attMap={}; todayAtt.forEach(a=>{attMap[a.childId]=a;});
+  const presentCnt=todayAtt.filter(a=>a.status==='present').length;
+  const absentCnt=todayAtt.filter(a=>a.status==='absent').length;
+  const lateCnt=todayAtt.filter(a=>a.status==='late').length;
+  const notRecorded=children.filter(c=>!attMap[c.id]).length;
+  const attPct=children.length>0?Math.round((presentCnt/children.length)*100):0;
+  const unreadMsgs=DB.unreadInternalCount(me?.id,'school_admin',bid);
+  const expiringSoon=al.in3.length+al.today.length;
+  const activeSubs=subs.filter(s=>s.isActive);
+  const expiredSubs=al.expired.filter(s=>diffDays(T0,s.endDate)<=5);
+  const branch=DB.branches().find(b=>b.id===bid);
+  // الأطفال الغائبون اليوم
+  const absentKids=children.filter(c=>attMap[c.id]?.status==='absent');
+  // حالة الاشتراك لكل طفل
+  const subStatus=(c)=>{
+    const sub=DB.activeSub(c.id);
+    const st=DB.subStatus(sub);
+    return {sub,st};
+  };
+  const morning=children.filter(c=>(c.period||'morning')==='morning');
+  const evening=children.filter(c=>c.period==='evening');
+  const renderKidCard=(c)=>{
+    const {sub,st}=subStatus(c);
+    const stColor={active:'#10b981',today:'#f59e0b',soon3:'#f97316',soon7:'#3b82f6',expired:'#ef4444',none:'#94a3b8'}[st]||'#94a3b8';
+    const stLbl={active:'نشط',today:'ينتهي اليوم',soon3:'ينتهي قريباً',soon7:'7 أيام',expired:'منتهي',none:'بلا اشتراك'}[st]||'—';
+    const attSt=attMap[c.id]?.status||'';
+    const attColor={present:'#10b981',absent:'#ef4444',late:'#f59e0b'}[attSt]||'#e2e8f0';
+    const attLbl={present:'✅',absent:'❌',late:'⏰'}[attSt]||'○';
+    return `<div style="background:#fff;border-radius:10px;border:2px solid ${stColor}22;padding:10px 12px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="App.go('children',{search:'${esc(c.name)}'})">
+      <div style="width:8px;height:8px;border-radius:50%;background:${stColor};flex-shrink:0"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}</div>
+        <div style="font-size:11px;color:#64748b">${esc(c.parentName||'')} ${sub?'· حتى '+formatDate(sub.endDate):''}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+        <span style="font-size:10px;font-weight:700;color:${stColor}">${stLbl}</span>
+        <span style="font-size:14px" title="${{present:'حاضر',absent:'غائب',late:'متأخر'}[attSt]||'لم يُسجَّل'}">${attLbl}</span>
+      </div>
+    </div>`;
+  };
+  const renderSection=(list,title,icon,bg,border)=>list.length?`
+    <div style="margin-bottom:6px;padding:8px 12px;background:${bg};border-radius:8px;border:1px solid ${border};display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:14px;font-weight:800;color:#0f766e">${icon} ${title}</span>
+      <span style="font-size:12px;color:#64748b">${list.filter(c=>attMap[c.id]?.status==='present').length} حاضر من ${list.length}</span>
     </div>
-    <table>
-      <thead><tr><th>الفرع</th><th>الطفل</th><th>ولي الأمر</th><th>نوع الاشتراك</th><th>ينتهي في</th><th>الدفع</th><th>الحالة</th></tr></thead>
-      <tbody>
-        ${children.map(c=>{
-          const sub=DB.activeSub(c.id);
-          const st=DB.subStatus(sub);
-          const stMap={active:['badge-green','نشط'],today:['badge-yellow','ينتهي اليوم'],soon3:['badge-orange','ينتهي قريباً'],soon7:['badge-blue','7 أيام'],expired:['badge-red','منتهي'],none:['badge-gray','بلا اشتراك']};
-          const [bc,bl]=stMap[st];
-          return `<tr>
-            <td><span class="badge badge-blue" style="font-size:11px">🏢 ${DB.branchName(c.branchId)}</span></td>
-            <td><strong>${esc(c.name)}</strong><br><small style="color:#94a3b8">${c.grade||''}</small></td>
-            <td>${esc(c.parentName)}<br><a href="tel:${c.parentPhone}" style="color:#0f766e;font-size:13px">${c.parentPhone}</a></td>
-            <td>${sub?({'daily':'يومي','weekly':'أسبوعي','monthly':'٣٠ يوم','custom':'مخصص'}[sub.type]||sub.type):'—'}</td>
-            <td>${sub?formatDate(sub.endDate):'—'}</td>
-            <td>${sub?Views._payBadge(sub):'—'}</td>
-            <td><span class="badge ${bc}">${bl}</span></td>
-          </tr>`;
-        }).join('')}
-      </tbody>
-    </table>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-bottom:16px">
+      ${list.map(renderKidCard).join('')}
+    </div>`:'';
+  return `
+  <!-- إجراءات سريعة -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+    <button class="btn btn-primary" onclick="App.go('attendance')" style="flex:1;min-width:120px;justify-content:center;font-weight:700">✅ تسجيل الحضور</button>
+    <button class="btn" onclick="App.go('branchTasks')" style="flex:1;min-width:120px;justify-content:center;background:${expiringSoon>0?'#dc2626':'#f1f5f9'};color:${expiringSoon>0?'#fff':'#475569'};font-weight:700;border:none">📌 مهام التحصيل${expiringSoon>0?' ('+expiringSoon+')':''}</button>
+    <button class="btn" onclick="App.go('cashClosing')" style="flex:1;min-width:120px;justify-content:center;background:#f1f5f9;color:#475569;font-weight:700;border:none">💰 تقفيل الصندوق</button>
+    <button class="btn" onclick="App.go('messages')" style="flex:1;min-width:120px;justify-content:center;background:${unreadMsgs>0?'#dc2626':'#f1f5f9'};color:${unreadMsgs>0?'#fff':'#475569'};font-weight:700;border:none;position:relative">
+      💬 الرسائل${unreadMsgs>0?` <span style="background:#fff;color:#dc2626;border-radius:50%;padding:0 5px;font-size:11px;font-weight:900">${unreadMsgs}</span>`:''}
+    </button>
+  </div>
+
+  <!-- لوحة اليوم السريعة -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px">
+    <div style="background:linear-gradient(135deg,#0f766e,#0d9488);color:#fff;border-radius:12px;padding:14px;cursor:pointer" onclick="App.go('attendance')">
+      <div style="font-size:10px;opacity:.8;margin-bottom:4px">✅ حضور اليوم</div>
+      <div style="font-size:26px;font-weight:900">${attPct}%</div>
+      <div style="font-size:11px;opacity:.9;margin-top:3px">${presentCnt} حاضر · ${absentCnt} غائب</div>
+      <div style="margin-top:6px;background:rgba(255,255,255,.2);border-radius:4px;height:5px"><div style="background:#fff;height:5px;border-radius:4px;width:${attPct}%"></div></div>
+    </div>
+    <div style="background:${notRecorded>0?'linear-gradient(135deg,#f59e0b,#d97706)':'#fff'};color:${notRecorded>0?'#fff':'#1e293b'};border-radius:12px;padding:14px;border:2px solid ${notRecorded>0?'transparent':'#e2e8f0'};cursor:pointer" onclick="App.go('attendance')">
+      <div style="font-size:10px;opacity:${notRecorded>0?.85:.6};margin-bottom:4px">⬜ لم يُسجَّل</div>
+      <div style="font-size:26px;font-weight:900">${notRecorded}</div>
+      <div style="font-size:11px;opacity:.8;margin-top:3px">${lateCnt>0?lateCnt+' متأخر':notRecorded>0?'انقر للتسجيل':'الكل مسجّل ✅'}</div>
+    </div>
+    <div style="background:${expiredSubs.length>0?'linear-gradient(135deg,#ef4444,#dc2626)':'#fff'};color:${expiredSubs.length>0?'#fff':'#1e293b'};border-radius:12px;padding:14px;border:2px solid ${expiredSubs.length>0?'transparent':'#e2e8f0'};cursor:pointer" onclick="App.go('branchTasks')">
+      <div style="font-size:10px;opacity:${expiredSubs.length>0?.85:.6};margin-bottom:4px">🔴 اشتراكات منتهية</div>
+      <div style="font-size:26px;font-weight:900">${expiredSubs.length}</div>
+      <div style="font-size:11px;opacity:.8;margin-top:3px">${expiringSoon>0?expiringSoon+' تنتهي قريباً':expiredSubs.length>0?'تحتاج تجديد':'لا يوجد منتهي ✅'}</div>
+    </div>
+    <div style="background:#fff;border-radius:12px;padding:14px;border:2px solid #e2e8f0">
+      <div style="font-size:10px;color:#64748b;margin-bottom:4px">📋 الاشتراكات</div>
+      <div style="font-size:26px;font-weight:900;color:#0f766e">${activeSubs.length}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:3px">من ${children.length} طفل مسجّل</div>
+    </div>
+  </div>
+
+  ${Views._alertBanners(al,sid)}
+
+  <!-- الغائبون اليوم -->
+  ${absentKids.length?`<div class="card" style="border-right:4px solid #ef4444;padding:14px 16px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:14px;font-weight:700;color:#dc2626">❌ غائبون اليوم (${absentKids.length})</div>
+      <button class="btn btn-xs" style="background:#25d366;color:#fff;border:none" onclick="sendBulkAbsentWA()">💬 إبلاغ الكل واتساب</button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${absentKids.map(c=>`<div style="display:flex;align-items:center;gap:6px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:6px 10px">
+        <span style="font-size:13px;font-weight:600">${esc(c.name)}</span>
+        ${c.parentPhone?`<a href="https://wa.me/${(c.parentPhone||'').replace(/^\+?/,'').replace(/^0/,'966')}?text=${encodeURIComponent('السلام عليكم '+esc(c.parentName)+' · غاب طفلك '+esc(c.name)+' اليوم '+formatDate(T0)+' · نتمنى السلامة')}" target="_blank" style="background:#25d366;color:#fff;border-radius:6px;padding:3px 7px;font-size:11px;text-decoration:none">واتساب</a>`:''}
+      </div>`).join('')}
+    </div>
+  </div>`:''}
+
+  <!-- الأطفال حسب الفترة -->
+  <div class="card" style="padding:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:15px;font-weight:800;color:#1e293b">👶 الأطفال — ${formatDate(T0)}</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-primary btn-xs" onclick="App.go('children')">إدارة الأطفال</button>
+        <button class="btn btn-secondary btn-xs" onclick="App.go('subscriptions')">الاشتراكات</button>
+      </div>
+    </div>
+    ${renderSection(morning,'الفترة الصباحية','🌅','#eff6ff','#bfdbfe')}
+    ${renderSection(evening,'الفترة المسائية','🌙','#fff7ed','#fed7aa')}
+    ${!morning.length&&!evening.length?'<p style="text-align:center;color:#94a3b8;padding:24px">لا يوجد أطفال مسجلون</p>':''}
+    <!-- شريط ملخص الاشتراكات -->
+    <div style="margin-top:12px;padding:10px 12px;background:#f8fafc;border-radius:8px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;border:1px solid #e2e8f0">
+      <span style="font-size:12px;font-weight:700;color:#475569">حالة الاشتراكات:</span>
+      ${[['#10b981','نشط',children.filter(c=>DB.subStatus(DB.activeSub(c.id))==='active').length],
+         ['#3b82f6','7 أيام',children.filter(c=>DB.subStatus(DB.activeSub(c.id))==='soon7').length],
+         ['#f97316','قريباً',children.filter(c=>['soon3','today'].includes(DB.subStatus(DB.activeSub(c.id)))).length],
+         ['#ef4444','منتهي',children.filter(c=>DB.subStatus(DB.activeSub(c.id))==='expired').length],
+         ['#94a3b8','بلا اشتراك',children.filter(c=>DB.subStatus(DB.activeSub(c.id))==='none').length],
+        ].filter(([,, n])=>n>0).map(([color,label,count])=>`<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block"></span><span style="font-size:12px;color:#475569">${label}: <strong>${count}</strong></span></span>`).join('')}
+    </div>
   </div>`;
 },
 
@@ -7347,6 +7465,27 @@ function markAllPresent(date,schoolId,gridId){
   toast(`✅ تم تعليم ${count} طفل كحاضر — لا تنسي الحفظ`);
 }
 
+// إرسال واتساب لكل أولياء أمور الغائبين اليوم
+function sendBulkAbsentWA(){
+  const sid=Auth.schoolId();
+  const bid=Auth.branchId();
+  const children=DB.children().filter(c=>(!sid||c.schoolId===sid)&&(!bid||c.branchId===bid));
+  const childIds=new Set(children.map(c=>c.id));
+  const attMap={};
+  DB.attendance().filter(a=>a.date===T0&&childIds.has(a.childId)).forEach(a=>{attMap[a.childId]=a;});
+  const absentKids=children.filter(c=>attMap[c.id]?.status==='absent'&&c.parentPhone);
+  if(!absentKids.length){toast('لا يوجد غائبون مسجّلون اليوم','error');return;}
+  let i=0;
+  const send=()=>{
+    if(i>=absentKids.length){toast(`✅ تم إرسال ${absentKids.length} رسالة واتساب`);return;}
+    const c=absentKids[i++];
+    const phone=(c.parentPhone||'').replace(/^\+?/,'').replace(/^0/,'966');
+    const msg=`السلام عليكم ${c.parentName||''}،\nنُعلمكم بغياب طفلكم ${c.name} اليوم ${formatDate(T0)}.\nنتمنى له السلامة.`;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,'_blank');
+    setTimeout(send,800);
+  };
+  send();
+}
 // تنبيه واتساب لولي أمر طفل غائب
 function notifyAbsentParent(childId,date){
   const c=DB.children().find(x=>x.id===childId);
