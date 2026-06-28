@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v43 -->
+<!-- BUILD: 2026-06-24-v44 -->
 <script>
 (function(){
-  var BUILD='v43-20260624-1';
+  var BUILD='v44-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -6379,12 +6379,22 @@ function saveChild(edit=false){
   if(!name||!parent||!phone){_savingChild=false;alert('يرجى ملء الحقول المطلوبة');return}
   if(!edit){
     const nm=name.toLowerCase();
+    const targetBranch=document.getElementById('c-branch')?.value||Auth.branchId()||'';
     const dup=DB.children().find(c=>(c.name||'').trim().toLowerCase()===nm&&(c.parentPhone||'').trim()===phone);
     if(dup){
-      _savingChild=false;
       const dupBranch=DB.branches().find(b=>b.id===dup.branchId)?.name||'';
-      alert(`⚠️ هذا الطفل مسجّل مسبقاً!\n\nالاسم: ${dup.name}\nهاتف ولي الأمر: ${dup.parentPhone}\nالفرع: ${dupBranch}\n\nلا يمكن تسجيله مرة أخرى بنفس الاسم ورقم هاتف ولي الأمر.`);
-      return;
+      const sameBranch=dup.branchId===targetBranch;
+      if(sameBranch){
+        // تكرار حقيقي داخل نفس الفرع — منع تام
+        _savingChild=false;
+        alert(`⚠️ هذا الطفل مسجّل مسبقاً في نفس الفرع!\n\nالاسم: ${dup.name}\nهاتف ولي الأمر: ${dup.parentPhone}\nالفرع: ${dupBranch}\n\nلا يمكن تسجيله مرة أخرى بنفس الاسم ورقم هاتف ولي الأمر في نفس الفرع.`);
+        return;
+      }
+      // موجود في فرع آخر — تحذير قابل للتجاوز
+      if(!confirm(`⚠️ يوجد طفل بنفس الاسم ورقم الجوال في فرع آخر:\n\nالاسم: ${dup.name}\nهاتف ولي الأمر: ${dup.parentPhone}\nالفرع: ${dupBranch}\n\nإذا كان هذا طفلاً جديداً (أو أخ/أخت بنفس رقم ولي الأمر) اضغط «موافق» للمتابعة.\nوإذا كان نفس الطفل ينتقل من ذلك الفرع، استخدم خاصية «نقل بين الفروع» بدلاً من التسجيل.`)){
+        _savingChild=false;
+        return;
+      }
     }
   }
   const childId=edit?document.getElementById('c-id')?.value:uid();
