@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v44 -->
+<!-- BUILD: 2026-06-24-v45 -->
 <script>
 (function(){
-  var BUILD='v44-20260624-1';
+  var BUILD='v45-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -44,7 +44,8 @@ body{font-family:'Tajawal',sans-serif;background:#f1f5f9;color:#1e293b;direction
 .sidebar-logo p{color:rgba(255,255,255,.6);font-size:11px;margin-top:2px}
 .nav-section{padding:4px 6px;flex:1;overflow-y:auto;min-height:0}
 .nav-section::-webkit-scrollbar{width:3px}.nav-section::-webkit-scrollbar-track{background:transparent}.nav-section::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:4px}
-.nav-label{color:rgba(255,255,255,.4);font-size:10px;font-weight:600;padding:0 10px;margin-bottom:4px;letter-spacing:.5px}
+.nav-label{color:rgba(255,255,255,.45);font-size:10px;font-weight:700;padding:0 10px;margin:14px 0 5px;letter-spacing:.6px;text-transform:uppercase}
+.nav-group:first-child .nav-label{margin-top:4px}
 .nav-item{display:flex;align-items:center;gap:8px;padding:7px 10px;color:rgba(255,255,255,.75);cursor:pointer;border-radius:7px;margin:0;transition:.2s;font-size:13px;font-weight:500}
 .nav-item:hover,.nav-item.active{background:rgba(255,255,255,.15);color:#fff}
 .nav-item .ni{width:18px;height:18px;flex-shrink:0}
@@ -70,6 +71,24 @@ body{font-family:'Tajawal',sans-serif;background:#f1f5f9;color:#1e293b;direction
 .alert-orange{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}
 .alert-green{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
 .alert-blue{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+/* مركز التنبيهات — تصميم موحّد قابل للطي */
+.alert-center{background:#fff;border:1px solid #e8edf3;border-radius:16px;padding:14px 16px;margin-bottom:18px;box-shadow:0 1px 4px rgba(15,23,42,.06)}
+.alert-center-head{font-size:13px;font-weight:800;color:#334155;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+.alert-center-head .acc-pill{margin-right:auto;background:#fef2f2;color:#b91c1c;font-size:11px;font-weight:800;padding:2px 9px;border-radius:20px}
+.alert-center .alert-box{margin-bottom:8px}
+.alert-center .alert-box:last-child{margin-bottom:0}
+.alert-ic{font-size:18px;flex-shrink:0;line-height:1.4}
+.alert-head{font-weight:700;font-size:13.5px}
+.alert-count{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 7px;border-radius:20px;background:rgba(0,0,0,.10);font-size:12px;font-weight:800}
+.alert-note{font-size:11px;opacity:.72;margin-top:4px;line-height:1.5}
+.alert-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.alert-chip{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.7);border:1px solid rgba(15,23,42,.08);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:600}
+details.alert-box>summary{list-style:none;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none}
+details.alert-box>summary::-webkit-details-marker{display:none}
+.alert-toggle{margin-right:auto;transition:.2s;font-size:13px;opacity:.55}
+details.alert-box[open] .alert-toggle{transform:rotate(180deg)}
+.alert-x{background:rgba(15,23,42,.12);color:inherit;border:none;border-radius:50%;width:17px;height:17px;font-size:10px;cursor:pointer;line-height:1;flex-shrink:0;font-family:inherit;padding:0;transition:.15s}
+.alert-x:hover{background:#ef4444;color:#fff}
 .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
 .badge-green{background:#dcfce7;color:#166534}
 .badge-yellow{background:#fef9c3;color:#854d0e}
@@ -209,6 +228,8 @@ details[open]>summary span:last-child{transform:rotate(180deg)}
 .notif-item{padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;gap:10px;transition:.15s;position:relative}
 .notif-item:hover{filter:brightness(0.97)}
 .notif-item.unread::before{content:'';position:absolute;top:8px;left:8px;width:7px;height:7px;border-radius:50%;background:#ef4444;box-shadow:0 0 0 2px #fff}
+.notif-day{background:#f8fafc;padding:6px 16px;font-size:11px;font-weight:800;color:#94a3b8;border-bottom:1px solid #eef2f7;letter-spacing:.3px}
+.notif-type{font-size:9px;font-weight:800;padding:1px 7px;border-radius:5px;flex-shrink:0}
 .notif-badge{position:absolute;top:-5px;left:-5px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;border-radius:50%;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;padding:0 3px;pointer-events:none}
 .nav-msg-dot{display:inline-block;width:8px;height:8px;background:#ef4444;border-radius:50%;margin-right:auto;flex-shrink:0;box-shadow:0 0 0 2px rgba(255,255,255,.25);animation:pulse-dot 1.5s ease-in-out infinite}
 @keyframes pulse-dot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.8}}
@@ -829,46 +850,68 @@ const App = {
   },
   sidebar(){
     const u=Auth.user;
-    const links = u.role==='superadmin' ? [
-      {v:'dashboard',icon:'🏠',label:'الرئيسية'},
-      {v:'schools',icon:'🏫',label:'المدارس'},
-      {v:'branches',icon:'🏢',label:'الفروع'},
-      {v:'children',icon:'👶',label:'الأطفال'},
-      {v:'subscriptions',icon:'📋',label:'الاشتراكات'},
-      {v:'reports',icon:'📊',label:'التقارير'},
-      {v:'branchReport',icon:'📈',label:'تقرير الفروع'},
-      {v:'users',icon:'👥',label:'المستخدمون'},
-      {v:'activities',icon:'🎯',label:'دليل الأنشطة'},
-      {v:'sales',icon:'🛍️',label:'المبيعات'},
-      {v:'expenses',icon:'💸',label:'المصروفات'},
-      {v:'accounting',icon:'🧾',label:'المحاسبة'},
-      {v:'govDocs',icon:'🏛️',label:'الوثائق الحكومية'},
-      {v:'hr',icon:'👥',label:'الموارد البشرية'},
-      {v:'tasks',icon:'📌',label:'مهام اليوم'},
-      {v:'cashClosing',icon:'💰',label:'تقفيل الصندوق'},
-      {v:'messages',icon:'💬',label:'الرسائل الداخلية'},
-      {v:'auditLog',icon:'🔍',label:'سجل النشاط'},
-      {v:'settings',icon:'⚙️',label:'الإعدادات'},
+    const groups = u.role==='superadmin' ? [
+      {items:[{v:'dashboard',icon:'🏠',label:'الرئيسية'}]},
+      {label:'الإدارة',items:[
+        {v:'schools',icon:'🏫',label:'المدارس'},
+        {v:'branches',icon:'🏢',label:'الفروع'},
+        {v:'children',icon:'👶',label:'الأطفال'},
+        {v:'subscriptions',icon:'📋',label:'الاشتراكات'},
+      ]},
+      {label:'المالية',items:[
+        {v:'sales',icon:'🛍️',label:'المبيعات'},
+        {v:'expenses',icon:'💸',label:'المصروفات'},
+        {v:'accounting',icon:'🧾',label:'المحاسبة'},
+        {v:'cashClosing',icon:'💰',label:'تقفيل الصندوق'},
+      ]},
+      {label:'الموظفون والوثائق',items:[
+        {v:'hr',icon:'👥',label:'الموارد البشرية'},
+        {v:'govDocs',icon:'🏛️',label:'الوثائق الحكومية'},
+        {v:'users',icon:'🔑',label:'المستخدمون'},
+      ]},
+      {label:'المتابعة والتقارير',items:[
+        {v:'tasks',icon:'📌',label:'مهام اليوم'},
+        {v:'messages',icon:'💬',label:'الرسائل الداخلية'},
+        {v:'reports',icon:'📊',label:'التقارير'},
+        {v:'branchReport',icon:'📈',label:'تقرير الفروع'},
+      ]},
+      {label:'أدوات',items:[
+        {v:'activities',icon:'🎯',label:'دليل الأنشطة'},
+        {v:'auditLog',icon:'🔍',label:'سجل النشاط'},
+        {v:'settings',icon:'⚙️',label:'الإعدادات'},
+      ]},
     ] : u.role==='school_admin' ? [
-      {v:'dashboard',icon:'🏠',label:'الرئيسية'},
-      {v:'children',icon:'👶',label:'الأطفال'},
-      {v:'subscriptions',icon:'📋',label:'الاشتراكات'},
-      {v:'attendance',icon:'✅',label:'الحضور'},
-      {v:'branchTasks',icon:'🔴',label:'مهام التحصيل'},
-      {v:'cashClosing',icon:'💰',label:'تقفيل الصندوق'},
-      {v:'childNotes',icon:'📝',label:'ملاحظات الأطفال'},
-      {v:'messages',icon:'💬',label:'الرسائل الداخلية'},
-      {v:'expenses',icon:'💸',label:'مصروفات الفرع'},
-      {v:'branchReport',icon:'📈',label:'تقرير الفرع'},
-      {v:'reports',icon:'📊',label:'التقارير'},
-      {v:'teachers',icon:'👩‍🏫',label:'المعلمات'},
-      {v:'whatsapp',icon:'💬',label:'رسائل واتساب'},
-      {v:'activities',icon:'🎯',label:'الأنشطة الأسبوعية'},
-      {v:'sales',icon:'🛍️',label:'المبيعات'},
-      {v:'hr',icon:'👥',label:'الموارد البشرية'},
+      {items:[{v:'dashboard',icon:'🏠',label:'الرئيسية'}]},
+      {label:'العمليات اليومية',items:[
+        {v:'children',icon:'👶',label:'الأطفال'},
+        {v:'subscriptions',icon:'📋',label:'الاشتراكات'},
+        {v:'attendance',icon:'✅',label:'الحضور'},
+        {v:'branchTasks',icon:'🔴',label:'مهام التحصيل'},
+        {v:'childNotes',icon:'📝',label:'ملاحظات الأطفال'},
+      ]},
+      {label:'المالية',items:[
+        {v:'cashClosing',icon:'💰',label:'تقفيل الصندوق'},
+        {v:'expenses',icon:'💸',label:'مصروفات الفرع'},
+        {v:'sales',icon:'🛍️',label:'المبيعات'},
+      ]},
+      {label:'الفريق',items:[
+        {v:'teachers',icon:'👩‍🏫',label:'المعلمات'},
+        {v:'hr',icon:'👥',label:'الموارد البشرية'},
+      ]},
+      {label:'التواصل',items:[
+        {v:'messages',icon:'💬',label:'الرسائل الداخلية'},
+        {v:'whatsapp',icon:'🟢',label:'رسائل واتساب'},
+      ]},
+      {label:'التقارير',items:[
+        {v:'branchReport',icon:'📈',label:'تقرير الفرع'},
+        {v:'reports',icon:'📊',label:'التقارير'},
+        {v:'activities',icon:'🎯',label:'الأنشطة الأسبوعية'},
+      ]},
     ] : [
-      {v:'attendance',icon:'✅',label:'تسجيل الحضور'},
-      {v:'my_reports',icon:'📊',label:'تقارير الحضور'},
+      {items:[
+        {v:'attendance',icon:'✅',label:'تسجيل الحضور'},
+        {v:'my_reports',icon:'📊',label:'تقارير الحضور'},
+      ]},
     ];
     return `
     <div class="sidebar">
@@ -878,7 +921,7 @@ const App = {
         <p>نظام إدارة متكامل</p>
       </div>
       <div class="nav-section">
-        ${(()=>{const u=Auth.user;const unreadMsg=u?DB.unreadInternalCount(u.id,u.role,Auth.branchId()):0;return links.map(l=>{const isMsg=l.v==='messages';const dot=isMsg&&unreadMsg>0?`<span class="nav-msg-dot" title="${unreadMsg} رسالة غير مقروءة"></span>`:'';return `<div class="nav-item ${App.view===l.v?'active':''}" style="position:relative" onclick="App.go('${l.v}');closeSidebar()">${l.icon} ${l.label}${dot}</div>`;}).join('')})()}
+        ${(()=>{const u=Auth.user;const unreadMsg=u?DB.unreadInternalCount(u.id,u.role,Auth.branchId()):0;return groups.map(g=>{const head=g.label?`<div class="nav-label">${g.label}</div>`:'';const items=g.items.map(l=>{const isMsg=l.v==='messages';const dot=isMsg&&unreadMsg>0?`<span class="nav-msg-dot" title="${unreadMsg} رسالة غير مقروءة"></span>`:'';return `<div class="nav-item ${App.view===l.v?'active':''}" style="position:relative" onclick="App.go('${l.v}');closeSidebar()">${l.icon} ${l.label}${dot}</div>`;}).join('');return `<div class="nav-group">${head}${items}</div>`;}).join('')})()}
       </div>
       <div style="flex-shrink:0;padding:6px 6px;border-top:1px solid rgba(255,255,255,.15)">
         <div class="nav-item" onclick="Auth.logout()">🚪 تسجيل الخروج</div>
@@ -904,6 +947,8 @@ const App = {
       if(bid) notifs=notifs.filter(n=>!n.branchId||n.branchId===bid);
     }
     const typeIcon={new_child:'👶',new_sub:'📋',first_att:'🌟'};
+    const typeLabel={new_child:'طفل جديد',new_sub:'اشتراك جديد',first_att:'أول حضور'};
+    const typeChip={new_child:['#dbeafe','#1e40af'],new_sub:['#dcfce7','#166534'],first_att:['#fef3c7','#92400e']};
     const branches=DB.branches();
     // لون لكل فرع (للتمييز البصري)
     const branchColor=(bid)=>{
@@ -958,25 +1003,35 @@ const App = {
               <div style="font-size:11px;color:#64748b;margin-top:6px">عرض ${notifs.length} من ${allNotifs.length} تنبيه</div>
             </div>`:''}
             ${notifs.length===0?`<div style="padding:32px;text-align:center;color:#94a3b8;font-size:14px">لا توجد إشعارات${isSA&&(nFilter.branch!=='all'||nFilter.period!=='all')?' بهذه الفلاتر':' بعد'}</div>`:
-            notifs.slice(0,30).map(n=>{
-              const c=branchColor(n.branchId);
-              const bName=n.branchId?DB.branchName(n.branchId):'';
-              const styleAttr=n.branchId?`background:${c.tint};border-right:5px solid ${c.fg};`:'background:#fff;';
-              return `
-              <div class="notif-item ${n.isRead?'':'unread'}" style="${styleAttr}">
-                <span style="font-size:20px;flex-shrink:0">${typeIcon[n.type]||'🔔'}</span>
-                <div style="flex:1;min-width:0">
-                  <div style="font-size:13px;font-weight:600;color:#1e293b">${esc(n.title)}</div>
-                  <div style="font-size:12px;color:#64748b;margin-top:2px">${esc(n.body)}</div>
-                  <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px">
-                    ${bName?`<span style="background:${c.bg};color:${c.fg};font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px">🏢 ${esc(bName)}</span>`:''}
-                    ${n.period?`<span style="background:${n.period==='morning'?'#fef3c7':'#e0e7ff'};color:${n.period==='morning'?'#92400e':'#3730a3'};font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px">${periodLbl[n.period]||n.period}</span>`:''}
-                    ${n.addedBy?`<span style="background:#f1f5f9;color:#475569;font-size:10px;font-weight:600;padding:2px 7px;border-radius:5px">👤 ${esc(n.addedBy)}</span>`:''}
+            (()=>{
+              const dayBucket=(iso)=>{if(!iso)return 'أقدم';const dd=diffDays(T0,iso.split('T')[0]);if(dd<=0)return 'اليوم';if(dd===1)return 'أمس';if(dd<7)return 'هذا الأسبوع';return 'أقدم';};
+              let lastB='';
+              return notifs.slice(0,40).map(n=>{
+                const c=branchColor(n.branchId);
+                const bName=n.branchId?DB.branchName(n.branchId):'';
+                const styleAttr=n.branchId?`background:${c.tint};border-right:5px solid ${c.fg};`:'background:#fff;';
+                const tl=typeLabel[n.type];const[tcbg,tcfg]=typeChip[n.type]||['#f1f5f9','#475569'];
+                const bkt=dayBucket(n.createdAt);
+                const dayHead=bkt!==lastB?(lastB=bkt,`<div class="notif-day">${bkt}</div>`):'';
+                return `${dayHead}
+                <div class="notif-item ${n.isRead?'':'unread'}" style="${styleAttr}">
+                  <span style="font-size:20px;flex-shrink:0">${typeIcon[n.type]||'🔔'}</span>
+                  <div style="flex:1;min-width:0">
+                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                      ${tl?`<span class="notif-type" style="background:${tcbg};color:${tcfg}">${tl}</span>`:''}
+                      <span style="font-size:13px;font-weight:600;color:#1e293b">${esc(n.title)}</span>
+                    </div>
+                    <div style="font-size:12px;color:#64748b;margin-top:2px">${esc(n.body)}</div>
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px">
+                      ${bName?`<span style="background:${c.bg};color:${c.fg};font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px">🏢 ${esc(bName)}</span>`:''}
+                      ${n.period?`<span style="background:${n.period==='morning'?'#fef3c7':'#e0e7ff'};color:${n.period==='morning'?'#92400e':'#3730a3'};font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px">${periodLbl[n.period]||n.period}</span>`:''}
+                      ${n.addedBy?`<span style="background:#f1f5f9;color:#475569;font-size:10px;font-weight:600;padding:2px 7px;border-radius:5px">👤 ${esc(n.addedBy)}</span>`:''}
+                    </div>
+                    <div style="font-size:11px;color:#94a3b8;margin-top:4px">${formatRelTime(n.createdAt)}</div>
                   </div>
-                  <div style="font-size:11px;color:#94a3b8;margin-top:4px">${formatRelTime(n.createdAt)}</div>
-                </div>
-              </div>`;
-            }).join('')}
+                </div>`;
+              }).join('');
+            })()}
           </div>
         </div>`:''}
         <div class="topbar-user">
@@ -1192,9 +1247,7 @@ _superDash(){
     <div class="stat-card yellow"><div class="stat-val">${totalRevenue.toLocaleString()} ر.س</div><div class="stat-lbl">💰 إجمالي الإيرادات</div></div>
     <div class="stat-card red"><div class="stat-val">${pendingRevenue.toLocaleString()} ر.س</div><div class="stat-lbl">⏳ مبالغ معلقة ${infoIcon('pending')}</div></div>
   </div>
-  ${Views._alertBanners(al)}
-  ${Views._govDocAlertBanner()}
-  ${Views._hrDocAlertBanner()}
+  ${Views._alertCenter(al)}
   <div class="card">
     <div class="card-title">🏢 توزيع الأطفال على الفروع</div>
     <div style="display:flex;gap:16px;flex-wrap:wrap">
@@ -1332,7 +1385,7 @@ _schoolDash(){
     </div>
   </div>
 
-  ${Views._alertBanners(al,sid)}
+  ${Views._alertCenter(al,sid)}
 
   <!-- الغائبون اليوم -->
   ${absentKids.length?`<div class="card" style="border-right:4px solid #ef4444;padding:14px 16px;margin-bottom:14px">
@@ -1373,6 +1426,32 @@ _schoolDash(){
   </div>`;
 },
 
+// مُولّد موحّد لصناديق التنبيه: أيقونة + عنوان + عدّاد، وقائمة أسماء كـ chips تُطوى تلقائياً إذا طالت
+_alert(cls,icon,title,items,opts={}){
+  const n=items.length;
+  if(!n) return '';
+  const preview=opts.preview??3;
+  const note=opts.note?`<div class="alert-note">${opts.note}</div>`:'';
+  const head=`<span class="alert-head">${title}</span><span class="alert-count">${n}</span>`;
+  const chips=`<div class="alert-chips">${items.map(t=>`<span class="alert-chip">${t}</span>`).join('')}</div>`;
+  if(n>preview){
+    return `<details class="alert-box ${cls}"><summary><span class="alert-ic">${icon}</span><span style="flex:1;display:flex;align-items:center;gap:6px;flex-wrap:wrap">${head}</span><span class="alert-toggle">▾</span></summary>${note}${chips}</details>`;
+  }
+  const click=opts.onclick?` onclick="${opts.onclick}" style="cursor:pointer"`:'';
+  return `<div class="alert-box ${cls}"${click}><span class="alert-ic">${icon}</span><div style="flex:1">${head?`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${head}</div>`:''}${note}${chips}</div></div>`;
+},
+
+// مركز التنبيهات الموحّد — يجمع الاشتراكات + وثائق الموظفين + الوثائق الحكومية في صندوق واحد منظّم
+_alertCenter(al,schoolId=null){
+  const parts=[
+    Views._alertBanners(al,schoolId),
+    Views._hrDocAlertBanner(),
+    Auth.isSuperAdmin()?Views._govDocAlertBanner():''
+  ].filter(Boolean).join('');
+  if(!parts) return '';
+  return `<div class="alert-center"><div class="alert-center-head">🔔 مركز التنبيهات</div>${parts}</div>`;
+},
+
 _alertBanners(al,schoolId=null){
   const children=DB.children();
   const getName=(sub)=>{
@@ -1385,26 +1464,18 @@ _alertBanners(al,schoolId=null){
   const hiddenCount=al.expired.length-recentExpired.length;
   let html='';
   if(recentExpired.length){
-    html+=`<div class="alert-box alert-red" style="position:relative">
-      🔴 <div style="flex:1">
-        <strong>اشتراكات منتهية (${recentExpired.length})</strong>
-        ${hiddenCount>0?`<span style="font-size:11px;color:#f87171;margin-right:8px">· ${hiddenCount} مخفية (أكثر من 5 أيام)</span>`:''}
-        <br>
-        ${recentExpired.map(s=>`<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 0">
-          ${getName(s)} — انتهى ${formatDate(s.endDate)} (${diffDays(T0,s.endDate)} يوم)
-          <button onclick="dismissSubAlert('${s.id}')" style="background:#ef4444;color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:10px;cursor:pointer;line-height:1;flex-shrink:0;font-family:inherit" title="إخفاء">✕</button>
-        </span>`).join(' &nbsp;|&nbsp; ')}
-      </div>
-    </div>`;
+    const items=recentExpired.map(s=>`${getName(s)} <span style="opacity:.7">· ${diffDays(T0,s.endDate)}ي</span> <button onclick="event.stopPropagation();dismissSubAlert('${s.id}')" class="alert-x" title="إخفاء">✕</button>`);
+    const title='اشتراكات منتهية'+(hiddenCount>0?` <span style="font-weight:400;font-size:11px;opacity:.7">(${hiddenCount} مخفية)</span>`:'');
+    html+=Views._alert('alert-red','🔴',title,items,{preview:3});
   }
   if(al.today.length){
-    html+=`<div class="alert-box alert-yellow">🟡 <div><strong>تنتهي اليوم (${al.today.length})</strong><br>${al.today.map(s=>getName(s)).join(' | ')}</div></div>`;
+    html+=Views._alert('alert-yellow','🟡','تنتهي اليوم',al.today.map(s=>getName(s)),{preview:4});
   }
   if(al.in3.length){
-    html+=`<div class="alert-box alert-orange">🟠 <div><strong>تنتهي خلال 3 أيام (${al.in3.length})</strong><br>${al.in3.map(s=>`${getName(s)} — ${formatDate(s.endDate)}`).join(' | ')}</div></div>`;
+    html+=Views._alert('alert-orange','🟠','تنتهي خلال 3 أيام',al.in3.map(s=>`${getName(s)} — ${formatDate(s.endDate)}`),{preview:3});
   }
   if(al.in7.length){
-    html+=`<div class="alert-box alert-blue">🔵 <div><strong>تنتهي خلال أسبوع (${al.in7.length})</strong><br>${al.in7.map(s=>`${getName(s)} — ${formatDate(s.endDate)}`).join(' | ')}</div></div>`;
+    html+=Views._alert('alert-blue','🔵','تنتهي خلال أسبوع',al.in7.map(s=>`${getName(s)} — ${formatDate(s.endDate)}`),{preview:3});
   }
   return html;
 },
@@ -1421,16 +1492,16 @@ _hrDocAlertBanner(){
       if(!e[f.k]) return;
       const st=DB.hrDocStatus(e[f.k]);
       const days=diffDays(e[f.k],T0);
-      if(st==='expired') expired.push(`${esc(e.name)} (${f.lbl})`);
-      else if(st==='soon7') urgent.push(`${esc(e.name)} — ${f.lbl} يوم ${days}`);
-      else if(st==='soon60') warn.push(`${esc(e.name)} — ${f.lbl}: ${days} يوم`);
+      if(st==='expired') expired.push(`${esc(e.name)} <span style="opacity:.7">(${f.lbl})</span>`);
+      else if(st==='soon7') urgent.push(`${esc(e.name)} <span style="opacity:.7">${f.lbl} · ${days}ي</span>`);
+      else if(st==='soon60') warn.push(`${esc(e.name)} <span style="opacity:.7">${f.lbl} · ${days}ي</span>`);
     });
   });
   if(!expired.length&&!urgent.length&&!warn.length) return '';
   let html='';
-  if(expired.length) html+=`<div class="alert-box alert-red" style="cursor:pointer" onclick="App.go('hr',{hrTab:'employees'})">👷 <div><strong>وثائق موظفين منتهية (${expired.length})</strong><br>${expired.join(' · ')}</div></div>`;
-  if(urgent.length) html+=`<div class="alert-box alert-red" style="cursor:pointer" onclick="App.go('hr',{hrTab:'employees'})">🚨 <div><strong>أسبوع أخير لانتهاء وثائق موظفين (${urgent.length})</strong><br>${urgent.join(' · ')}</div></div>`;
-  if(warn.length) html+=`<div class="alert-box alert-orange" style="cursor:pointer" onclick="App.go('hr',{hrTab:'employees'})">⏳ <div><strong>وثائق موظفين تنتهي قريباً — ${warn.length} تنبيه</strong><br><small>العد التنازلي لشهرين قبل انتهاء العقود (نظام العمل السعودي المادة 75)</small><br>${warn.slice(0,5).join(' · ')}${warn.length>5?` · +${warn.length-5} آخرين`:''}</div></div>`;
+  if(expired.length) html+=Views._alert('alert-red','👷','وثائق موظفين منتهية',expired,{onclick:"App.go('hr',{hrTab:'employees'})",preview:3});
+  if(urgent.length) html+=Views._alert('alert-red','🚨','أسبوع أخير لوثائق موظفين',urgent,{onclick:"App.go('hr',{hrTab:'employees'})",preview:3});
+  if(warn.length) html+=Views._alert('alert-orange','⏳','وثائق موظفين تنتهي قريباً',warn,{onclick:"App.go('hr',{hrTab:'employees'})",preview:3,note:'العد التنازلي لشهرين قبل انتهاء العقود (نظام العمل السعودي المادة 75)'});
   return html;
 },
 _govDocAlertBanner(){
@@ -1438,14 +1509,10 @@ _govDocAlertBanner(){
   const expired=docs.filter(d=>DB.govDocStatus(d)==='expired');
   const soon=docs.filter(d=>['soon7','soon30'].includes(DB.govDocStatus(d)));
   if(!expired.length&&!soon.length) return '';
-  const label=(d)=>`${esc(d.type==='other'?(d.customType||'وثيقة'):this._govDocTypeLabel(d.type))} — ${esc(DB.branchName(d.branchId))}`;
+  const label=(d)=>`${esc(d.type==='other'?(d.customType||'وثيقة'):this._govDocTypeLabel(d.type))} <span style="opacity:.7">${esc(DB.branchName(d.branchId))} · ${formatDate(d.expiryDate)}</span>`;
   let html='';
-  if(expired.length){
-    html+=`<div class="alert-box alert-red" style="cursor:pointer" onclick="App.go('govDocs')">🏛️ <div><strong>وثائق حكومية منتهية (${expired.length})</strong><br>${expired.map(d=>`${label(d)} — انتهت ${formatDate(d.expiryDate)}`).join(' | ')}</div></div>`;
-  }
-  if(soon.length){
-    html+=`<div class="alert-box alert-orange" style="cursor:pointer" onclick="App.go('govDocs')">🏛️ <div><strong>وثائق حكومية تنتهي قريباً (${soon.length})</strong><br>${soon.map(d=>`${label(d)} — ${formatDate(d.expiryDate)}`).join(' | ')}</div></div>`;
-  }
+  if(expired.length) html+=Views._alert('alert-red','🏛️','وثائق حكومية منتهية',expired.map(label),{onclick:"App.go('govDocs')",preview:3});
+  if(soon.length) html+=Views._alert('alert-orange','🏛️','وثائق حكومية تنتهي قريباً',soon.map(label),{onclick:"App.go('govDocs')",preview:3});
   return html;
 },
 
