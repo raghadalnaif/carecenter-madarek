@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v46 -->
+<!-- BUILD: 2026-06-24-v47 -->
 <script>
 (function(){
-  var BUILD='v46-20260624-1';
+  var BUILD='v47-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -711,6 +711,15 @@ const DB = {
   addNotification(n){
     const a=this.notifications();
     a.unshift({...n,id:uid(),createdAt:new Date().toISOString(),isRead:false});
+    if(a.length>50) a.splice(50);
+    this.save('notifications',a);
+  },
+  // إضافة عدة إشعارات دفعة واحدة بحفظ واحد (بدل حفظ كامل لكل إشعار — يمنع بطء «حفظ الحضور»)
+  addNotificationsBatch(list){
+    if(!list||!list.length) return;
+    const a=this.notifications();
+    const now=new Date().toISOString();
+    list.forEach(n=>a.unshift({...n,id:uid(),createdAt:now,isRead:false}));
     if(a.length>50) a.splice(50);
     this.save('notifications',a);
   },
@@ -1870,9 +1879,12 @@ attendance(){
   const date=App.params.date||T0;
   const allSubs=DB.subscriptions();
 
-  const hasActiveSub=(childId)=>allSubs.some(s=>
-    s.childId===childId&&s.isActive&&s.startDate<=date&&s.endDate>=date
-  );
+  // فهرسة لمرة واحدة (O(عدد الاشتراكات)) بدل البحث الخطي لكل طفل — يسرّع عرض صفحة الحضور
+  // يُعتبر الطفل «له اشتراك» إذا عنده أي اشتراك فعّال غير منتهٍ (endDate>=اليوم)،
+  // فيظهر فوراً عند التجديد حتى لو بدأ الاشتراك الجديد بتاريخ لاحق.
+  const subActiveChildIds=new Set();
+  allSubs.forEach(s=>{if(s.isActive&&s.endDate>=date)subActiveChildIds.add(s.childId);});
+  const hasActiveSub=(childId)=>subActiveChildIds.has(childId);
 
   let kids=DB.children();
   if(sid) kids=kids.filter(c=>c.schoolId===sid);
@@ -7553,18 +7565,28 @@ function setAtt(childId,status,date,schoolId){
 function saveAttendance(date,schoolId){
   const att=DB.attendance();
   const entries=pendingAtt[date]||{};
-  if(!Object.keys(entries).length){toast('لم يتم تعديل أي حضور','warn');return;}
-  Object.values(entries).forEach(entry=>{
-    const hadPrev=att.some(a=>a.childId===entry.childId);
-    const idx=att.findIndex(a=>a.childId===entry.childId&&a.date===date);
-    if(idx>=0) att[idx]={...att[idx],...entry};
-    else att.push({id:uid(),...entry});
-    if(!hadPrev&&entry.status==='present'&&Auth.user){
-      const child=DB.children().find(c=>c.id===entry.childId);
-      if(child) DB.addNotification({type:'first_att',title:'🌟 أول حضور',body:`${child.name} حضر لأول مرة`,branchId:child.branchId,period:child.period,addedBy:Auth.user.name,addedById:Auth.user.id});
-    }
+  const list=Object.values(entries);
+  if(!list.length){toast('لم يتم تعديل أي حضور','warn');return;}
+  // فهرسة لمرة واحدة بدل بحث خطي لكل إدخال (كان O(عدد الإدخالات × حجم السجل))
+  const idxByKey=new Map();           // childId|date → موضع السجل
+  const childrenWithAtt=new Set();    // أطفال لهم أي حضور سابق (لكشف «أول حضور»)
+  att.forEach((a,i)=>{idxByKey.set(a.childId+'|'+a.date,i);childrenWithAtt.add(a.childId);});
+  const firstAttIds=[];
+  list.forEach(entry=>{
+    const hadPrev=childrenWithAtt.has(entry.childId);
+    const key=entry.childId+'|'+date;
+    const idx=idxByKey.get(key);
+    if(idx!==undefined) att[idx]={...att[idx],...entry};
+    else{att.push({id:uid(),...entry});idxByKey.set(key,att.length-1);childrenWithAtt.add(entry.childId);}
+    if(!hadPrev&&entry.status==='present'&&Auth.user) firstAttIds.push(entry.childId);
   });
   DB.saveAttendance(att);
+  // إشعارات «أول حضور» تُحفظ دفعة واحدة (بدل حفظ كامل للإشعارات لكل طفل)
+  if(firstAttIds.length&&Auth.user){
+    const kidsById=new Map(DB.children().map(c=>[c.id,c]));
+    const notifs=firstAttIds.map(cid=>kidsById.get(cid)).filter(Boolean).map(child=>({type:'first_att',title:'🌟 أول حضور',body:`${child.name} حضر لأول مرة`,branchId:child.branchId,period:child.period,addedBy:Auth.user.name,addedById:Auth.user.id}));
+    DB.addNotificationsBatch(notifs);
+  }
   delete pendingAtt[date]; // امسح الذاكرة المعلّقة
   toast('✅ تم حفظ الحضور بنجاح');
 }
