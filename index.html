@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v48 -->
+<!-- BUILD: 2026-06-24-v49 -->
 <script>
 (function(){
-  var BUILD='v48-20260624-1';
+  var BUILD='v49-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -251,7 +251,13 @@ details[open]>summary span:last-child{transform:rotate(180deg)}
   /* قائمة المحادثات (للمدير العام) شريط أفقي قابل للسحب على الجوال */
   .msg-conv{display:flex;overflow-x:auto;overflow-y:hidden;max-height:none;-webkit-overflow-scrolling:touch;gap:8px;padding:8px}
   .msg-conv>div{min-width:158px;flex-shrink:0;border-bottom:none!important;border:1px solid #e2e8f0;border-radius:12px}
-  .msg-thread{height:calc(100dvh - 140px);min-height:0}
+  /* المراسلات الخاصة (مدير الفرع): المحادثة تملأ الشاشة كاملة */
+  .msg-thread{min-height:0;margin-bottom:0;height:calc(100dvh - 200px)}
+  .msg-layout.solo .msg-thread{height:calc(100dvh - 90px)}
+  .content:has(.msg-layout.solo){display:flex;flex-direction:column;padding:0}
+  .content:has(.msg-layout.solo) .msg-layout{flex:1;min-height:0}
+  .content:has(.msg-layout.solo) .msg-thread{flex:1;height:auto;border-radius:0}
+  .msg-composer{padding-bottom:calc(10px + env(safe-area-inset-bottom))}
   .msg-list{padding:12px}
   .msg-bubble{max-width:88%}
   .msg-send-lbl{display:none}
