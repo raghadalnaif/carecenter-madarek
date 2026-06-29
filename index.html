@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v47 -->
+<!-- BUILD: 2026-06-24-v48 -->
 <script>
 (function(){
-  var BUILD='v47-20260624-1';
+  var BUILD='v48-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -234,9 +234,29 @@ details[open]>summary span:last-child{transform:rotate(180deg)}
 .nav-msg-dot{display:inline-block;width:8px;height:8px;background:#ef4444;border-radius:50%;margin-right:auto;flex-shrink:0;box-shadow:0 0 0 2px rgba(255,255,255,.25);animation:pulse-dot 1.5s ease-in-out infinite}
 @keyframes pulse-dot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.8}}
 .export-label{display:inline}
+/* ===== الرسائل الداخلية ===== */
+.msg-layout{display:grid;grid-template-columns:320px 1fr;gap:14px;align-items:start}
+.msg-layout.solo{grid-template-columns:1fr}
+.msg-thread{display:flex;flex-direction:column;height:calc(100vh - 230px);min-height:440px}
+.msg-list{flex:1;padding:16px;overflow-y:auto;background:#f7f8fa;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.msg-bubble{max-width:74%}
+.msg-composer{padding:10px 12px;border-top:1px solid #e2e8f0;background:#fff}
+.msg-conv{max-height:calc(100vh - 260px);overflow-y:auto}
+.msg-send-lbl{display:inline}
+.msg-send-ic{display:none}
 @media(max-width:768px){
   .notif-panel{position:fixed;top:60px;left:8px;right:8px;width:auto;max-height:70vh;border-radius:12px}
   .export-label{display:none}
+  .msg-layout{grid-template-columns:1fr!important;gap:10px}
+  /* قائمة المحادثات (للمدير العام) شريط أفقي قابل للسحب على الجوال */
+  .msg-conv{display:flex;overflow-x:auto;overflow-y:hidden;max-height:none;-webkit-overflow-scrolling:touch;gap:8px;padding:8px}
+  .msg-conv>div{min-width:158px;flex-shrink:0;border-bottom:none!important;border:1px solid #e2e8f0;border-radius:12px}
+  .msg-thread{height:calc(100dvh - 140px);min-height:0}
+  .msg-list{padding:12px}
+  .msg-bubble{max-width:88%}
+  .msg-send-lbl{display:none}
+  .msg-send-ic{display:inline;font-size:18px}
+  .msg-intro{display:none}
 }
 </style>
 </head>
@@ -346,6 +366,20 @@ function _onKeyValue(k,val){
       }
     }
   }
+  // رسالة داخلية جديدة وصلت من جهاز آخر → تنبيه فوري (صوت + اهتزاز + toast)
+  if(k==='internalMessages'&&Array.isArray(val)&&Auth.user){
+    const me=Auth.user;
+    const oldIds=new Set((Array.isArray(_mem[k])?_mem[k]:[]).map(m=>m.id));
+    const forMe=val.filter(m=>m&&!oldIds.has(m.id)&&m.fromUserId!==me.id&&(
+      me.role==='superadmin'?m.toRole==='superadmin':
+      me.role==='school_admin'?(m.toBranchId===me.branchId||m.toUserId===me.id):false
+    ));
+    if(forMe.length){
+      const newest=forMe[0];
+      _msgPing();
+      if(typeof toast==='function') setTimeout(()=>toast('💬 رسالة من '+(newest.fromName||'')+': '+((newest.message||'').slice(0,50)||'📎 مرفق')),100);
+    }
+  }
   _mem[k]=val;
   try{localStorage.setItem('ccs_'+k,incoming);}catch{}
   // ضمان تحديث بيانات المستخدم الحالي إن تغيّر المستخدمون
@@ -368,6 +402,34 @@ function _refreshNotifBadge(){
     dot.title=_storageMode==='firebase'?'وضع احتياطي — لا تزامن مع الفروع الأخرى':ok?'متصل بالسيرفر':'اتصال بالسيرفر منقطع — إعادة محاولة...';
   }
 }
+// تحديث نقطة الرسائل غير المقروءة في القائمة الجانبية فوراً (بدون إعادة رسم كامل)
+function _refreshMsgNav(){
+  if(!Auth.user) return;
+  const item=document.querySelector('.nav-item[data-v="messages"]');
+  if(!item) return;
+  let unread=0;
+  try{unread=DB.unreadInternalCount(Auth.user.id,Auth.user.role,Auth.branchId());}catch{}
+  let dot=item.querySelector('.nav-msg-dot');
+  if(unread>0&&!dot){const s=document.createElement('span');s.className='nav-msg-dot';s.title=unread+' رسالة غير مقروءة';item.appendChild(s);}
+  else if(unread<=0&&dot){dot.remove();}
+}
+// تنبيه صوتي قصير + اهتزاز عند وصول رسالة جديدة (تنبيه فوري وسريع)
+let _audioCtx=null;
+function _msgPing(){
+  try{
+    _audioCtx=_audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+    const ctx=_audioCtx;if(ctx.state==='suspended')ctx.resume();
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);
+    o.type='sine';o.frequency.setValueAtTime(880,ctx.currentTime);
+    o.frequency.setValueAtTime(1175,ctx.currentTime+0.09);
+    g.gain.setValueAtTime(0.0001,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.25,ctx.currentTime+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+0.28);
+    o.start();o.stop(ctx.currentTime+0.3);
+  }catch{}
+  try{if(navigator.vibrate)navigator.vibrate([40,30,40]);}catch{}
+}
 // تجميع إعادات الرسم — عدة تحديثات متتالية تُنتج إعادة رسم واحدة فقط
 function _scheduleRender(){
   if(_renderScheduled) return;
@@ -376,6 +438,7 @@ function _scheduleRender(){
     _renderScheduled=false;
     if(!Auth.user) return;
     _refreshNotifBadge(); // شارة الجرس تتحدّث دائماً ولو كنا في الإعدادات أو نافذة مفتوحة
+    _refreshMsgNav();     // نقطة الرسائل في القائمة الجانبية تتحدّث فوراً
     if(App.modal||App.view==='settings') return;
     const el=document.getElementById('content');
     if(!el) return;
@@ -930,7 +993,7 @@ const App = {
         <p>نظام إدارة متكامل</p>
       </div>
       <div class="nav-section">
-        ${(()=>{const u=Auth.user;const unreadMsg=u?DB.unreadInternalCount(u.id,u.role,Auth.branchId()):0;return groups.map(g=>{const head=g.label?`<div class="nav-label">${g.label}</div>`:'';const items=g.items.map(l=>{const isMsg=l.v==='messages';const dot=isMsg&&unreadMsg>0?`<span class="nav-msg-dot" title="${unreadMsg} رسالة غير مقروءة"></span>`:'';return `<div class="nav-item ${App.view===l.v?'active':''}" style="position:relative" onclick="App.go('${l.v}');closeSidebar()">${l.icon} ${l.label}${dot}</div>`;}).join('');return `<div class="nav-group">${head}${items}</div>`;}).join('')})()}
+        ${(()=>{const u=Auth.user;const unreadMsg=u?DB.unreadInternalCount(u.id,u.role,Auth.branchId()):0;return groups.map(g=>{const head=g.label?`<div class="nav-label">${g.label}</div>`:'';const items=g.items.map(l=>{const isMsg=l.v==='messages';const dot=isMsg&&unreadMsg>0?`<span class="nav-msg-dot" title="${unreadMsg} رسالة غير مقروءة"></span>`:'';return `<div class="nav-item ${App.view===l.v?'active':''}" data-v="${l.v}" style="position:relative" onclick="App.go('${l.v}');closeSidebar()">${l.icon} ${l.label}${dot}</div>`;}).join('');return `<div class="nav-group">${head}${items}</div>`;}).join('')})()}
       </div>
       <div style="flex-shrink:0;padding:6px 6px;border-top:1px solid rgba(255,255,255,.15)">
         <div class="nav-item" onclick="Auth.logout()">🚪 تسجيل الخروج</div>
@@ -3861,23 +3924,23 @@ messages(){
   const subHint=isSA?'الرسائل هنا داخلية بينك ومديرة الفرع فقط — لا تُرسل عبر واتساب':'الرسائل هنا داخلية بينك والمدير العام فقط — لا تُرسل عبر واتساب';
 
   return `
-  <div class="card no-print" style="padding:14px;margin-bottom:14px;background:linear-gradient(135deg,#0f766e,#065f46);color:#fff">
+  <div class="card no-print msg-intro" style="padding:14px;margin-bottom:14px;background:linear-gradient(135deg,#0f766e,#065f46);color:#fff">
     <div style="font-size:18px;font-weight:800">💬 الرسائل الداخلية</div>
     <p style="opacity:.9;font-size:13px;margin-top:4px">قناة تواصل مباشرة وآمنة بين المدير العام ومديرات الفروع — للملاحظات الإدارية والاستفسارات اليومية</p>
   </div>
 
-  <div style="display:grid;grid-template-columns:${isSA?'320px 1fr':'1fr'};gap:14px;align-items:start">
+  <div class="msg-layout ${isSA?'':'solo'}">
     ${isSA?`<div class="card" style="padding:0;overflow:hidden">
       <div style="padding:12px 14px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:13px;font-weight:700;color:#1e293b">📥 المحادثات حسب الفرع</div>
-      ${sidebar||'<div style="padding:32px;text-align:center;color:#94a3b8">لا توجد فروع</div>'}
+      <div class="msg-conv">${sidebar||'<div style="padding:32px;text-align:center;color:#94a3b8">لا توجد فروع</div>'}</div>
     </div>`:''}
 
-    <div class="card" style="padding:0;display:flex;flex-direction:column;min-height:500px">
+    <div class="card msg-thread" style="padding:0">
       <div style="padding:14px 16px;background:${activeColor.light};border-bottom:1px solid ${activeColor.fg}33">
         <div style="font-size:14px;font-weight:700;color:${activeColor.fg}">${headerLabel}</div>
         <div style="font-size:11px;color:#64748b;margin-top:2px">${subHint}</div>
       </div>
-      <div id="msg-list" style="flex:1;padding:16px;overflow-y:auto;max-height:520px;background:#fafafa;display:flex;flex-direction:column;gap:10px">
+      <div id="msg-list" class="msg-list">
         ${threadMsgs.length===0?`<div style="text-align:center;color:#94a3b8;padding:60px 20px;font-size:14px">
           <div style="font-size:42px;margin-bottom:10px">💬</div>
           <div>لا توجد رسائل بعد</div>
@@ -3890,7 +3953,7 @@ messages(){
           const fgColor=mine?'#fff':'#1e293b';
           const borderC=mine?'#0f766e':(m.fromRole==='superadmin'?'#a78bfa':c.fg);
           return `<div style="display:flex;${mine?'justify-content:flex-end':'justify-content:flex-start'}">
-            <div style="max-width:75%;background:${bgColor};color:${fgColor};border:1px solid ${borderC}33;border-radius:14px;padding:10px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
+            <div class="msg-bubble" style="background:${bgColor};color:${fgColor};border:1px solid ${borderC}33;border-radius:14px;padding:10px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
               <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11px;${mine?'color:rgba(255,255,255,.85)':'color:#64748b'};font-weight:700">
                 ${m.fromRole==='superadmin'?'👔':'🏢'} ${esc(m.fromName||'—')}
                 ${fromBranch&&!mine&&m.fromRole!=='superadmin'?`<span style="background:${c.bg};color:${c.fg};padding:1px 6px;border-radius:6px;font-size:10px">${esc(fromBranch.name.split(' - ')[0]||fromBranch.name)}</span>`:''}
@@ -3908,10 +3971,10 @@ messages(){
           </div>`;
         }).join('')}
       </div>
-      ${(isSA&&!activeBranchInfo)?'':`<div style="padding:12px 14px;border-top:1px solid #e2e8f0;background:#fff;display:flex;flex-direction:column;gap:8px">
-        <div style="display:flex;gap:8px">
-          <textarea id="msg-input" class="input" rows="2" placeholder="اكتب رسالتك هنا... (Ctrl+Enter للإرسال)" style="flex:1;resize:none;font-family:inherit" onkeydown="if(event.ctrlKey&&event.key==='Enter'){event.preventDefault();sendInternalMessage('${isSA?activeThread:''}');}"></textarea>
-          <button class="btn btn-primary" onclick="sendInternalMessage('${isSA?activeThread:''}')">📤 إرسال</button>
+      ${(isSA&&!activeBranchInfo)?'':`<div class="msg-composer" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <textarea id="msg-input" class="input" rows="1" placeholder="اكتب رسالتك... (Enter للإرسال · Shift+Enter سطر جديد)" style="flex:1;resize:none;font-family:inherit;max-height:120px" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendInternalMessage('${isSA?activeThread:''}');}"></textarea>
+          <button class="btn btn-primary" style="flex-shrink:0" onclick="sendInternalMessage('${isSA?activeThread:''}')"><span class="msg-send-lbl">📤 إرسال</span><span class="msg-send-ic">📤</span></button>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <label style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;color:#64748b;padding:6px 10px;border:1px dashed #cbd5e1;border-radius:8px;background:#f8fafc">
@@ -7791,6 +7854,8 @@ function sendInternalMessage(targetBranchId){
   clearMsgAttachment();
   toast('✅ تم إرسال الرسالة');
   App.refresh();
+  // إبقاء المؤشر في حقل الكتابة لمتابعة المحادثة بسلاسة + التمرير لأسفل
+  setTimeout(()=>{const i=document.getElementById('msg-input');if(i)i.focus();const ml=document.getElementById('msg-list');if(ml)ml.scrollTop=ml.scrollHeight;},60);
 }
 
 // تذكيرات التجديد التلقائية
