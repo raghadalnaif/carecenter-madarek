@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v49 -->
+<!-- BUILD: 2026-06-24-v50 -->
 <script>
 (function(){
-  var BUILD='v49-20260624-1';
+  var BUILD='v50-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -747,6 +747,16 @@ const DB = {
   // تقفيل الصندوق اليومي (Daily Cash Closing)
   cashClosings(){return this.get('cashClosings')||[]},
   addCashClosing(c){const a=this.cashClosings();a.unshift({...c,id:uid(),at:new Date().toISOString()});if(a.length>730)a.splice(730);this.save('cashClosings',a)},
+  // الإقفال المحاسبي الشهري (Monthly Closing) — لقطة ثابتة لأرقام الشهر + أرشفة
+  monthlyClosings(){return this.get('monthlyClosings')||[]},
+  addMonthlyClosing(c){
+    // استبدال أي إقفال سابق لنفس الشهر (إعادة احتساب)
+    const a=this.monthlyClosings().filter(x=>x.month!==c.month);
+    a.unshift({...c,id:uid(),closedAt:new Date().toISOString()});
+    a.sort((x,y)=>(y.month||'').localeCompare(x.month||''));
+    this.save('monthlyClosings',a);
+  },
+  deleteMonthlyClosing(month){this.save('monthlyClosings',this.monthlyClosings().filter(x=>x.month!==month))},
   // ملاحظات الأطفال اليومية
   childNotes(){return this.get('childNotes')||[]},
   addChildNote(n){const a=this.childNotes();a.unshift({...n,id:uid(),at:new Date().toISOString()});if(a.length>5000)a.splice(5000);this.save('childNotes',a)},
@@ -940,6 +950,7 @@ const App = {
         {v:'sales',icon:'🛍️',label:'المبيعات'},
         {v:'expenses',icon:'💸',label:'المصروفات'},
         {v:'accounting',icon:'🧾',label:'المحاسبة'},
+        {v:'monthlyClose',icon:'🔒',label:'الإقفال الشهري'},
         {v:'cashClosing',icon:'💰',label:'تقفيل الصندوق'},
       ]},
       {label:'الموظفون والوثائق',items:[
@@ -1007,7 +1018,7 @@ const App = {
     </div>`;
   },
   topbar(){
-    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات',accounting:'🧾 المحاسبة',branchReport:'📈 تقرير الفرع الشهري',childNotes:'📝 ملاحظات الأطفال',expenses:'💸 مصروفات الفرع',messages:'💬 الرسائل الداخلية',auditLog:'🔍 سجل النشاط',govDocs:'🏛️ الوثائق الحكومية',hr:'👥 الموارد البشرية'};
+    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات',accounting:'🧾 المحاسبة',monthlyClose:'🔒 الإقفال الشهري',branchReport:'📈 تقرير الفرع الشهري',childNotes:'📝 ملاحظات الأطفال',expenses:'💸 مصروفات الفرع',messages:'💬 الرسائل الداخلية',auditLog:'🔍 سجل النشاط',govDocs:'🏛️ الوثائق الحكومية',hr:'👥 الموارد البشرية'};
     const now=new Date();
     const hm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
     const unread=DB.unreadCount();
@@ -1137,6 +1148,7 @@ const App = {
       activities:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       sales:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       accounting:()=>Auth.isSuperAdmin(),
+      monthlyClose:()=>Auth.isSuperAdmin(),
       expenses:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       tasks:()=>Auth.isSuperAdmin(),
       branchTasks:()=>Auth.isSchoolAdmin(),
@@ -1152,7 +1164,7 @@ const App = {
     };
     const guard=guards[App.view];
     if(guard&&!guard()) return Views._forbidden();
-    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,childNotes:Views.childNotes,messages:Views.messages,settings:Views.settings,govDocs:Views.govDocs,hr:Views.hr};
+    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,monthlyClose:Views.monthlyClose,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,childNotes:Views.childNotes,messages:Views.messages,settings:Views.settings,govDocs:Views.govDocs,hr:Views.hr};
     const fn=map[App.view]||Views.dashboard;
     try{return fn();}
     catch(e){console.error('[CCS]',App.view,e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة: ${App.view}</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
@@ -2893,6 +2905,7 @@ accounting(){
         </select>
       </div>
       ${(dateFrom||dateTo||searchQ||filterBranch!=='all'||filterPeriod!=='all'||filterPay!=='all')?`<button class="btn btn-secondary btn-sm" onclick="App.go('accounting')">✕ مسح الفلاتر</button>`:''}
+      <button class="btn btn-sm" style="background:#0f766e;color:#fff" onclick="App.go('monthlyClose')">🔒 الإقفال الشهري</button>
       <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ طباعة</button>
       <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('acc-table','فواتير')">📊 CSV</button>
     </div>
@@ -2965,6 +2978,122 @@ accounting(){
       </div>
     </div>`;
   })()}`;
+},
+
+// ===== الإقفال المحاسبي الشهري =====
+// يحسب أرقام شهر معيّن (إيرادات الاشتراكات + المبيعات − المصروفات − الرواتب) موزّعة على الفروع
+_monthFinance(monthKey){
+  const subs=DB.subscriptions().filter(s=>(s.createdAt||s.startDate||'').startsWith(monthKey));
+  const sales=DB.sales().filter(s=>(s.date||'').startsWith(monthKey));
+  const exps=DB.expenses().filter(e=>(e.date||'').startsWith(monthKey));
+  const pays=(DB.hrPayroll?DB.hrPayroll():[]).filter(p=>p.month===monthKey);
+  const subRevenue=subs.reduce((a,s)=>a+(+s.paidAmount||0),0);
+  const salesRevenue=sales.reduce((a,s)=>a+(+s.price||0),0);
+  const expenses=exps.reduce((a,e)=>a+(+e.amount||0),0);
+  const payroll=pays.reduce((a,p)=>a+(+p.netSalary||0),0);
+  const income=subRevenue+salesRevenue;
+  const net=income-expenses-payroll;
+  const byBranch=DB.branches().map(b=>{
+    const bi=subs.filter(s=>s.branchId===b.id).reduce((a,s)=>a+(+s.paidAmount||0),0)
+            +sales.filter(s=>s.branchId===b.id).reduce((a,s)=>a+(+s.price||0),0);
+    const bx=exps.filter(e=>e.branchId===b.id).reduce((a,e)=>a+(+e.amount||0),0);
+    const bp=pays.filter(p=>{const emp=(DB.hrEmployees?DB.hrEmployees():[]).find(e=>e.id===p.employeeId);return emp&&emp.branchId===b.id;}).reduce((a,p)=>a+(+p.netSalary||0),0);
+    return {branchId:b.id,name:b.name,income:bi,expenses:bx,payroll:bp,net:bi-bx-bp};
+  });
+  return {month:monthKey,subRevenue,salesRevenue,expenses,payroll,income,net,byBranch,
+    counts:{subs:subs.length,sales:sales.length,expenses:exps.length,pays:pays.length}};
+},
+_monthLabel(m){
+  if(!m) return '';
+  const [y,mo]=m.split('-');
+  const names=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  return `${names[(+mo||1)-1]} ${y}`;
+},
+monthlyClose(){
+  if(!Auth.isSuperAdmin()) return Views._forbidden();
+  const month=App.params.mcMonth||T0.slice(0,7);
+  const f=Views._monthFinance(month);
+  const closings=DB.monthlyClosings();
+  const closed=closings.find(c=>c.month===month);
+  const isCurrent=month===T0.slice(0,7);
+  const lbl=Views._monthLabel(month);
+  const money=(n)=>(+n||0).toLocaleString();
+  return `
+  <div class="card no-print" style="background:linear-gradient(135deg,#0f766e,#065f46);color:#fff;padding:16px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:18px;font-weight:800">🔒 الإقفال المحاسبي الشهري</div>
+        <p style="opacity:.9;font-size:13px;margin-top:4px">تصفية أرقام كل شهر على حدة وأرشفتها — مع إمكانية الرجوع لأي شهر سابق</p>
+      </div>
+      <input type="month" class="input" style="width:180px;color:#1e293b" value="${month}" max="${T0.slice(0,7)}" onchange="App.go('monthlyClose',{mcMonth:this.value})">
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <h2 style="font-size:18px;font-weight:800;color:#0f766e;margin:0">📅 ${lbl}</h2>
+    ${isCurrent?'<span class="badge badge-blue">الشهر الحالي</span>':''}
+    ${closed?`<span class="badge badge-green">✅ مُقفل — ${formatDate((closed.closedAt||'').split('T')[0])} بواسطة ${esc(closed.closedBy||'—')}</span>`:'<span class="badge badge-yellow">⏳ غير مُقفل</span>'}
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card green"><div class="stat-val">${money(f.income)}</div><div class="stat-lbl">💰 إجمالي الدخل (ر.س)<br><small style="color:#94a3b8">اشتراكات ${money(f.subRevenue)} + مبيعات ${money(f.salesRevenue)}</small></div></div>
+    <div class="stat-card red"><div class="stat-val">${money(f.expenses)}</div><div class="stat-lbl">💸 المصروفات التشغيلية (${f.counts.expenses})</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${money(f.payroll)}</div><div class="stat-lbl">👥 الرواتب (مسير الشهر)</div></div>
+    <div class="stat-card ${f.net>=0?'green':'red'}"><div class="stat-val" style="color:${f.net>=0?'#10b981':'#ef4444'}">${money(f.net)}</div><div class="stat-lbl">${f.net>=0?'💎 صافي الربح':'⚠️ صافي الخسارة'} (ر.س)</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🏢 التوزيع على الفروع</div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>الفرع</th><th>الدخل</th><th>المصروفات</th><th>الرواتب</th><th>الصافي</th></tr></thead>
+      <tbody>
+        ${f.byBranch.map(b=>`<tr>
+          <td><strong>${esc(b.name.split(' - ')[0]||b.name)}</strong></td>
+          <td style="color:#059669;font-weight:600">${money(b.income)}</td>
+          <td style="color:#ef4444">${money(b.expenses)}</td>
+          <td style="color:#b45309">${money(b.payroll)}</td>
+          <td style="font-weight:700;color:${b.net>=0?'#0f766e':'#ef4444'}">${money(b.net)} ر.س</td>
+        </tr>`).join('')}
+        <tr style="background:#f8fafc;font-weight:800">
+          <td>الإجمالي</td>
+          <td style="color:#059669">${money(f.income)}</td>
+          <td style="color:#ef4444">${money(f.expenses)}</td>
+          <td style="color:#b45309">${money(f.payroll)}</td>
+          <td style="color:${f.net>=0?'#0f766e':'#ef4444'}">${money(f.net)} ر.س</td>
+        </tr>
+      </tbody>
+    </table></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+      ${closed
+        ? `<button class="btn btn-secondary" onclick="closeMonth('${month}',true)">🔄 إعادة احتساب وتحديث الإقفال</button>
+           <button class="btn btn-danger" onclick="reopenMonth('${month}')">🔓 فتح الشهر (إلغاء الإقفال)</button>`
+        : `<button class="btn btn-primary" onclick="closeMonth('${month}',false)">🔒 إقفال الشهر وأرشفته</button>`}
+      <button class="btn btn-secondary" onclick="window.print()">🖨️ طباعة</button>
+    </div>
+    ${closed?`<div style="margin-top:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;font-size:12px;color:#166534">
+      📌 الأرقام المؤرشفة وقت الإقفال: صافي ${money(closed.net)} ر.س · دخل ${money(closed.income)} · مصروفات ${money(closed.expenses)} · رواتب ${money(closed.payroll)}.
+      ${(closed.net!==f.net||closed.income!==f.income||closed.expenses!==f.expenses||closed.payroll!==f.payroll)?'<br>⚠️ تغيّرت البيانات منذ الإقفال — اضغط «إعادة احتساب» لتحديث اللقطة.':''}
+    </div>`:''}
+  </div>
+
+  <div class="card">
+    <div class="card-title">🗂️ سجل الأشهر المُقفلة (${closings.length})</div>
+    ${closings.length===0?`<div class="empty-state"><div class="es-icon">🗂️</div><p>لا توجد أشهر مُقفلة بعد</p></div>`:`
+    <div class="table-wrap"><table>
+      <thead><tr><th>الشهر</th><th>الدخل</th><th>المصروفات</th><th>الرواتب</th><th>الصافي</th><th>تاريخ الإقفال</th><th></th></tr></thead>
+      <tbody>
+        ${closings.map(c=>`<tr style="cursor:pointer" onclick="App.go('monthlyClose',{mcMonth:'${c.month}'})">
+          <td><strong>${Views._monthLabel(c.month)}</strong>${c.month===month?' <span class="badge badge-blue" style="font-size:10px">معروض</span>':''}</td>
+          <td style="color:#059669;font-weight:600">${money(c.income)}</td>
+          <td style="color:#ef4444">${money(c.expenses)}</td>
+          <td style="color:#b45309">${money(c.payroll)}</td>
+          <td style="font-weight:700;color:${(c.net||0)>=0?'#0f766e':'#ef4444'}">${money(c.net)} ر.س</td>
+          <td style="font-size:12px;color:#64748b">${formatDate((c.closedAt||'').split('T')[0])}<br><span style="font-size:11px">${esc(c.closedBy||'')}</span></td>
+          <td><button class="btn btn-secondary btn-xs" onclick="event.stopPropagation();App.go('monthlyClose',{mcMonth:'${c.month}'})">عرض</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`}
+  </div>`;
 },
 
 // ---------- EXPENSES ----------
@@ -7708,6 +7837,30 @@ function notifyAbsentParent(childId,date){
 }
 
 // تقفيل الصندوق اليومي
+// إقفال شهر محاسبياً — يحفظ لقطة ثابتة بأرقام الشهر (لا يحذف أي بيانات)
+function closeMonth(month,isRecalc){
+  if(!Auth.isSuperAdmin()){toast('هذه الصلاحية للمدير العام فقط','error');return;}
+  const f=Views._monthFinance(month);
+  const lbl=Views._monthLabel(month);
+  if(!confirm(`${isRecalc?'إعادة احتساب وتحديث إقفال':'إقفال'} شهر ${lbl}؟\n\nالدخل: ${f.income.toLocaleString()} ر.س\nالمصروفات: ${f.expenses.toLocaleString()} ر.س\nالرواتب: ${f.payroll.toLocaleString()} ر.س\nالصافي: ${f.net.toLocaleString()} ر.س\n\nستُحفظ لقطة ثابتة بهذه الأرقام (البيانات لا تُحذف).`)) return;
+  DB.addMonthlyClosing({
+    month:f.month,income:f.income,subRevenue:f.subRevenue,salesRevenue:f.salesRevenue,
+    expenses:f.expenses,payroll:f.payroll,net:f.net,byBranch:f.byBranch,counts:f.counts,
+    closedBy:Auth.user?.name||'—',closedById:Auth.user?.id||''
+  });
+  DB.addAuditLog({action:isRecalc?'إعادة إقفال شهري':'إقفال شهري',entity:'محاسبة',entityId:month,details:`شهر ${lbl} | دخل ${f.income} | مصروفات ${f.expenses} | رواتب ${f.payroll} | صافي ${f.net}`,by:Auth.user?.name||'—'});
+  toast(`✅ تم إقفال شهر ${lbl} وأرشفته`);
+  App.refresh();
+}
+function reopenMonth(month){
+  if(!Auth.isSuperAdmin()){toast('هذه الصلاحية للمدير العام فقط','error');return;}
+  const lbl=Views._monthLabel(month);
+  if(!confirm(`فتح شهر ${lbl} وإلغاء إقفاله؟\nسيُحذف سجل الإقفال المؤرشف فقط (لا تتأثر بيانات الاشتراكات/المصروفات).`)) return;
+  DB.deleteMonthlyClosing(month);
+  DB.addAuditLog({action:'فتح شهر مُقفل',entity:'محاسبة',entityId:month,details:`إلغاء إقفال شهر ${lbl}`,by:Auth.user?.name||'—'});
+  toast(`🔓 تم فتح شهر ${lbl}`);
+  App.refresh();
+}
 function saveCashClosing(date,branchId,expCash,expMada,expTransfer){
   const actualCash=+(document.getElementById('cc-actual')?.value||0);
   const notes=document.getElementById('cc-notes')?.value?.trim()||'';
