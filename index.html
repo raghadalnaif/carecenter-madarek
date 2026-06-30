@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v50 -->
+<!-- BUILD: 2026-06-24-v51 -->
 <script>
 (function(){
-  var BUILD='v50-20260624-1';
+  var BUILD='v51-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -776,9 +776,18 @@ const DB = {
     if(changed) this.save('internalMessages',a);
   },
   deleteInternalMessage(id){this.save('internalMessages',this.internalMessages().filter(x=>x.id!==id))},
+  // استرجاع رسالة للطرفين — لا تُحذف بل تُعلَّم «مُسترجَعة» مع إزالة المحتوى والمرفق
+  recallInternalMessage(id,byId){
+    const a=this.internalMessages();
+    const i=a.findIndex(x=>x.id===id);
+    if(i<0) return;
+    a[i]={...a[i],recalled:true,recalledAt:new Date().toISOString(),recalledBy:byId,message:'',attachment:null};
+    this.save('internalMessages',a);
+  },
   unreadInternalCount(userId,role,branchId){
     if(!userId) return 0;
     return this.internalMessages().filter(m=>{
+      if(m.recalled) return false;
       if((m.readBy||[]).includes(userId)) return false;
       if(role==='superadmin') return m.toRole==='superadmin'||m.toUserId==='all_superadmins';
       if(role==='school_admin') return m.toBranchId===branchId||m.toUserId===userId;
@@ -4039,9 +4048,9 @@ messages(){
     sidebar=branches.map(b=>{
       const c=branchColor(b.id);
       const bMsgs=visible.filter(m=>m.fromBranchId===b.id||m.toBranchId===b.id);
-      const unread=bMsgs.filter(m=>!(m.readBy||[]).includes(me.id)).length;
+      const unread=bMsgs.filter(m=>!m.recalled&&!(m.readBy||[]).includes(me.id)).length;
       const last=bMsgs.sort((a,b)=>(b.at||'').localeCompare(a.at||''))[0];
-      const lastPreview=last?(last.message||'').slice(0,40):'';
+      const lastPreview=last?(last.recalled?'🚫 رسالة مُسترجَعة':(last.message||'📎 مرفق').slice(0,40)):'';
       return `<div onclick="App.go('messages',{thread:'${b.id}'})" style="cursor:pointer;padding:14px;border-bottom:1px solid #e2e8f0;background:${activeThread===b.id?c.light:'#fff'};border-right:4px solid ${activeThread===b.id?c.fg:'transparent'}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <strong style="color:${c.fg};font-size:14px">🏢 ${esc(b.name.split(' - ')[0]||b.name)}</strong>
@@ -4084,14 +4093,24 @@ messages(){
           const mine=m.fromUserId===me.id;
           const fromBranch=branches.find(b=>b.id===m.fromBranchId);
           const c=branchColor(m.fromBranchId);
+          // رسالة مُسترجَعة → فقاعة رمادية محايدة بتنبيه «تم استرجاع الرسالة»
+          if(m.recalled){
+            return `<div style="display:flex;${mine?'justify-content:flex-end':'justify-content:flex-start'}">
+              <div class="msg-bubble" style="background:#f1f5f9;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:14px;padding:9px 14px">
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-style:italic">🚫 تم استرجاع الرسالة</div>
+                <div style="font-size:10px;color:#cbd5e1;margin-top:4px;text-align:left">${formatRelTime(m.recalledAt||m.at)}</div>
+              </div>
+            </div>`;
+          }
           const bgColor=mine?'#0f766e':(m.fromRole==='superadmin'?'#f5f3ff':c.light);
           const fgColor=mine?'#fff':'#1e293b';
           const borderC=mine?'#0f766e':(m.fromRole==='superadmin'?'#a78bfa':c.fg);
           return `<div style="display:flex;${mine?'justify-content:flex-end':'justify-content:flex-start'}">
-            <div class="msg-bubble" style="background:${bgColor};color:${fgColor};border:1px solid ${borderC}33;border-radius:14px;padding:10px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
+            <div class="msg-bubble" style="position:relative;background:${bgColor};color:${fgColor};border:1px solid ${borderC}33;border-radius:14px;padding:10px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
               <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11px;${mine?'color:rgba(255,255,255,.85)':'color:#64748b'};font-weight:700">
                 ${m.fromRole==='superadmin'?'👔':'🏢'} ${esc(m.fromName||'—')}
                 ${fromBranch&&!mine&&m.fromRole!=='superadmin'?`<span style="background:${c.bg};color:${c.fg};padding:1px 6px;border-radius:6px;font-size:10px">${esc(fromBranch.name.split(' - ')[0]||fromBranch.name)}</span>`:''}
+                ${mine?`<button onclick="recallMessage('${m.id}')" title="استرجاع الرسالة للطرفين" style="margin-right:auto;background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:6px;font-size:11px;padding:1px 7px;cursor:pointer;font-family:inherit">↩︎ استرجاع</button>`:''}
               </div>
               <div style="font-size:13px;line-height:1.6;white-space:pre-wrap">${esc(m.message)}</div>
               ${m.attachment?`<div style="margin-top:6px;padding:6px 10px;background:${mine?'rgba(255,255,255,.15)':'#f1f5f9'};border-radius:8px;display:flex;align-items:center;gap:8px">
@@ -8015,6 +8034,19 @@ function sendInternalMessage(targetBranchId){
   App.refresh();
   // إبقاء المؤشر في حقل الكتابة لمتابعة المحادثة بسلاسة + التمرير لأسفل
   setTimeout(()=>{const i=document.getElementById('msg-input');if(i)i.focus();const ml=document.getElementById('msg-list');if(ml)ml.scrollTop=ml.scrollHeight;},60);
+}
+// استرجاع رسالة أرسلتها بالخطأ — تُحذف للطرفين ويبقى تنبيه «تم استرجاع الرسالة»
+function recallMessage(id){
+  const me=Auth.user;
+  if(!me) return;
+  const m=DB.internalMessages().find(x=>x.id===id);
+  if(!m){toast('الرسالة غير موجودة','error');return;}
+  if(m.fromUserId!==me.id){toast('يمكنك استرجاع رسائلك أنت فقط','error');return;}
+  if(!confirm('استرجاع هذه الرسالة؟ ستُحذف لديك ولدى الطرف الآخر ويظهر مكانها «تم استرجاع الرسالة».')) return;
+  DB.recallInternalMessage(id,me.id);
+  DB.addAuditLog({action:'استرجاع رسالة داخلية',entity:'رسائل',entityId:id,details:`${me.name} استرجع رسالة`,by:me.name});
+  toast('↩︎ تم استرجاع الرسالة');
+  App.refresh();
 }
 
 // تذكيرات التجديد التلقائية
