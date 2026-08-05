@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v54 -->
+<!-- BUILD: 2026-06-24-v55 -->
 <script>
 (function(){
-  var BUILD='v54-20260624-1';
+  var BUILD='v55-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -8803,17 +8803,25 @@ document.getElementById('app').innerHTML=`<div style="height:100vh;display:flex;
     });
     if(changed) DB.save('branches',branches);
   })();
-  // تعيين موقع فرع زامل بن سليم (b2) تلقائياً — يُضبط فقط إذا لم يكن له موقع بعد،
-  // فلا يمسح أي تعديل يدوي لاحق (المالكة تقدر تغيّره من تعديل الفرع)
+  // تعيين مواقع الفروع تلقائياً (مع تصحيح خطأ سابق):
+  // الإحداثيات 24.6882151,46.7946825 تخص فرع هارون الرشيد (b1) — كانت مزروعة خطأً على زامل بن سليم (b2)
   (()=>{
     try{
+      const HLAT=24.6882151, HLNG=46.7946825;
       const branches=DB.branches();
-      const b=branches.find(x=>x.id==='b2'||(x.name||'').includes('زامل بن سليم'));
-      if(b&&(b.lat==null||b.lat===''||b.lat===undefined)){
-        b.lat=24.6882151;b.lng=46.7946825;
-        if(!b.geoRadius)b.geoRadius=150;
-        DB.save('branches',branches);
+      let changed=false;
+      // إزالة الموقع الخاطئ من زامل بن سليم (b2) إن كان لا يزال على القيمة المزروعة خطأً فقط
+      const b2=branches.find(x=>x.id==='b2'||(x.name||'').includes('زامل بن سليم'));
+      if(b2&&Math.abs((+b2.lat||0)-HLAT)<1e-6&&Math.abs((+b2.lng||0)-HLNG)<1e-6){
+        b2.lat=null;b2.lng=null;changed=true;
       }
+      // تعيين الموقع الصحيح لفرع هارون الرشيد (b1) إن لم يكن له موقع بعد
+      const b1=branches.find(x=>x.id==='b1'||(x.name||'').includes('هارون الرشيد'));
+      if(b1&&(b1.lat==null||b1.lat===''||b1.lat===undefined)){
+        b1.lat=HLAT;b1.lng=HLNG;
+        if(!b1.geoRadius)b1.geoRadius=150;changed=true;
+      }
+      if(changed) DB.save('branches',branches);
     }catch(e){}
   })();
   Auth.init();
