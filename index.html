@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v51 -->
+<!-- BUILD: 2026-06-24-v52 -->
 <script>
 (function(){
-  var BUILD='v51-20260624-1';
+  var BUILD='v52-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -19,7 +19,8 @@
   if(stored!==BUILD||urlBuild!==BUILD){
     localStorage.setItem(key,BUILD);
     if(urlBuild!==BUILD){
-      var url=location.pathname+'?r='+BUILD;
+      // نحافظ على الـhash (مثل #attend لصفحة تحضير الموظفين) عبر إعادة التحميل
+      var url=location.pathname+'?r='+BUILD+location.hash;
       location.replace(url);
     }
   }
@@ -924,7 +925,12 @@ const App = {
     if(el){el.innerHTML=this.currentView();return;}
     this.render();
   },
-  render(){document.getElementById('app').innerHTML=Auth.user?this.shell():Views.login()},
+  render(){
+    // صفحة تحضير الموظفين الذاتية (#attend أو #attend?b=فرع من الباركود) — بدون تسجيل دخول إداري
+    const h=(location.hash||'').replace(/^#/,'');
+    if(h.split(/[?\/]/)[0]==='attend'){document.getElementById('app').innerHTML=Views.staffCheckin();return;}
+    document.getElementById('app').innerHTML=Auth.user?this.shell():Views.login();
+  },
   shell(){
     return `
     <div id="fb-status-bar" style="display:${_fbStatus==='error'?'flex':'none'};background:#fef2f2;border-bottom:2px solid #fecaca;padding:8px 20px;align-items:center;gap:10px;font-size:13px;color:#991b1b;position:sticky;top:0;z-index:200">
@@ -1226,7 +1232,66 @@ login(){
           <input class="input" id="l-pass" type="password" placeholder="••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
         </div>
         <button class="btn btn-primary" style="width:100%;justify-content:center;font-size:15px;padding:12px" onclick="doLogin()">تسجيل الدخول</button>
+        <div style="text-align:center;margin-top:18px;padding-top:16px;border-top:1px solid #e2e8f0">
+          <a href="#attend" onclick="location.hash='attend';App.render();return false;" style="display:inline-flex;align-items:center;gap:6px;color:#0f766e;font-weight:700;font-size:14px;text-decoration:none">🕐 تحضير الموظفين (دخول/خروج)</a>
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px">للموظفين — تسجيل الحضور من الجوال بالموقع والرمز السري</div>
+        </div>
       </div>
+    </div>
+  </div>`;
+},
+
+// ===== صفحة تحضير الموظفين الذاتية (GPS + PIN) =====
+staffCheckin(){
+  const branches=DB.branches();
+  // أولوية الفرع: من الباركود (#attend?b=) ثم آخر اختيار محفوظ ثم أول فرع
+  const hashB=(location.hash.match(/[?&]b=([^&]+)/)||[])[1];
+  const fromQR=!!hashB&&branches.some(x=>x.id===hashB);
+  const bid=(fromQR?hashB:null)||localStorage.getItem('_sc_branch')||branches[0]?.id||'';
+  const emps=DB.hrEmployees().filter(e=>(e.status||'active')==='active'&&e.branchId===bid);
+  const b=branches.find(x=>x.id===bid);
+  const hasGeo=b&&b.lat&&b.lng;
+  return `
+  <div style="min-height:100vh;background:linear-gradient(160deg,#0f766e 0%,#064e3b 100%);display:flex;align-items:flex-start;justify-content:center;padding:20px;direction:rtl">
+    <div style="width:100%;max-width:440px">
+      <div style="text-align:center;color:#fff;margin:10px 0 20px">
+        <img src="logo.png" style="width:70px;height:70px;object-fit:contain" onerror="this.style.display='none'">
+        <h1 style="font-size:22px;font-weight:900;margin-top:6px">تحضير الموظفين</h1>
+        <p style="opacity:.8;font-size:13px">سجّل دخولك وخروجك من جوالك</p>
+      </div>
+      <div style="background:#fff;border-radius:18px;padding:20px;box-shadow:0 20px 50px rgba(0,0,0,.3)">
+        ${fromQR?`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 14px;margin-bottom:14px;text-align:center">
+            <div style="font-size:12px;color:#166534">📷 تم فتح الصفحة عبر باركود</div>
+            <div style="font-size:16px;font-weight:800;color:#0f766e">🏢 ${esc(b?.name||'')}</div>
+          </div>
+          <input type="hidden" id="sc-branch" value="${bid}">`
+        :`<div class="input-group">
+          <label>🏢 الفرع</label>
+          <select class="input" id="sc-branch" onchange="staffPickBranch(this.value)">
+            ${branches.map(x=>`<option value="${x.id}" ${x.id===bid?'selected':''}>${esc(x.name)}</option>`).join('')}
+          </select>
+        </div>`}
+        ${!hasGeo?`<div class="alert-box alert-yellow" style="font-size:12px">⚠️ لم يُحدَّد موقع هذا الفرع بعد. يتواصل المدير لضبط موقع الفرع من إعداداته.</div>`:''}
+        <div class="input-group">
+          <label>👤 الموظف</label>
+          <select class="input" id="sc-emp">
+            ${emps.length?emps.map(e=>`<option value="${e.id}">${esc(e.name)} — ${esc(e.jobTitle||'')}</option>`).join(''):'<option value="">لا يوجد موظفون في هذا الفرع</option>'}
+          </select>
+        </div>
+        <div class="input-group">
+          <label>🔒 الرمز السري (4 أرقام)</label>
+          <input class="input" id="sc-pin" type="tel" inputmode="numeric" maxlength="6" placeholder="••••" style="text-align:center;letter-spacing:8px;font-size:22px;font-weight:700" autocomplete="off">
+        </div>
+        <div style="display:flex;gap:10px;margin-top:6px">
+          <button class="btn" style="flex:1;justify-content:center;background:#10b981;color:#fff;font-size:16px;padding:14px;font-weight:800" onclick="staffCheck('in')">🟢 تسجيل دخول</button>
+          <button class="btn" style="flex:1;justify-content:center;background:#ef4444;color:#fff;font-size:16px;padding:14px;font-weight:800" onclick="staffCheck('out')">🔴 تسجيل خروج</button>
+        </div>
+        <div id="sc-result" style="margin-top:14px"></div>
+        <div style="text-align:center;margin-top:14px">
+          <a href="#" onclick="location.hash='';App.render();return false;" style="color:#94a3b8;font-size:12px;text-decoration:none">← دخول الإدارة</a>
+        </div>
+      </div>
+      <p style="text-align:center;color:rgba(255,255,255,.7);font-size:11px;margin-top:14px">📍 يتطلب السماح بالوصول لموقعك للتأكد أنك داخل الفرع</p>
     </div>
   </div>`;
 },
@@ -1688,8 +1753,9 @@ branches(){
             <div style="font-size:11px;color:#64748b">ر.س</div>
           </div>
         </div>
-        <div style="margin-top:12px">
-          <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center" onclick="App.go('children',{branch:'${b.id}'})">👶 عرض أطفال هذا الفرع</button>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" style="flex:1;min-width:150px;justify-content:center" onclick="App.go('children',{branch:'${b.id}'})">👶 عرض أطفال هذا الفرع</button>
+          <button class="btn btn-sm" style="flex:1;min-width:150px;justify-content:center;background:#0f766e;color:#fff" onclick="Modals.branchQR('${b.id}')">📷 باركود تحضير الموظفين</button>
         </div>
       </div>`;
     }).join('')}
@@ -4645,7 +4711,7 @@ hr(){
       ${App.params.hrAttReport?`<div class="card">
         <div class="card-title">📊 تقرير تفصيلي — ${formatDate(date)}</div>
         <div class="table-wrap"><table>
-          <thead><tr><th>الموظف</th><th>المسمى</th><th>الحالة</th><th>دقائق التأخر</th><th>خصم التأخر (ر.س)</th></tr></thead>
+          <thead><tr><th>الموظف</th><th>المسمى</th><th>الحالة</th><th>دخول</th><th>خروج</th><th>ساعات</th><th>دقائق التأخر</th><th>خصم التأخر (ر.س)</th></tr></thead>
           <tbody>
           ${activeEmps.map(e=>{
             const a=attMap[e.id]||{};
@@ -4654,10 +4720,14 @@ hr(){
             const lateMin=+(a.lateMinutes||0);
             const dailyRate=(+e.basicSalary||0)/workingDays;
             const lateDeduct=st==='late'?Math.round(lateMin/(8*60)*dailyRate*100)/100:0;
+            const wMin=(a.checkIn&&a.checkOut)?((()=>{const[a1,b1]=a.checkIn.split(':').map(Number),[a2,b2]=a.checkOut.split(':').map(Number);return (a2*60+b2)-(a1*60+b1);})()):0;
             return `<tr>
-              <td><strong>${esc(e.name)}</strong></td>
+              <td><strong>${esc(e.name)}</strong>${a.via==='qr-gps'?' <span style="color:#166534;font-size:10px">📷GPS</span>':''}</td>
               <td>${esc(e.jobTitle||'—')}</td>
               <td style="font-weight:600">${stLabel}</td>
+              <td style="text-align:center;color:#166534">${a.checkIn||'—'}</td>
+              <td style="text-align:center;color:#991b1b">${a.checkOut||'—'}</td>
+              <td style="text-align:center;font-weight:600">${wMin>0?(wMin/60).toFixed(1):'—'}</td>
               <td style="text-align:center">${st==='late'?lateMin+' دقيقة':'—'}</td>
               <td style="color:#ef4444">${st==='late'&&lateDeduct>0?lateDeduct.toLocaleString()+' ر.س':'—'}</td>
             </tr>`;
@@ -4677,18 +4747,27 @@ hr(){
             const lateMin=+(a.lateMinutes||0);
             const dailyRate=(+e.basicSalary||0)/workingDays;
             const lateDeduct=lateMin>0?Math.round(lateMin/(8*60)*dailyRate*100)/100:0;
+            const workedMin=(a.checkIn&&a.checkOut)?((h,m)=>{const[a1,b1]=a.checkIn.split(':').map(Number),[a2,b2]=a.checkOut.split(':').map(Number);return (a2*60+b2)-(a1*60+b1);})():0;
             const opts=[['present','حاضر','#10b981'],['late','متأخر','#f59e0b'],['absent','غائب','#ef4444'],['leave','إجازة','#8b5cf6']];
-            return `<div style="background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;padding:10px 14px">
+            const stColor={present:'#10b981',late:'#f59e0b',absent:'#ef4444',leave:'#8b5cf6'}[st]||'#e2e8f0';
+            return `<div style="background:#fff;border-radius:10px;border:1px solid #e2e8f0;border-right:4px solid ${stColor};padding:10px 14px">
               <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-                <div style="flex:1;min-width:140px;font-size:14px;font-weight:600">${esc(e.name)}<span style="font-size:11px;color:#64748b;font-weight:400;margin-right:8px">${esc(e.jobTitle||'')}</span></div>
+                <div style="flex:1;min-width:140px;font-size:14px;font-weight:600">${esc(e.name)}<span style="font-size:11px;color:#64748b;font-weight:400;margin-right:8px">${esc(e.jobTitle||'')}</span>
+                  ${a.via==='qr-gps'?`<span style="background:#dcfce7;color:#166534;font-size:9px;font-weight:700;padding:1px 6px;border-radius:5px;margin-right:6px">📷 باركود+GPS${a.checkInDist!=null?` ${a.checkInDist}م`:''}</span>`:''}
+                </div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap">
                   ${opts.map(([v,l,c])=>`<button class="btn btn-xs" style="background:${st===v?c:'#fff'};color:${st===v?'#fff':c};border:2px solid ${c};font-size:12px" onclick="setHrAtt('${e.id}','${date}','${v}')">${l}</button>`).join('')}
                 </div>
               </div>
+              ${(a.checkIn||a.checkOut)?`<div style="display:flex;align-items:center;gap:14px;margin-top:8px;flex-wrap:wrap;font-size:12px">
+                <span style="color:#166534;font-weight:600">🟢 دخول: ${a.checkIn||'—'}</span>
+                <span style="color:#991b1b;font-weight:600">🔴 خروج: ${a.checkOut||'—'}</span>
+                ${workedMin>0?`<span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:6px;font-weight:700">⏳ ${(workedMin/60).toFixed(1)} ساعة</span>`:''}
+              </div>`:''}
               ${st==='late'?`<div style="display:flex;align-items:center;gap:10px;margin-top:8px;padding-top:8px;border-top:1px solid #fde68a;flex-wrap:wrap">
                 <span style="font-size:12px;color:#92400e;font-weight:600">⏱️ دقائق التأخر:</span>
                 <input type="number" min="0" max="480" class="input" style="width:80px;padding:4px 8px;font-size:13px" value="${lateMin}" oninput="setHrLateMin('${e.id}','${date}',this.value)" placeholder="0">
-                ${lateDeduct>0?`<span style="font-size:12px;color:#dc2626;font-weight:600">خصم: ${lateDeduct.toLocaleString()} ر.س</span>`:'<span style="font-size:12px;color:#94a3b8">أدخل الدقائق لحساب الخصم</span>'}
+                ${lateDeduct>0?`<span style="font-size:12px;color:#dc2626;font-weight:600">خصم: ${lateDeduct.toLocaleString()} ر.س</span>`:'<span style="font-size:12px;color:#94a3b8">تُحسب تلقائياً عند تسجيل الدخول</span>'}
               </div>`:''}
             </div>`;
           }).join('')}
@@ -4806,6 +4885,38 @@ hr(){
 //  MODALS
 // =========================================================
 const Modals = {
+  _branchGeoFields(b){
+    return `
+      <div style="background:#f0fdf4;border-radius:8px;padding:10px 14px;font-size:12px;color:#166534;font-weight:600;margin-bottom:10px">📍 موقع الفرع (لتحضير الموظفين بالباركود + GPS)</div>
+      <input type="hidden" id="br-lat" value="${b?.lat||''}"><input type="hidden" id="br-lng" value="${b?.lng||''}">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="captureBranchLocation()">📍 التقط موقعي الحالي</button>
+        <span id="br-geo-status" style="font-size:12px;color:${b?.lat?'#166534':'#94a3b8'}">${b?.lat?`✓ محدَّد (${(+b.lat).toFixed(5)}, ${(+b.lng).toFixed(5)})`:'لم يُحدَّد بعد — قف داخل الفرع واضغط الزر'}</span>
+      </div>
+      <div class="input-group"><label>نطاق السماح للتحضير (متر)</label><input class="input" id="br-radius" type="number" min="30" max="1000" value="${b?.geoRadius||150}">
+        <small style="font-size:11px;color:#64748b;margin-top:2px;display:block">المسافة المسموحة من موقع الفرع لقبول تحضير الموظف</small>
+      </div>`;
+  },
+  branchQR(id){
+    const b=DB.branches().find(x=>x.id===id);if(!b)return;
+    const url=location.origin+location.pathname+'#attend?b='+id;
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal" style="max-width:420px">
+      <div class="modal-header"><h2>📷 باركود التحضير — ${esc(b.name)}</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body" style="text-align:center">
+        ${!b.lat?`<div class="alert-box alert-yellow" style="font-size:12px">⚠️ حدِّد موقع الفرع أولاً (تعديل الفرع ← 📍 التقط موقعي) ليعمل التحقق بالـGPS.</div>`:''}
+        <div id="br-qr" style="display:flex;justify-content:center;padding:16px"></div>
+        <p style="font-size:13px;color:#475569">اطبع الباركود وعلّقه عند مدخل الفرع. يمسحه الموظف بجواله فيسجّل دخوله/خروجه، ويتأكد النظام أنه داخل الفرع عبر الموقع (GPS) + رمزه السري.</p>
+        <div style="font-size:11px;color:#94a3b8;word-break:break-all;margin-top:6px">${url}</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="printBranchQR('${id}')">🖨️ طباعة الباركود</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إغلاق</button>
+      </div>
+    </div></div>`);
+    setTimeout(()=>{const el=document.getElementById('br-qr');if(el&&window.QRCode){el.innerHTML='';new QRCode(el,{text:url,width:220,height:220,correctLevel:QRCode.CorrectLevel.M});}else if(el){el.innerHTML='<div style="color:#ef4444;font-size:13px">تعذّر توليد الباركود</div>';}},80);
+  },
   addBranch(){
     App.showModal(`
     <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
@@ -4814,6 +4925,7 @@ const Modals = {
       <div class="modal-body">
         <div class="input-group"><label>اسم الفرع *</label><input class="input" id="br-name" placeholder="مثال: الفرع الرئيسي"></div>
         <div class="input-group"><label>الموقع / الحي</label><input class="input" id="br-loc" placeholder="مثال: حي النزهة"></div>
+        ${Views._branchGeoFields(null)}
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" onclick="saveBranch()">حفظ</button>
@@ -4832,6 +4944,7 @@ const Modals = {
         <input type="hidden" id="br-id" value="${b.id}">
         <div class="input-group"><label>اسم الفرع *</label><input class="input" id="br-name" value="${esc(b.name)}"></div>
         <div class="input-group"><label>الموقع / الحي</label><input class="input" id="br-loc" value="${esc(b.location||'')}"></div>
+        ${Views._branchGeoFields(b)}
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" onclick="saveBranch(true)">حفظ التعديلات</button>
@@ -5816,6 +5929,19 @@ const Modals = {
           <option value="part" ${e?.contractType==='part'?'selected':''}>دوام جزئي</option>
         </select></div>
       </div>
+      <div style="background:#f0fdf4;border-radius:8px;padding:10px 14px;font-size:12px;color:#166534;font-weight:600">🕐 الدوام والتحضير (باركود + GPS)</div>
+      <div class="grid-2">
+        <div class="input-group"><label>بداية الدوام</label><input class="input" id="hr-duty-start" type="time" value="${e?.dutyStart||'07:00'}"></div>
+        <div class="input-group"><label>نهاية الدوام</label><input class="input" id="hr-duty-end" type="time" value="${e?.dutyEnd||'15:00'}"></div>
+      </div>
+      <div class="grid-2">
+        <div class="input-group"><label>سماح التأخير (دقائق)</label><input class="input" id="hr-grace" type="number" min="0" max="120" value="${e?.graceMinutes??15}">
+          <small style="font-size:11px;color:#64748b;margin-top:2px;display:block">لا يُحتسب تأخراً إلا بعده</small>
+        </div>
+        <div class="input-group"><label>🔒 الرمز السري للتحضير (4 أرقام)</label><input class="input" id="hr-pin" type="tel" inputmode="numeric" maxlength="6" value="${esc(e?.pin||'')}" placeholder="مثال: 1234">
+          <small style="font-size:11px;color:#64748b;margin-top:2px;display:block">يستخدمه الموظف عند مسح الباركود لتسجيل حضوره</small>
+        </div>
+      </div>
       <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;font-size:12px;color:#1d4ed8;font-weight:600">💰 الراتب والبدلات</div>
       <div class="grid-2">
         <div class="input-group"><label>الراتب الأساسي (ر.س) *</label><input class="input" id="hr-basic" type="number" min="0" value="${e?.basicSalary||0}" oninput="hrCalcTotal()"></div>
@@ -6113,6 +6239,103 @@ function doLogin(){
   else{const e=document.getElementById('login-err');if(e)e.style.display='flex'}
 }
 
+// ===== تحضير الموظفين الذاتي (باركود + GPS) =====
+function _nowHM(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function _minsBetween(t1,t2){if(!t1||!t2)return 0;const[a,b]=t1.split(':').map(Number),[c,d]=t2.split(':').map(Number);return (c*60+d)-(a*60+b);}
+// المسافة بالأمتار بين إحداثيتين (Haversine)
+function _geoDistance(lat1,lng1,lat2,lng2){
+  const R=6371000,rad=x=>x*Math.PI/180;
+  const dLat=rad(lat2-lat1),dLng=rad(lng2-lng1);
+  const a=Math.sin(dLat/2)**2+Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLng/2)**2;
+  return Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
+}
+function staffPickBranch(bid){localStorage.setItem('_sc_branch',bid);App.render();}
+// التقاط موقع الفرع الحالي (يقف المدير داخل الفرع)
+function captureBranchLocation(){
+  if(!navigator.geolocation||!window.isSecureContext){toast('افتح النظام عبر https://kidsenses.today لالتقاط الموقع','error');return;}
+  const st=document.getElementById('br-geo-status');if(st)st.textContent='📍 جارٍ التحديد...';
+  navigator.geolocation.getCurrentPosition(function(p){
+    const la=p.coords.latitude,ln=p.coords.longitude;
+    const latEl=document.getElementById('br-lat'),lngEl=document.getElementById('br-lng');
+    if(latEl)latEl.value=la;if(lngEl)lngEl.value=ln;
+    if(st){st.textContent=`✓ محدَّد (${la.toFixed(5)}, ${ln.toFixed(5)})`;st.style.color='#166534';}
+    toast('✅ تم التقاط موقع الفرع — لا تنسَ الحفظ');
+  },function(e){if(st)st.textContent='❌ تعذّر تحديد الموقع';toast('تعذّر تحديد الموقع — فعّل GPS واسمح بالإذن','error');},{enableHighAccuracy:true,timeout:12000,maximumAge:0});
+}
+// طباعة باركود التحضير للفرع
+function printBranchQR(id){
+  const b=DB.branches().find(x=>x.id===id);
+  const box=document.getElementById('br-qr');
+  const cnv=box?.querySelector('canvas');const img=box?.querySelector('img');
+  const src=cnv?cnv.toDataURL('image/png'):(img?img.src:'');
+  if(!src){toast('الباركود غير جاهز بعد','error');return;}
+  const w=window.open('','_blank','width=480,height=680');
+  w.document.write(`<html dir="rtl"><head><meta charset="utf-8"><title>باركود التحضير — ${esc(b?.name||'')}</title></head>
+   <body style="font-family:Tahoma,sans-serif;text-align:center;padding:30px;color:#1e293b">
+     <h2 style="color:#0f766e;margin-bottom:4px">🕐 تحضير الموظفين</h2>
+     <h3 style="margin:0 0 16px">${esc(b?.name||'')}</h3>
+     <img src="${src}" style="width:320px;height:320px;border:8px solid #0f766e;border-radius:12px">
+     <p style="font-size:16px;margin-top:20px;font-weight:700">امسح الباركود بجوالك لتسجيل الدخول والخروج</p>
+     <p style="color:#666;font-size:14px">📍 يجب أن تكون داخل الفرع ليُقبل التحضير</p>
+     <script>onload=function(){setTimeout(function(){print();},300);}<\/script>
+   </body></html>`);
+  w.document.close();
+}
+function _scMsg(html,type){
+  const el=document.getElementById('sc-result');if(!el)return;
+  const bg={ok:'#f0fdf4',err:'#fef2f2',info:'#eff6ff'}[type]||'#f8fafc';
+  const bd={ok:'#bbf7d0',err:'#fecaca',info:'#bfdbfe'}[type]||'#e2e8f0';
+  el.innerHTML=`<div style="background:${bg};border:1px solid ${bd};border-radius:10px;padding:12px 14px;font-size:14px;font-weight:600;text-align:center">${html}</div>`;
+}
+function staffCheck(kind){
+  const bid=document.getElementById('sc-branch')?.value;
+  const empId=document.getElementById('sc-emp')?.value;
+  const pin=(document.getElementById('sc-pin')?.value||'').trim();
+  const b=DB.branches().find(x=>x.id===bid);
+  const emp=DB.hrEmployees().find(e=>e.id===empId);
+  if(!emp){_scMsg('⚠️ اختر الموظف أولاً','err');return;}
+  if(!emp.pin){_scMsg('⚠️ لا يوجد رمز سري لهذا الموظف — يضبطه المدير من ملف الموظف','err');return;}
+  if(!pin){_scMsg('⚠️ أدخل الرمز السري','err');return;}
+  if(String(emp.pin)!==pin){_scMsg('❌ الرمز السري غير صحيح','err');return;}
+  if(!b||!b.lat||!b.lng){_scMsg('⚠️ لم يُحدَّد موقع الفرع — يضبطه المدير من إعدادات الفرع','err');return;}
+  if(!navigator.geolocation||!window.isSecureContext){_scMsg('📍 خدمة الموقع غير متاحة. افتح الرابط عبر <b>https://kidsenses.today</b> واسمح بالوصول للموقع.','err');return;}
+  _scMsg('📍 جارٍ تحديد موقعك...','info');
+  navigator.geolocation.getCurrentPosition(function(pos){
+    const lat=pos.coords.latitude,lng=pos.coords.longitude;
+    const radius=+(b.geoRadius||150);
+    const dist=_geoDistance(lat,lng,+b.lat,+b.lng);
+    if(dist>radius){
+      _scMsg(`❌ أنت خارج نطاق الفرع (تبعد ${dist} متر / المسموح ${radius} متر).<br>سجّل الحضور من داخل الفرع.`,'err');
+      return;
+    }
+    _staffRecord(emp,kind,lat,lng,dist);
+  },function(err){
+    const msg=err.code===1?'❌ رفضت إذن الموقع. فعّل الموقع من إعدادات المتصفح ثم أعد المحاولة.':'❌ تعذّر تحديد موقعك. تأكد من تفعيل GPS.';
+    _scMsg(msg,'err');
+  },{enableHighAccuracy:true,timeout:12000,maximumAge:0});
+}
+function _staffRecord(emp,kind,lat,lng,dist){
+  const date=T0,now=_nowHM();
+  const prev=DB.hrAttendance().find(a=>a.employeeId===emp.id&&a.date===date);
+  const list=DB.hrAttendance().filter(a=>!(a.employeeId===emp.id&&a.date===date));
+  if(kind==='in'){
+    const dutyStart=emp.dutyStart||'07:00';
+    const grace=+(emp.graceMinutes??15);
+    const lateBy=Math.max(0,_minsBetween(dutyStart,now)-grace);
+    const status=lateBy>0?'late':'present';
+    list.push({id:uid(),employeeId:emp.id,date,status,checkIn:now,checkOut:prev?.checkOut||'',lateMinutes:lateBy,via:'qr-gps',checkInLat:lat,checkInLng:lng,checkInDist:dist});
+    DB.saveHrAttendance(list);
+    _scMsg(`✅ تم تسجيل دخولك يا ${esc(emp.name)}<br>🕐 ${now} · 📍 داخل الفرع (${dist}م)${lateBy>0?`<br>⏰ متأخر ${lateBy} دقيقة`:' · في الوقت 👌'}`,'ok');
+  } else {
+    if(prev) list.push({...prev,checkOut:now,checkOutLat:lat,checkOutLng:lng});
+    else list.push({id:uid(),employeeId:emp.id,date,status:'present',checkIn:'',checkOut:now,lateMinutes:0,via:'qr-gps',checkOutLat:lat,checkOutLng:lng});
+    DB.saveHrAttendance(list);
+    const worked=prev?.checkIn?(_minsBetween(prev.checkIn,now)/60).toFixed(1):null;
+    _scMsg(`✅ تم تسجيل خروجك يا ${esc(emp.name)}<br>🕐 ${now} · 📍 (${dist}م)${worked?`<br>⏳ ساعات العمل: ${worked} ساعة`:''}`,'ok');
+  }
+  const pinEl=document.getElementById('sc-pin');if(pinEl)pinEl.value='';
+}
+
 function getSubPrices(branchId){
   const cfg=DB.settings().prices||{};
   const defM=cfg.morning||{daily:150,weekly:600,monthly:1800};
@@ -6282,10 +6505,18 @@ function toggleSchoolField(){
 function saveBranch(edit=false){
   const name=document.getElementById('br-name')?.value?.trim();
   if(!name){alert('اسم الفرع مطلوب');return}
+  const bid=edit?document.getElementById('br-id')?.value:uid();
+  const prev=edit?(DB.branches().find(x=>x.id===bid)||{}):{};
+  const latV=document.getElementById('br-lat')?.value;
+  const lngV=document.getElementById('br-lng')?.value;
   const b={
-    id:edit?document.getElementById('br-id')?.value:uid(),
+    ...prev,
+    id:bid,
     name,
     location:document.getElementById('br-loc')?.value?.trim()||'',
+    lat:latV?+latV:(prev.lat??null),
+    lng:lngV?+lngV:(prev.lng??null),
+    geoRadius:+(document.getElementById('br-radius')?.value||150),
   };
   if(edit) DB.updateBranch(b); else DB.addBranch(b);
   toast(edit?'✅ تم حفظ الفرع':'✅ تم إضافة الفرع');
@@ -6514,6 +6745,10 @@ function saveHrEmployee(edit=false){
     contractEnd:document.getElementById('hr-end')?.value||'',
     healthCertExpiry:document.getElementById('hr-health-exp')?.value||'',
     contractType:document.getElementById('hr-ctype')?.value||'full',
+    dutyStart:document.getElementById('hr-duty-start')?.value||'07:00',
+    dutyEnd:document.getElementById('hr-duty-end')?.value||'15:00',
+    graceMinutes:+(document.getElementById('hr-grace')?.value||15),
+    pin:(document.getElementById('hr-pin')?.value||'').trim(),
     basicSalary:+(document.getElementById('hr-basic')?.value||0),
     housingAllowance:+(document.getElementById('hr-housing')?.value||0),
     transportAllowance:+(document.getElementById('hr-transport')?.value||0),
@@ -6551,16 +6786,21 @@ function saveHrLeave(){
   toast('✅ تم تسجيل الإجازة');App.closeModal();App.go('hr',{hrTab:'leaves'});
 }
 function setHrAtt(empId,date,status){
+  // حافظ على أوقات الدخول/الخروج (باركود+GPS) عند التعديل اليدوي للحالة
+  const prev=DB.hrAttendance().find(a=>a.employeeId===empId&&a.date===date)||{};
   const list=DB.hrAttendance().filter(a=>!(a.employeeId===empId&&a.date===date));
-  list.push({id:uid(),employeeId:empId,date,status});
+  const keep=(status==='absent'||status==='leave')?{}:{checkIn:prev.checkIn||'',checkOut:prev.checkOut||'',via:prev.via,checkInDist:prev.checkInDist};
+  list.push({id:uid(),employeeId:empId,date,status,lateMinutes:prev.lateMinutes||0,...keep});
   DB.saveHrAttendance(list);App.refresh();
 }
 function markAllHrPresent(date){
   const bid=Auth.branchId();
   let emps=DB.hrEmployees().filter(e=>(e.status||'active')==='active'||(e.status||'active')==='on_leave');
   if(bid) emps=emps.filter(e=>e.branchId===bid);
-  const existing=DB.hrAttendance().filter(a=>a.date!==date||!emps.find(e=>e.id===a.employeeId));
-  emps.forEach(e=>existing.push({id:uid(),employeeId:e.id,date,status:'present'}));
+  const empIds=new Set(emps.map(e=>e.id));
+  const prevMap={};DB.hrAttendance().forEach(a=>{if(a.date===date&&empIds.has(a.employeeId))prevMap[a.employeeId]=a;});
+  const existing=DB.hrAttendance().filter(a=>a.date!==date||!empIds.has(a.employeeId));
+  emps.forEach(e=>{const p=prevMap[e.id]||{};existing.push({id:uid(),employeeId:e.id,date,status:p.status==='late'?'late':'present',checkIn:p.checkIn||'',checkOut:p.checkOut||'',lateMinutes:p.lateMinutes||0,via:p.via,checkInDist:p.checkInDist});});
   DB.saveHrAttendance(existing);App.refresh();
 }
 function deleteHrEmployee(id){
