@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v52 -->
+<!-- BUILD: 2026-06-24-v53 -->
 <script>
 (function(){
-  var BUILD='v52-20260624-1';
+  var BUILD='v53-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -4888,11 +4888,15 @@ const Modals = {
   _branchGeoFields(b){
     return `
       <div style="background:#f0fdf4;border-radius:8px;padding:10px 14px;font-size:12px;color:#166534;font-weight:600;margin-bottom:10px">📍 موقع الفرع (لتحضير الموظفين بالباركود + GPS)</div>
-      <input type="hidden" id="br-lat" value="${b?.lat||''}"><input type="hidden" id="br-lng" value="${b?.lng||''}">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
         <button type="button" class="btn btn-secondary btn-sm" onclick="captureBranchLocation()">📍 التقط موقعي الحالي</button>
-        <span id="br-geo-status" style="font-size:12px;color:${b?.lat?'#166534':'#94a3b8'}">${b?.lat?`✓ محدَّد (${(+b.lat).toFixed(5)}, ${(+b.lng).toFixed(5)})`:'لم يُحدَّد بعد — قف داخل الفرع واضغط الزر'}</span>
+        <span id="br-geo-status" style="font-size:12px;color:${b?.lat?'#166534':'#94a3b8'}">${b?.lat?`✓ محدَّد (${(+b.lat).toFixed(5)}, ${(+b.lng).toFixed(5)})`:'يعمل فقط عبر https — أو الصق الإحداثيات يدوياً بالأسفل'}</span>
       </div>
+      <div class="grid-2">
+        <div class="input-group" style="margin-bottom:6px"><label>خط العرض (Latitude)</label><input class="input" id="br-lat" type="number" step="any" value="${b?.lat||''}" placeholder="مثال: 24.71360"></div>
+        <div class="input-group" style="margin-bottom:6px"><label>خط الطول (Longitude)</label><input class="input" id="br-lng" type="number" step="any" value="${b?.lng||''}" placeholder="مثال: 46.67530"></div>
+      </div>
+      <div style="font-size:11px;color:#64748b;margin:0 0 10px;line-height:1.6">💡 <b>بدون GPS؟</b> افتح خرائط Google على موقع الفرع، اضغط مطوّلاً على المكان، وستظهر الإحداثيات (رقمان). انسخهما والصق الأول في «خط العرض» والثاني في «خط الطول».</div>
       <div class="input-group"><label>نطاق السماح للتحضير (متر)</label><input class="input" id="br-radius" type="number" min="30" max="1000" value="${b?.geoRadius||150}">
         <small style="font-size:11px;color:#64748b;margin-top:2px;display:block">المسافة المسموحة من موقع الفرع لقبول تحضير الموظف</small>
       </div>`;
