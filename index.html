@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v56 -->
+<!-- BUILD: 2026-06-24-v57 -->
 <script>
 (function(){
-  var BUILD='v56-20260624-1';
+  var BUILD='v57-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -4654,12 +4654,13 @@ hr(){
           <option value="branch" ${hrSort==='branch'?'selected':''}>🏢 الفرع</option>
         </select>
         <button class="btn btn-primary" onclick="Modals.addHrEmployee()">+ إضافة موظف</button>
+        <button class="btn btn-secondary" onclick="genAllPins()" title="توليد رمز سري عشوائي لكل موظف بدون رمز">🎲 توليد رموز التحضير</button>
       </div>
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>الاسم</th><th>المسمى الوظيفي</th><th>الفرع</th><th>الراتب</th><th>نهاية العقد</th><th>الحالة</th><th>تنبيهات</th><th>إجراءات</th></tr></thead>
+          <thead><tr><th>الاسم</th><th>المسمى الوظيفي</th><th>الفرع</th><th>الراتب</th><th>🔒 رمز التحضير</th><th>نهاية العقد</th><th>الحالة</th><th>تنبيهات</th><th>إجراءات</th></tr></thead>
           <tbody>
-          ${list.length===0?`<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:32px">لا يوجد موظفون</td></tr>`:''}
+          ${list.length===0?`<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:32px">لا يوجد موظفون</td></tr>`:''}
           ${list.map(e=>{
             const bal=annualBalance(e);
             const cdSt=DB.hrDocStatus(e.contractEnd);
@@ -4670,6 +4671,10 @@ hr(){
               <td>${esc(e.jobTitle||'—')}</td>
               <td>${esc(branches.find(b=>b.id===e.branchId)?.name.split(' - ')[0]||'—')}</td>
               <td style="font-weight:600;color:#059669">${(+e.basicSalary||0).toLocaleString()} ر.س</td>
+              <td style="white-space:nowrap">
+                ${e.pin?`<span style="font-family:monospace;font-weight:700;font-size:15px;letter-spacing:3px;background:#f0fdf4;color:#166534;padding:2px 8px;border-radius:6px">${e.pin}</span>`:'<span style="color:#ef4444;font-size:11px">بدون رمز</span>'}
+                <button class="btn btn-xs" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;margin-right:4px;padding:3px 7px" onclick="regenPin('${e.id}')" title="توليد رمز عشوائي جديد">🎲</button>
+              </td>
               <td>${cdBadge||'—'}</td>
               <td>${statusBadge(e.status||'active')}</td>
               <td style="font-size:11px;max-width:140px">${docAlert(e)||'<span style="color:#10b981">✓ سليم</span>'}</td>
@@ -6813,6 +6818,37 @@ function deleteHrEmployee(id){
   DB.updateHrEmployee({...e,status:'deleted'});
   DB.addAuditLog({action:'حذف موظف',entity:'HR',entityId:id,details:e?.name||'',by:Auth.user?.name||'—'});
   toast('✅ تم حذف الموظف');App.refresh();
+}
+// توليد رمز سري عشوائي فريد من 4 أرقام (غير مستخدم من موظف آخر)
+function _uniquePin(exceptId){
+  const used=new Set(DB.hrEmployees().filter(x=>x.id!==exceptId).map(x=>x.pin).filter(Boolean));
+  let pin,tries=0;
+  do{pin=String(Math.floor(1000+Math.random()*9000));tries++;}while(used.has(pin)&&tries<200);
+  return pin;
+}
+// توليد رمز لموظف واحد (يستبدل الحالي)
+function regenPin(id){
+  const e=DB.hrEmployees().find(x=>x.id===id);if(!e)return;
+  if(e.pin&&!confirm(`لدى ${e.name} رمز حالياً (${e.pin}).\nهل تريد توليد رمز جديد بدلاً منه؟`)) return;
+  const pin=_uniquePin(id);
+  DB.updateHrEmployee({...e,pin});
+  toast(`🎲 رمز ${e.name}: ${pin}`);App.refresh();
+}
+// توليد رموز عشوائية لكل موظف بدون رمز دفعة واحدة (مع إبقاء الموجود)
+function genAllPins(){
+  const bid=Auth.branchId();
+  const emps=DB.hrEmployees().filter(e=>e.status!=='deleted'&&(!bid||e.branchId===bid));
+  const missing=emps.filter(e=>!e.pin);
+  if(!missing.length){toast('كل الموظفين لديهم رموز بالفعل ✅','warn');return;}
+  if(!confirm(`توليد رمز سري عشوائي (4 أرقام) لـ ${missing.length} موظف بدون رمز؟\nالموظفون الذين لديهم رمز لن يتغيّروا.`)) return;
+  const used=new Set(DB.hrEmployees().map(e=>e.pin).filter(Boolean));
+  missing.forEach(e=>{
+    let pin,tries=0;do{pin=String(Math.floor(1000+Math.random()*9000));tries++;}while(used.has(pin)&&tries<200);
+    used.add(pin);
+    DB.updateHrEmployee({...e,pin});
+  });
+  DB.addAuditLog({action:'توليد رموز تحضير',entity:'HR',entityId:'bulk',details:`${missing.length} موظف`,by:Auth.user?.name||'—'});
+  toast(`✅ تم توليد رموز لـ ${missing.length} موظف`);App.refresh();
 }
 function deleteHrLeave(id){
   if(!confirm('هل تريد حذف هذه الإجازة؟')) return;
