@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v57 -->
+<!-- BUILD: 2026-06-24-v58 -->
 <script>
 (function(){
-  var BUILD='v57-20260624-1';
+  var BUILD='v58-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -5938,14 +5938,37 @@ const Modals = {
           <option value="part" ${e?.contractType==='part'?'selected':''}>دوام جزئي</option>
         </select></div>
       </div>
-      <div style="background:#f0fdf4;border-radius:8px;padding:10px 14px;font-size:12px;color:#166534;font-weight:600">🕐 الدوام والتحضير (باركود + GPS)</div>
-      <div class="grid-2">
-        <div class="input-group"><label>بداية الدوام</label><input class="input" id="hr-duty-start" type="time" value="${e?.dutyStart||'07:00'}"></div>
-        <div class="input-group"><label>نهاية الدوام</label><input class="input" id="hr-duty-end" type="time" value="${e?.dutyEnd||'15:00'}"></div>
+      <div style="background:#f0fdf4;border-radius:8px;padding:10px 14px;font-size:12px;color:#166534;font-weight:600">🕐 دوام الموظف الأسبوعي (لحساب التأخير بدقة — الدوام قد يختلف كل يوم)</div>
+      ${(()=>{
+        const DAYS=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+        const hm2min=(t)=>{const p=(t||'0:0').split(':');return (+p[0]||0)*60+(+p[1]||0);};
+        const defHours=(e?.dutyStart&&e?.dutyEnd)?Math.max(1,Math.round((hm2min(e.dutyEnd)-hm2min(e.dutyStart))/60)):8;
+        const sched=(e?.schedule&&e.schedule.length===7)?e.schedule:DAYS.map((_,d)=>({day:d,off:d===5,start:e?.dutyStart||'07:00',hours:defHours}));
+        const firstW=sched.find(s=>!s.off)||sched[0];
+        return `
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:8px">
+        <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+          <div><label style="font-size:11px;font-weight:600;color:#374151;display:block;margin-bottom:3px">دوام موحّد — بداية</label><input type="time" id="hr-uni-start" class="input" style="width:120px" value="${firstW.start||'07:00'}"></div>
+          <div><label style="font-size:11px;font-weight:600;color:#374151;display:block;margin-bottom:3px">ساعات العمل</label><input type="number" id="hr-uni-hours" class="input" style="width:80px" min="1" max="16" step="0.5" value="${firstW.hours||8}"></div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="hrApplyUniformShift()">↧ تطبيق على أيام العمل</button>
+        </div>
+        <div style="font-size:11px;color:#64748b;margin-top:5px">لو الدوام ثابت كل الأيام: عبّي البداية والساعات واضغطي «تطبيق». وإن اختلف يوم معيّن، عدّليه بالجدول تحت. لإجازة يوم: أزيلي علامة «✓».</div>
       </div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">
+        ${sched.map((s,d)=>`
+        <div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:5px;width:100px;font-size:13px;font-weight:600;cursor:pointer"><input type="checkbox" id="sd-work-${d}" ${s.off?'':'checked'} onchange="hrToggleDay(${d})" style="width:16px;height:16px"> ${DAYS[d]}</label>
+          <span style="font-size:12px;color:#64748b">من</span>
+          <input type="time" id="sd-start-${d}" class="input" style="width:115px;padding:5px 8px" value="${s.start||'07:00'}" ${s.off?'disabled':''}>
+          <span style="font-size:12px;color:#64748b">ساعات</span>
+          <input type="number" id="sd-hours-${d}" class="input" style="width:70px;padding:5px 8px" min="1" max="16" step="0.5" value="${s.hours||8}" ${s.off?'disabled':''}>
+          <span id="sd-off-lbl-${d}" style="font-size:11px;color:#94a3b8;font-weight:600">${s.off?'🏖️ إجازة':''}</span>
+        </div>`).join('')}
+      </div>`;
+      })()}
       <div class="grid-2">
         <div class="input-group"><label>سماح التأخير (دقائق)</label><input class="input" id="hr-grace" type="number" min="0" max="120" value="${e?.graceMinutes??15}">
-          <small style="font-size:11px;color:#64748b;margin-top:2px;display:block">لا يُحتسب تأخراً إلا بعده</small>
+          <small style="font-size:11px;color:#64748b;margin-top:2px;display:block">لا يُحتسب تأخراً إلا بعده من بداية دوام ذلك اليوم</small>
         </div>
         <div class="input-group"><label>🔒 الرمز السري للتحضير (4 أرقام)</label><input class="input" id="hr-pin" type="tel" inputmode="numeric" maxlength="6" value="${esc(e?.pin||'')}" placeholder="مثال: 1234">
           <small style="font-size:11px;color:#64748b;margin-top:2px;display:block">يستخدمه الموظف عند مسح الباركود لتسجيل حضوره</small>
@@ -6057,6 +6080,18 @@ const Modals = {
             ${gratNote?`<div style="font-size:11px;color:#7c3aed;margin-top:4px">${gratNote}</div>`:'<div style="font-size:11px;color:#059669;margin-top:4px">✅ مستحقة كاملة عند الإنهاء / الاستقالة بعد 10 سنوات</div>'}
           </div>
         </div>
+        ${(()=>{
+          const DAYS=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+          const hm2min=(t)=>{const p=(t||'0:0').split(':');return (+p[0]||0)*60+(+p[1]||0);};
+          const add=(t,h)=>{const m=hm2min(t)+Math.round((+h||0)*60);return String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0');};
+          const sched=(e.schedule&&e.schedule.length===7)?e.schedule:null;
+          return `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px">
+            <div style="font-size:12px;color:#64748b;font-weight:700;margin-bottom:10px">🕐 دوام الأسبوع · 🔒 رمز التحضير: <span style="font-family:monospace;font-weight:800;letter-spacing:2px;color:#166534">${e.pin||'—'}</span> · سماح ${e.graceMinutes??15}د</div>
+            ${sched?`<div style="display:flex;flex-wrap:wrap;gap:6px">
+              ${sched.map(s=>`<span style="font-size:11px;padding:3px 8px;border-radius:6px;font-weight:600;background:${s.off?'#f1f5f9':'#dcfce7'};color:${s.off?'#94a3b8':'#166534'}">${DAYS[s.day]}: ${s.off?'إجازة':`${s.start}–${add(s.start,s.hours)} (${s.hours}س)`}</span>`).join('')}
+            </div>`:`<div style="font-size:12px;color:#94a3b8">لم يُحدَّد جدول دوام — عدّلي الموظف لضبطه</div>`}
+          </div>`;
+        })()}
         <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:14px">
           <div style="font-size:12px;color:#64748b;font-weight:700;margin-bottom:10px">🏖️ رصيد الإجازات (${T0.slice(0,4)}) — نظام العمل السعودي</div>
           <div style="display:flex;gap:16px;flex-wrap:wrap">
@@ -6328,13 +6363,17 @@ function _staffRecord(emp,kind,lat,lng,dist){
   const prev=DB.hrAttendance().find(a=>a.employeeId===emp.id&&a.date===date);
   const list=DB.hrAttendance().filter(a=>!(a.employeeId===emp.id&&a.date===date));
   if(kind==='in'){
-    const dutyStart=emp.dutyStart||'07:00';
+    // بداية دوام اليوم من الجدول الأسبوعي (الدوام قد يختلف كل يوم)
+    const wd=new Date().getDay(); // 0=الأحد
+    const sch=(emp.schedule||[]).find(s=>s.day===wd);
+    const isOff=sch?!!sch.off:false;
+    const dutyStart=(sch&&!sch.off&&sch.start)?sch.start:(emp.dutyStart||'07:00');
     const grace=+(emp.graceMinutes??15);
-    const lateBy=Math.max(0,_minsBetween(dutyStart,now)-grace);
+    const lateBy=isOff?0:Math.max(0,_minsBetween(dutyStart,now)-grace);
     const status=lateBy>0?'late':'present';
-    list.push({id:uid(),employeeId:emp.id,date,status,checkIn:now,checkOut:prev?.checkOut||'',lateMinutes:lateBy,via:'qr-gps',checkInLat:lat,checkInLng:lng,checkInDist:dist});
+    list.push({id:uid(),employeeId:emp.id,date,status,checkIn:now,checkOut:prev?.checkOut||'',lateMinutes:lateBy,dutyStart:isOff?'':dutyStart,via:'qr-gps',checkInLat:lat,checkInLng:lng,checkInDist:dist});
     DB.saveHrAttendance(list);
-    _scMsg(`✅ تم تسجيل دخولك يا ${esc(emp.name)}<br>🕐 ${now} · 📍 داخل الفرع (${dist}م)${lateBy>0?`<br>⏰ متأخر ${lateBy} دقيقة`:' · في الوقت 👌'}`,'ok');
+    _scMsg(`✅ تم تسجيل دخولك يا ${esc(emp.name)}<br>🕐 ${now} · 📍 داخل الفرع (${dist}م)${isOff?'<br>🏖️ اليوم إجازتك — سُجّل حضورك بدون احتساب تأخير':(lateBy>0?`<br>⏰ متأخر ${lateBy} دقيقة (دوامك ${dutyStart})`:' · في الوقت 👌')}`,'ok');
   } else {
     if(prev) list.push({...prev,checkOut:now,checkOutLat:lat,checkOutLng:lng});
     else list.push({id:uid(),employeeId:emp.id,date,status:'present',checkIn:'',checkOut:now,lateMinutes:0,via:'qr-gps',checkOutLat:lat,checkOutLng:lng});
@@ -6754,8 +6793,8 @@ function saveHrEmployee(edit=false){
     contractEnd:document.getElementById('hr-end')?.value||'',
     healthCertExpiry:document.getElementById('hr-health-exp')?.value||'',
     contractType:document.getElementById('hr-ctype')?.value||'full',
-    dutyStart:document.getElementById('hr-duty-start')?.value||'07:00',
-    dutyEnd:document.getElementById('hr-duty-end')?.value||'15:00',
+    schedule:_readSchedule(),
+    dutyStart:(_readSchedule().find(s=>!s.off)||{start:'07:00'}).start, // توافقية: بداية أول يوم عمل
     graceMinutes:+(document.getElementById('hr-grace')?.value||15),
     pin:(document.getElementById('hr-pin')?.value||'').trim(),
     basicSalary:+(document.getElementById('hr-basic')?.value||0),
@@ -6835,6 +6874,34 @@ function regenPin(id){
   toast(`🎲 رمز ${e.name}: ${pin}`);App.refresh();
 }
 // توليد رموز عشوائية لكل موظف بدون رمز دفعة واحدة (مع إبقاء الموجود)
+// تفعيل/تعطيل حقول اليوم عند تبديل «يوم عمل / إجازة»
+function hrToggleDay(d){
+  const work=document.getElementById('sd-work-'+d)?.checked;
+  const st=document.getElementById('sd-start-'+d),hr=document.getElementById('sd-hours-'+d),lbl=document.getElementById('sd-off-lbl-'+d);
+  if(st)st.disabled=!work;if(hr)hr.disabled=!work;if(lbl)lbl.textContent=work?'':'🏖️ إجازة';
+}
+// تطبيق الدوام الموحّد على كل أيام العمل (المفعّلة)
+function hrApplyUniformShift(){
+  const s=document.getElementById('hr-uni-start')?.value||'07:00';
+  const h=document.getElementById('hr-uni-hours')?.value||8;
+  let n=0;
+  for(let d=0;d<7;d++){
+    if(document.getElementById('sd-work-'+d)?.checked){
+      const st=document.getElementById('sd-start-'+d),hr=document.getElementById('sd-hours-'+d);
+      if(st)st.value=s;if(hr)hr.value=h;n++;
+    }
+  }
+  toast(`✅ طُبّق الدوام (${s} · ${h} ساعات) على ${n} يوم`);
+}
+// قراءة جدول الدوام الأسبوعي من النموذج
+function _readSchedule(){
+  const schedule=[];
+  for(let d=0;d<7;d++){
+    const work=document.getElementById('sd-work-'+d)?.checked;
+    schedule.push({day:d,off:!work,start:document.getElementById('sd-start-'+d)?.value||'07:00',hours:+(document.getElementById('sd-hours-'+d)?.value||8)});
+  }
+  return schedule;
+}
 function genAllPins(){
   const bid=Auth.branchId();
   const emps=DB.hrEmployees().filter(e=>e.status!=='deleted'&&(!bid||e.branchId===bid));
