@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v58 -->
+<!-- BUILD: 2026-06-24-v59 -->
 <script>
 (function(){
-  var BUILD='v58-20260624-1';
+  var BUILD='v59-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -4710,6 +4710,8 @@ hr(){
       <div class="actions-bar">
         <input type="date" class="input" style="width:180px" value="${date}" max="${T0}" onchange="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:this.value})">
         <button class="btn btn-primary" onclick="markAllHrPresent('${date}')">✅ تسجيل الكل حاضر</button>
+        ${_hrAttUndo?`<button class="btn btn-warning" onclick="undoHrAtt()" title="التراجع عن آخر إجراء">↩️ تراجع (${esc(_hrAttUndo.label)})</button>`:''}
+        <button class="btn btn-secondary" style="color:#dc2626" onclick="clearHrAttDay('${date}')" title="مسح كل حضور هذا اليوم">🗑️ مسح حضور اليوم</button>
         <button class="btn btn-secondary" onclick="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:'${date}',hrAttReport:'1'})" style="${App.params.hrAttReport?'background:#0f766e;color:#fff':''}">📊 تقرير الحضور</button>
         <button class="btn btn-secondary" onclick="exportHrAttendanceExcel('${date.slice(0,7)}','${filterBranch}')">📤 تصدير الشهر Excel</button>
       </div>
@@ -6833,7 +6835,34 @@ function saveHrLeave(){
   }
   toast('✅ تم تسجيل الإجازة');App.closeModal();App.go('hr',{hrTab:'leaves'});
 }
+// ===== تراجع (Undo) لحضور الموظفين =====
+// يحفظ لقطة من كامل سجل الحضور قبل كل إجراء، فيمكن التراجع عن آخر خطأ
+let _hrAttUndo=null;
+function _snapHrAtt(label){
+  try{_hrAttUndo={label,at:(typeof _nowHM==='function'?_nowHM():''),data:JSON.parse(JSON.stringify(DB.hrAttendance()))};}catch(e){_hrAttUndo=null;}
+}
+function undoHrAtt(){
+  if(!_hrAttUndo){toast('لا يوجد إجراء للتراجع عنه','warn');return;}
+  const lbl=_hrAttUndo.label;
+  DB.saveHrAttendance(_hrAttUndo.data);
+  _hrAttUndo=null;
+  toast('↩️ تم التراجع عن: '+lbl);
+  App.refresh();
+}
+// مسح كل حضور يوم معيّن (لتصحيح «تسجيل الكل حاضر» الخاطئ) — قابل للتراجع
+function clearHrAttDay(date){
+  const bid=Auth.branchId();
+  const emps=DB.hrEmployees().filter(e=>e.status!=='deleted'&&(!bid||e.branchId===bid));
+  const ids=new Set(emps.map(e=>e.id));
+  const affected=DB.hrAttendance().filter(a=>a.date===date&&ids.has(a.employeeId));
+  if(!affected.length){toast('لا يوجد حضور مسجّل لهذا اليوم','warn');return;}
+  if(!confirm(`مسح حضور ${affected.length} موظف ليوم ${formatDate(date)}؟\nيمكنك التراجع مباشرة بعدها.`)) return;
+  _snapHrAtt('مسح حضور '+formatDate(date));
+  DB.saveHrAttendance(DB.hrAttendance().filter(a=>!(a.date===date&&ids.has(a.employeeId))));
+  toast('🗑️ تم مسح حضور اليوم — اضغط «تراجع» للاستعادة');App.refresh();
+}
 function setHrAtt(empId,date,status){
+  _snapHrAtt('تغيير حالة موظف');
   // حافظ على أوقات الدخول/الخروج (باركود+GPS) عند التعديل اليدوي للحالة
   const prev=DB.hrAttendance().find(a=>a.employeeId===empId&&a.date===date)||{};
   const list=DB.hrAttendance().filter(a=>!(a.employeeId===empId&&a.date===date));
@@ -6845,11 +6874,13 @@ function markAllHrPresent(date){
   const bid=Auth.branchId();
   let emps=DB.hrEmployees().filter(e=>(e.status||'active')==='active'||(e.status||'active')==='on_leave');
   if(bid) emps=emps.filter(e=>e.branchId===bid);
+  if(!confirm(`تسجيل ${emps.length} موظف كحاضرين ليوم ${formatDate(date)}؟\nيمكنك التراجع بزر «تراجع» إن كان بالخطأ.`)) return;
+  _snapHrAtt('تسجيل الكل حاضر '+formatDate(date));
   const empIds=new Set(emps.map(e=>e.id));
   const prevMap={};DB.hrAttendance().forEach(a=>{if(a.date===date&&empIds.has(a.employeeId))prevMap[a.employeeId]=a;});
   const existing=DB.hrAttendance().filter(a=>a.date!==date||!empIds.has(a.employeeId));
   emps.forEach(e=>{const p=prevMap[e.id]||{};existing.push({id:uid(),employeeId:e.id,date,status:p.status==='late'?'late':'present',checkIn:p.checkIn||'',checkOut:p.checkOut||'',lateMinutes:p.lateMinutes||0,via:p.via,checkInDist:p.checkInDist});});
-  DB.saveHrAttendance(existing);App.refresh();
+  DB.saveHrAttendance(existing);toast('✅ تم تسجيل الجميع حاضرين — اضغط «تراجع» للتراجع');App.refresh();
 }
 function deleteHrEmployee(id){
   const e=DB.hrEmployees().find(x=>x.id===id);
