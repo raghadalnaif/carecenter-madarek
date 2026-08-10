@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v65 -->
+<!-- BUILD: 2026-06-24-v66 -->
 <script>
 (function(){
-  var BUILD='v65-20260624-1';
+  var BUILD='v66-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -1875,6 +1875,7 @@ children(){
     <button class="btn btn-primary btn-sm" onclick="Modals.addChild()">+ إضافة طفل</button>
     <button class="btn btn-secondary btn-sm" onclick="Modals.importChildren()">📥 استيراد Excel</button>
     <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('kids-table','الأطفال')">📊 تصدير</button>
+    <button class="btn btn-sm" style="background:#0f766e;color:#fff" onclick="printAllPickupCards()" title="طباعة بطاقة خروج لكل طفل">🪪 بطاقات الخروج</button>
     <div class="search-bar" style="flex:1;max-width:300px;margin:0">
       <span class="search-icon">🔍</span>
       <input id="search-children" class="input" placeholder="بحث بالاسم أو ولي الأمر أو الهاتف..." value="${esc(App.params.q||'')}" oninput="App.liveSearch('children',{...App.params,q:this.value},this)">
@@ -1937,6 +1938,7 @@ children(){
             <td>${sub?Views._payBadge(sub):'—'}</td>
             <td style="white-space:nowrap">
               <button class="btn btn-secondary btn-xs" onclick="Modals.editChild('${c.id}')">تعديل</button>
+              <button class="btn btn-xs" style="background:#f0fdfa;color:#0f766e;border:1px solid #99f6e4" onclick="printPickupCards(['${c.id}'])" title="بطاقة خروج الطفل">🪪</button>
               <button class="btn btn-primary btn-xs" onclick="Modals.addSub('${c.id}')">اشتراك</button>
               ${Auth.isSuperAdmin()?`<button class="btn btn-xs" style="background:#fffbeb;color:#92400e;border:1px solid #fde68a" onclick="Modals.transferChild('${c.id}')" title="نقل بين الفروع">🔄 نقل</button>`:''}
               ${Auth.isSuperAdmin()?`<button class="btn btn-xs" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe" onclick="App.go('statement',{childId:'${c.id}'})" title="كشف حساب">📄</button>`:''}
@@ -6572,6 +6574,56 @@ function captureBranchLocation(){
   },function(e){if(st)st.textContent='❌ تعذّر تحديد الموقع';toast('تعذّر تحديد الموقع — فعّل GPS واسمح بالإذن','error');},{enableHighAccuracy:true,timeout:12000,maximumAge:0});
 }
 // طباعة باركود التحضير للفرع
+// ===== بطاقة خروج الطفل (بحجم البطاقة البنكية — بدون تاريخ صلاحية) =====
+function printPickupCards(ids){
+  const kids=DB.children().filter(c=>ids.includes(c.id));
+  if(!kids.length){toast('لا يوجد أطفال للطباعة','error');return;}
+  const school=DB.schools()[0]||{};
+  const centerName=esc(school.name||'مدارك الطفل');
+  const card=(c)=>{
+    const branch=esc(DB.branchName(c.branchId)||'');
+    const code=(c.id||'').replace(/[^a-z0-9]/gi,'').slice(-6).toUpperCase()||'------';
+    const phone=esc(c.parentPhone||'—');
+    const period=c.period==='morning'?'صباحي':c.period==='evening'?'مسائي':'';
+    return `<div class="pc">
+      <div class="pc-h"><span>🌱 ${centerName}</span><span class="pc-code">${code}</span></div>
+      <div class="pc-b">
+        <div class="pc-name">${esc(c.name)}</div>
+        <div class="pc-row"><span>ولي الأمر:</span> ${esc(c.parentName||'—')}</div>
+        <div class="pc-row"><span>📱 الجوال:</span> <b dir="ltr">${phone}</b></div>
+        <div class="pc-meta">🏢 ${branch}${period?' · '+period:''}</div>
+      </div>
+      <div class="pc-note">🚫 لا يُسمح بخروج الطفل إلا بإبراز هذه البطاقة</div>
+    </div>`;
+  };
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>بطاقات خروج الأطفال</title>
+  <style>
+    @page{size:A4;margin:8mm}
+    *{box-sizing:border-box;font-family:'Tajawal','Segoe UI',Tahoma,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{margin:0;display:flex;flex-wrap:wrap;gap:5mm;align-content:flex-start}
+    .pc{width:85.6mm;height:53.98mm;border:1.4pt solid #0f766e;border-radius:3.5mm;overflow:hidden;display:flex;flex-direction:column;page-break-inside:avoid;background:linear-gradient(135deg,#effefb,#ffffff)}
+    .pc-h{background:#0f766e;color:#fff;padding:2.4mm 3.6mm;display:flex;justify-content:space-between;align-items:center;font-size:3.3mm;font-weight:800}
+    .pc-code{background:rgba(255,255,255,.25);padding:.4mm 2mm;border-radius:1.6mm;font-size:3mm;letter-spacing:.6mm;font-family:monospace}
+    .pc-b{flex:1;padding:2.6mm 3.6mm}
+    .pc-name{font-size:6.4mm;font-weight:900;color:#0f766e;margin-bottom:1.6mm;line-height:1.1}
+    .pc-row{font-size:3.7mm;color:#334155;margin-bottom:.8mm}
+    .pc-row span{color:#64748b}
+    .pc-meta{font-size:3.1mm;color:#64748b;margin-top:1.4mm}
+    .pc-note{background:#fee2e2;color:#b91c1c;font-size:2.9mm;font-weight:800;text-align:center;padding:1.8mm}
+  </style></head><body>${kids.map(card).join('')}
+  <script>onload=function(){setTimeout(function(){window.print();},400);}<\/script>
+  </body></html>`);
+  w.document.close();
+}
+function printAllPickupCards(){
+  const bid=Auth.branchId();
+  let kids=DB.children();
+  if(bid) kids=kids.filter(c=>c.branchId===bid);
+  if(!kids.length){toast('لا يوجد أطفال','error');return;}
+  if(!confirm(`طباعة ${kids.length} بطاقة خروج؟`)) return;
+  printPickupCards(kids.map(c=>c.id));
+}
 function printBranchQR(id){
   const b=DB.branches().find(x=>x.id===id);
   const box=document.getElementById('br-qr');
