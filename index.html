@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v66 -->
+<!-- BUILD: 2026-06-24-v67 -->
 <script>
 (function(){
-  var BUILD='v66-20260624-1';
+  var BUILD='v67-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -1042,6 +1042,7 @@ const App = {
       {items:[
         {v:'activities',icon:'🎯',label:'أنشطتي'},
         {v:'myAttendance',icon:'🕐',label:'حضوري'},
+        {v:'myLeaves',icon:'🏖️',label:'إجازاتي'},
         {v:'messages',icon:'💬',label:'الرسائل الداخلية'},
       ]},
     ];
@@ -1061,7 +1062,7 @@ const App = {
     </div>`;
   },
   topbar(){
-    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',myAttendance:'🕐 حضوري',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات',accounting:'🧾 المحاسبة',monthlyClose:'🔒 الإقفال الشهري',branchReport:'📈 تقرير الفرع الشهري',childNotes:'📝 ملاحظات الأطفال',expenses:'💸 مصروفات الفرع',messages:'💬 الرسائل الداخلية',auditLog:'🔍 سجل النشاط',govDocs:'🏛️ الوثائق الحكومية',hr:'👥 الموارد البشرية'};
+    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',myAttendance:'🕐 حضوري',myLeaves:'🏖️ إجازاتي',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات',accounting:'🧾 المحاسبة',monthlyClose:'🔒 الإقفال الشهري',branchReport:'📈 تقرير الفرع الشهري',childNotes:'📝 ملاحظات الأطفال',expenses:'💸 مصروفات الفرع',messages:'💬 الرسائل الداخلية',auditLog:'🔍 سجل النشاط',govDocs:'🏛️ الوثائق الحكومية',hr:'👥 الموارد البشرية'};
     const now=new Date();
     const hm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
     const unread=DB.unreadCount();
@@ -1190,6 +1191,7 @@ const App = {
       attendance:()=>role!=='teacher',
       my_reports:()=>false,
       myAttendance:()=>role==='teacher',
+      myLeaves:()=>role==='teacher',
       activities:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin()||role==='teacher',
       sales:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       accounting:()=>Auth.isSuperAdmin(),
@@ -1209,7 +1211,7 @@ const App = {
     };
     const guard=guards[App.view];
     if(guard&&!guard()) return Views._forbidden();
-    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,myAttendance:Views.myAttendance,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,monthlyClose:Views.monthlyClose,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,childNotes:Views.childNotes,messages:Views.messages,settings:Views.settings,govDocs:Views.govDocs,hr:Views.hr};
+    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,myAttendance:Views.myAttendance,myLeaves:Views.myLeaves,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,monthlyClose:Views.monthlyClose,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,childNotes:Views.childNotes,messages:Views.messages,settings:Views.settings,govDocs:Views.govDocs,hr:Views.hr};
     const fn=map[App.view]||Views.dashboard;
     try{return fn();}
     catch(e){console.error('[CCS]',App.view,e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة: ${App.view}</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
@@ -2609,6 +2611,58 @@ _teacherEmployee(u){
   if(u.employeeId){const byId=emps.find(e=>e.id===u.employeeId);if(byId)return byId;}
   const nm=(u.name||'').trim();
   return emps.find(e=>(e.name||'').trim()===nm)||null;
+},
+// رصيد الإجازة السنوية (نظام العمل السعودي: 21 يوم <5 سنوات، 30 يوم ≥5)
+_annualBalance(e){
+  if(!e||!e.contractStart) return {entitled:21,used:0,remaining:21,years:0};
+  const years=Math.max(0,(new Date(T0)-new Date(e.contractStart))/31557600000);
+  const entitled=years>=5?30:21;
+  const yS=T0.slice(0,4)+'-01-01',yE=T0.slice(0,4)+'-12-31';
+  const used=DB.hrLeaves().filter(l=>l.employeeId===e.id&&l.type==='annual'&&l.status==='approved'&&l.startDate>=yS&&l.startDate<=yE).reduce((a,l)=>a+(+l.days||0),0);
+  return {entitled,used,remaining:Math.max(0,entitled-used),years:Math.round(years*10)/10};
+},
+// واجهة المعلمة: إجازاتي (رصيد + رفع طلب + متابعة الحالة)
+myLeaves(){
+  const me=Auth.user;
+  if(me?.role!=='teacher') return Views._forbidden();
+  const emp=Views._teacherEmployee(me);
+  if(!emp) return `<div style="padding:20px"><div class="card"><div class="empty-state"><div class="es-icon">🔗</div><p style="font-weight:700;color:#64748b">لم يُربط حسابك بملف موظف</p><p style="font-size:13px;margin-top:6px">راجعي الإدارة لربط اسمك (${esc(me.name)}) بملفك في الموارد البشرية.</p></div></div></div>`;
+  const bal=Views._annualBalance(emp);
+  const typeLabel={annual:'سنوية',sick:'مرضية',haj:'حج',maternity:'أمومة',emergency:'طارئة',unpaid:'بدون راتب',official:'إذن رسمي'};
+  const mine=DB.hrLeaves().filter(l=>l.employeeId===emp.id).sort((a,b)=>(b.startDate||'').localeCompare(a.startDate||''));
+  return `
+  <div style="padding:20px">
+    <div style="background:linear-gradient(135deg,#0284c7,#0369a1);color:#fff;border-radius:16px;padding:22px 26px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-size:20px;font-weight:800">🏖️ إجازاتي</div>
+        <div style="opacity:.9;font-size:13px;margin-top:4px">ارفعي طلب إجازة للإدارة وتابعي حالته</div>
+      </div>
+      <button class="btn" style="background:#fff;color:#0369a1;font-weight:800;border:none" onclick="Modals.requestLeave()">➕ طلب إجازة</button>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card green"><div class="stat-val">${bal.remaining}</div><div class="stat-lbl">رصيد سنوي متبقٍ (من ${bal.entitled} يوم)</div></div>
+      <div class="stat-card yellow"><div class="stat-val">${bal.used}</div><div class="stat-lbl">مستخدم هذا العام</div></div>
+      <div class="stat-card blue"><div class="stat-val">${mine.filter(l=>l.status==='pending').length}</div><div class="stat-lbl">طلبات قيد المراجعة</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">📋 طلباتي (${mine.length})</div>
+      ${mine.length===0?`<div class="empty-state"><div class="es-icon">📭</div><p>لا توجد طلبات إجازة</p></div>`:`
+      <div class="table-wrap"><table>
+        <thead><tr><th>النوع</th><th>من</th><th>إلى</th><th>أيام</th><th>الحالة</th><th>السبب</th><th>مرفق</th></tr></thead>
+        <tbody>${mine.map(l=>{
+          const st=l.status==='approved'?'<span class="badge badge-green">✅ موافق</span>':l.status==='rejected'?'<span class="badge badge-red">❌ مرفوض</span>':'<span class="badge badge-yellow">⏳ قيد المراجعة</span>';
+          return `<tr>
+            <td style="font-weight:600">${typeLabel[l.type]||l.type}</td>
+            <td>${formatDate(l.startDate)}</td><td>${formatDate(l.endDate)}</td>
+            <td style="text-align:center;font-weight:700">${l.days}</td>
+            <td>${st}</td>
+            <td style="font-size:12px;color:#64748b;max-width:160px">${esc(l.reason||'—')}</td>
+            <td>${l.attachment?`<a href="${l.attachment.data}" download="${esc(l.attachment.name)}" style="color:#1d4ed8">📎</a>`:'—'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>`}
+    </div>
+  </div>`;
 },
 // سجل حضور المعلمة الشخصي — عرض فقط
 myAttendance(){
@@ -4969,24 +5023,30 @@ hr(){
         </select>
         <button class="btn btn-primary" onclick="Modals.addHrLeave()">+ إضافة إجازة</button>
       </div>
+      ${(()=>{const pend=leaves.filter(l=>l.status==='pending').length;return pend?`<div class="alert-box alert-yellow" style="margin-bottom:12px">⏳ <div><strong>${pend} طلب إجازة بانتظار موافقتك</strong></div></div>`:'';})()}
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>الموظف</th><th>نوع الإجازة</th><th>من</th><th>إلى</th><th>أيام</th><th>حالة</th><th>السبب</th><th>إجراءات</th></tr></thead>
+          <thead><tr><th>الموظف</th><th>الرصيد السنوي</th><th>نوع الإجازة</th><th>من</th><th>إلى</th><th>أيام</th><th>حالة</th><th>السبب</th><th>إجراءات</th></tr></thead>
           <tbody>
-          ${leaves.length===0?`<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:32px">لا توجد إجازات</td></tr>`:''}
+          ${leaves.length===0?`<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:32px">لا توجد إجازات</td></tr>`:''}
           ${leaves.map(l=>{
             const emp=emps.find(e=>e.id===l.employeeId)||DB.hrEmployees().find(e=>e.id===l.employeeId);
-            const stBadge=l.status==='approved'?'<span class="badge badge-green">موافق</span>':l.status==='rejected'?'<span class="badge badge-red">مرفوض</span>':'<span class="badge badge-yellow">معلق</span>';
+            const stBadge=l.status==='approved'?'<span class="badge badge-green">موافق</span>':l.status==='rejected'?'<span class="badge badge-red">مرفوض</span>':'<span class="badge badge-yellow">⏳ معلق</span>';
             const tc=typeColor[l.type]||'#475569';
-            return `<tr>
+            const bal=emp?annualBalance(emp):{remaining:'—',entitled:''};
+            return `<tr style="${l.status==='pending'?'background:#fffdf5':''}">
               <td><strong>${esc(emp?.name||'—')}</strong></td>
+              <td style="text-align:center;font-size:12px"><b style="color:#059669">${bal.remaining}</b><span style="color:#94a3b8">/${bal.entitled}</span></td>
               <td><span style="color:${tc};font-weight:600;font-size:12px">${typeLabel[l.type]||l.type}</span></td>
               <td>${formatDate(l.startDate)}</td>
               <td>${formatDate(l.endDate)}</td>
               <td style="font-weight:700;text-align:center">${l.days}</td>
               <td>${stBadge}</td>
-              <td style="font-size:12px;color:#64748b;max-width:160px">${esc(l.reason||'—')}</td>
-              <td>
+              <td style="font-size:12px;color:#64748b;max-width:150px">${esc(l.reason||'—')}${l.decidedBy?`<br><small style="color:#94a3b8">${l.status==='approved'?'وافق':'رفض'}: ${esc(l.decidedBy)}</small>`:''}</td>
+              <td style="white-space:nowrap">
+                ${l.status==='pending'?`<button class="btn btn-xs" style="background:#dcfce7;color:#166534;border:1px solid #86efac" onclick="approveLeave('${l.id}')">✅ قبول</button>
+                <button class="btn btn-xs" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a" onclick="rejectLeave('${l.id}')">❌ رفض</button>`:''}
+                ${l.attachment?`<a href="${l.attachment.data}" download="${esc(l.attachment.name)}" class="btn btn-xs" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;text-decoration:none" title="${esc(l.attachment.name)}">📎</a>`:''}
                 <button class="btn btn-xs" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5" onclick="deleteHrLeave('${l.id}')">🗑️</button>
               </td>
             </tr>`;
@@ -5072,6 +5132,33 @@ const Modals = {
       <div class="input-group"><label>نطاق السماح للتحضير (متر)</label><input class="input" id="br-radius" type="number" min="30" max="1000" value="${b?.geoRadius||150}">
         <small style="font-size:11px;color:#64748b;margin-top:2px;display:block">المسافة المسموحة من موقع الفرع لقبول تحضير الموظف</small>
       </div>`;
+  },
+  // طلب إجازة من المعلمة (يُرفع للإدارة قيد المراجعة)
+  requestLeave(){
+    const emp=Views._teacherEmployee(Auth.user);
+    const bal=Views._annualBalance(emp);
+    const typeLabel={annual:'سنوية',sick:'مرضية',emergency:'طارئة',official:'إذن رسمي',unpaid:'بدون راتب'};
+    _hlAttach=null;
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header"><h2>➕ طلب إجازة</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <div style="background:#f0fdf4;border-radius:8px;padding:8px 12px;font-size:12px;color:#166534;margin-bottom:12px">🏖️ رصيدك السنوي المتبقي: <b>${bal.remaining}</b> يوم من ${bal.entitled}</div>
+        <div class="input-group"><label>نوع الإجازة</label><select class="input" id="lr-type">${Object.entries(typeLabel).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div>
+        <div class="grid-2">
+          <div class="input-group"><label>من *</label><input class="input" id="lr-start" type="date" value="${T0}" onchange="_lrDays()"></div>
+          <div class="input-group"><label>إلى *</label><input class="input" id="lr-end" type="date" value="${T0}" onchange="_lrDays()"></div>
+        </div>
+        <div id="lr-days" style="font-size:13px;font-weight:700;color:#0f766e;margin-bottom:10px">١ يوم</div>
+        <div class="input-group"><label>السبب (اختياري)</label><textarea class="input" id="lr-reason" rows="2"></textarea></div>
+        <div class="input-group"><label>📎 إرفاق ملف/تقرير (اختياري)</label><input type="file" id="lr-file" accept=".pdf,image/*" onchange="_hlPickFile(this)"><div id="lr-file-name" style="font-size:12px;color:#0f766e;margin-top:4px"></div></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveLeaveRequest()">📤 رفع الطلب للإدارة</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
   },
   // إنشاء / تعديل نشاط مخصّص في المكتبة
   createActivity(id){
@@ -7334,6 +7421,46 @@ function genAllAccounts(){
 function deleteHrLeave(id){
   if(!confirm('هل تريد حذف هذه الإجازة؟')) return;
   DB.deleteHrLeave(id);toast('✅ تم حذف الإجازة');App.refresh();
+}
+// ===== قبول/رفض طلبات الإجازة + رفع طلب من المعلمة =====
+function approveLeave(id){
+  const l=DB.hrLeaves().find(x=>x.id===id);if(!l)return;
+  DB.updateHrLeave({...l,status:'approved',decidedBy:Auth.user?.name||'—',decidedAt:new Date().toISOString()});
+  if(l.startDate<=T0&&l.endDate>=T0){const e=DB.hrEmployees().find(x=>x.id===l.employeeId);if(e&&e.status==='active')DB.updateHrEmployee({...e,status:'on_leave'});}
+  DB.addAuditLog({action:'قبول إجازة',entity:'HR',entityId:id,details:`${l.days} يوم`,by:Auth.user?.name||'—'});
+  toast('✅ تمت الموافقة على الإجازة');App.refresh();
+}
+function rejectLeave(id){
+  const l=DB.hrLeaves().find(x=>x.id===id);if(!l)return;
+  if(!confirm('رفض طلب الإجازة؟')) return;
+  DB.updateHrLeave({...l,status:'rejected',decidedBy:Auth.user?.name||'—',decidedAt:new Date().toISOString()});
+  DB.addAuditLog({action:'رفض إجازة',entity:'HR',entityId:id,details:'',by:Auth.user?.name||'—'});
+  toast('❌ تم رفض الطلب');App.refresh();
+}
+let _hlAttach=null;
+function _hlPickFile(input){
+  const f=input.files[0];if(!f)return;
+  if(f.size>4*1024*1024){toast('الملف يجب ألا يتجاوز 4 ميجابايت','error');input.value='';return;}
+  const r=new FileReader();r.onload=ev=>{_hlAttach={name:f.name,data:ev.target.result,size:Math.round(f.size/1024)+'KB'};const n=document.getElementById('lr-file-name');if(n)n.textContent='📄 '+f.name;};r.readAsDataURL(f);
+}
+function _lrDays(){
+  const s=document.getElementById('lr-start')?.value,e=document.getElementById('lr-end')?.value,d=document.getElementById('lr-days');
+  if(s&&e&&e>=s&&d) d.textContent=(diffDays(e,s)+1)+' يوم';
+}
+function saveLeaveRequest(){
+  const me=Auth.user;const emp=Views._teacherEmployee(me);
+  if(!emp){toast('حسابك غير مربوط بموظف','error');return;}
+  const type=document.getElementById('lr-type')?.value;
+  const startDate=document.getElementById('lr-start')?.value;
+  const endDate=document.getElementById('lr-end')?.value;
+  const reason=(document.getElementById('lr-reason')?.value||'').trim();
+  if(!type||!startDate||!endDate){toast('عبّي النوع والتواريخ','error');return;}
+  if(endDate<startDate){toast('تاريخ الانتهاء قبل البداية','error');return;}
+  const days=diffDays(endDate,startDate)+1;
+  DB.addHrLeave({id:uid(),employeeId:emp.id,type,startDate,endDate,days,reason,status:'pending',attachment:_hlAttach||null,addedAt:T0,addedBy:me.name,requestedByTeacher:true});
+  DB.addAuditLog({action:'طلب إجازة',entity:'HR',entityId:emp.id,details:`${type} · ${days} يوم`,by:me.name});
+  _hlAttach=null;
+  toast('✅ تم رفع طلب الإجازة للإدارة');App.closeModal();App.go('myLeaves');
 }
 function printAttendanceSheet(date,schoolId){
   const bid=Auth.branchId();
