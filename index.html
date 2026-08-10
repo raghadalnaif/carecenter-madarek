@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v63 -->
+<!-- BUILD: 2026-06-24-v64 -->
 <script>
 (function(){
-  var BUILD='v63-20260624-1';
+  var BUILD='v64-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -2899,10 +2899,12 @@ activities(){
         </div>
       </summary>
       <div style="padding:16px">
+        ${act.image?`<img src="${act.image}" style="width:100%;max-height:220px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:12px">`:''}
         <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px">الهدف</div><div style="font-size:13px;color:#334155;line-height:1.7">${esc(act.goal||'—')}</div></div>
         <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px">المواد المطلوبة</div><div style="font-size:13px;color:#334155;line-height:1.7">${esc(act.materials||'—')}</div></div>
         <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:6px">خطوات التنفيذ</div><div style="font-size:13px;color:#334155;line-height:1.9;white-space:pre-line">${esc(act.steps||'—')}</div></div>
-        ${act.tips?`<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px"><div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:3px">💡 نصيحة للمعلمة</div><div style="font-size:12px;color:#78350f;line-height:1.7">${esc(act.tips)}</div></div>`:''}
+        ${act.tips?`<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:3px">💡 نصيحة للمعلمة</div><div style="font-size:12px;color:#78350f;line-height:1.7">${esc(act.tips)}</div></div>`:''}
+        ${act.attachment?`<a href="${act.attachment.data}" download="${esc(act.attachment.name)}" style="display:inline-flex;align-items:center;gap:6px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;text-decoration:none">📎 ${esc(act.attachment.name)} (${act.attachment.size||''})</a>`:''}
       </div>
     </details>`;
   return `
@@ -2972,10 +2974,12 @@ _teacherActivities(catColors){
           </div>
         </div>
         <div style="padding:16px">
+          ${a.image?`<img src="${a.image}" style="width:100%;max-height:260px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:12px">`:''}
           <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px">الهدف</div><div style="font-size:13px;color:#334155;line-height:1.7">${esc(a.goal||'—')}</div></div>
           <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px">المواد المطلوبة</div><div style="font-size:13px;color:#334155;line-height:1.7">${esc(a.materials||'—')}</div></div>
           <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:6px">خطوات التنفيذ</div><div style="font-size:13px;color:#334155;line-height:1.9;white-space:pre-line">${esc(a.steps||'—')}</div></div>
-          ${a.tips?`<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;margin-bottom:14px"><div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:3px">💡 نصيحة</div><div style="font-size:12px;color:#78350f;line-height:1.7">${esc(a.tips)}</div></div>`:''}
+          ${a.tips?`<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:3px">💡 نصيحة</div><div style="font-size:12px;color:#78350f;line-height:1.7">${esc(a.tips)}</div></div>`:''}
+          ${a.attachment?`<a href="${a.attachment.data}" download="${esc(a.attachment.name)}" style="display:inline-flex;align-items:center;gap:6px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;text-decoration:none;margin-bottom:14px">📎 ${esc(a.attachment.name)} (${a.attachment.size||''})</a>`:''}
           <div style="border-top:1px solid #e2e8f0;padding-top:14px">
             <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">هل نفّذتِ النشاط؟</div>
             <textarea id="actnote-${a.id}" class="input" rows="2" placeholder="ملاحظة (اختياري): كيف تم التنفيذ، عدد الأطفال..." style="resize:none;margin-bottom:8px">${esc(r?.note||'')}</textarea>
@@ -5069,6 +5073,7 @@ const Modals = {
   // إنشاء / تعديل نشاط مخصّص في المكتبة
   createActivity(id){
     const e=id?DB.customActivities().find(x=>x.id===id):null;
+    _caImage=e?.image||null;_caFile=e?.attachment||null; // تهيئة المرفقات
     App.showModal(`
     <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
     <div class="modal" style="max-width:600px">
@@ -5084,7 +5089,17 @@ const Modals = {
         <div class="input-group"><label>المواد المطلوبة</label><textarea class="input" id="ca-materials" rows="2">${esc(e?.materials||'')}</textarea></div>
         <div class="input-group"><label>خطوات التنفيذ</label><textarea class="input" id="ca-steps" rows="4" placeholder="١. ...&#10;٢. ...">${esc(e?.steps||'')}</textarea></div>
         <div class="input-group"><label>💡 نصيحة للمعلمة (اختياري)</label><textarea class="input" id="ca-tips" rows="2">${esc(e?.tips||'')}</textarea></div>
-        <div style="font-size:12px;color:#0f766e;background:#f0fdf4;border-radius:8px;padding:8px 12px">📢 النشاط يُحفظ في المكتبة ويصبح متاحاً لكل الفروع.</div>
+        <div class="grid-2">
+          <div class="input-group"><label>🖼️ صورة النشاط (اختياري)</label>
+            <input type="file" id="ca-image" accept="image/*" onchange="_caPickImage(this)">
+            <div id="ca-image-preview" style="margin-top:6px">${e?.image?`<div style="position:relative;display:inline-block"><img src="${e.image}" style="max-height:110px;border-radius:8px;border:1px solid #e2e8f0"><button type="button" onclick="_caClearImage()" style="position:absolute;top:2px;left:2px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer">✕</button></div>`:''}</div>
+          </div>
+          <div class="input-group"><label>📎 ملف مرفق (PDF/صورة اختياري)</label>
+            <input type="file" id="ca-file" accept=".pdf,image/*" onchange="_caPickFile(this)">
+            <div id="ca-file-name" style="font-size:12px;color:#0f766e;margin-top:6px">${e?.attachment?('📄 '+esc(e.attachment.name)):''}</div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:#0f766e;background:#f0fdf4;border-radius:8px;padding:8px 12px">📢 النشاط ومرفقاته يُحفظ في المكتبة ويصبح متاحاً لكل الفروع.</div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" onclick="saveCustomActivity()">💾 حفظ في المكتبة</button>
@@ -8819,6 +8834,22 @@ function publishActivity(n){
   App.render();
 }
 // ===== مكتبة الأنشطة: إنشاء / حذف / إرسال / تنفيذ =====
+let _caImage=null,_caFile=null;
+function _caPickImage(input){
+  const f=input.files[0];if(!f)return;
+  if(f.size>2*1024*1024){toast('الصورة يجب ألا تتجاوز 2 ميجابايت','error');input.value='';return;}
+  const r=new FileReader();
+  r.onload=ev=>{_caImage=ev.target.result;const p=document.getElementById('ca-image-preview');if(p)p.innerHTML=`<div style="position:relative;display:inline-block"><img src="${_caImage}" style="max-height:110px;border-radius:8px;border:1px solid #e2e8f0"><button type="button" onclick="_caClearImage()" style="position:absolute;top:2px;left:2px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer">✕</button></div>`;};
+  r.readAsDataURL(f);
+}
+function _caClearImage(){_caImage=null;const p=document.getElementById('ca-image-preview');if(p)p.innerHTML='';const i=document.getElementById('ca-image');if(i)i.value='';}
+function _caPickFile(input){
+  const f=input.files[0];if(!f)return;
+  if(f.size>4*1024*1024){toast('الملف يجب ألا يتجاوز 4 ميجابايت','error');input.value='';return;}
+  const r=new FileReader();
+  r.onload=ev=>{_caFile={name:f.name,data:ev.target.result,size:Math.round(f.size/1024)+'KB'};const n=document.getElementById('ca-file-name');if(n)n.textContent='📄 '+f.name;};
+  r.readAsDataURL(f);
+}
 function saveCustomActivity(){
   const name=(document.getElementById('ca-name')?.value||'').trim();
   if(!name){toast('اسم النشاط مطلوب','error');return;}
@@ -8830,12 +8861,14 @@ function saveCustomActivity(){
     materials:(document.getElementById('ca-materials')?.value||'').trim(),
     steps:(document.getElementById('ca-steps')?.value||'').trim(),
     tips:(document.getElementById('ca-tips')?.value||'').trim(),
+    image:_caImage||'',attachment:_caFile||null,
     catKey:'custom',cat:'✍️ أنشطة الإدارة',
     createdByName:Auth.user?.name||'—',createdById:Auth.user?.id||''
   };
   const id=document.getElementById('ca-id')?.value;
   if(id){DB.updateCustomActivity({...obj,id});} else {DB.addCustomActivity(obj);}
   DB.addAuditLog({action:id?'تعديل نشاط':'إضافة نشاط',entity:'أنشطة',entityId:id||name,details:name,by:Auth.user?.name||'—'});
+  _caImage=null;_caFile=null;
   toast('✅ تم حفظ النشاط في المكتبة — منشور لكل الفروع');
   App.closeModal();App.go('activities');
 }
@@ -8873,6 +8906,7 @@ function sendActivityConfirm(){
   if(scope==='teacher'&&!teacherId){toast('اختر المعلمة','error');return;}
   DB.addActivityAssignment({
     actKey:key,name:act.name,goal:act.goal,age:act.age,time:act.time,materials:act.materials,steps:act.steps,tips:act.tips,catKey:act.catKey||'custom',
+    image:act.image||'',attachment:act.attachment||null,
     scope,branchId:branchId||null,teacherId:teacherId||null,teacherName,
     sentBy:Auth.user?.id||'',sentByName:Auth.user?.name||'الإدارة'
   });
