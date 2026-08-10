@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v64 -->
+<!-- BUILD: 2026-06-24-v65 -->
 <script>
 (function(){
-  var BUILD='v64-20260624-1';
+  var BUILD='v65-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -4817,6 +4817,7 @@ hr(){
         </select>
         <button class="btn btn-primary" onclick="Modals.addHrEmployee()">+ إضافة موظف</button>
         <button class="btn btn-secondary" onclick="genAllPins()" title="توليد رمز سري عشوائي لكل موظف بدون رمز">🎲 توليد رموز التحضير</button>
+        <button class="btn btn-secondary" onclick="genAllAccounts()" title="إنشاء حساب دخول لكل موظف بدون حساب">🔑 إنشاء حسابات الدخول</button>
       </div>
       <div class="card">
         <div class="table-wrap"><table>
@@ -6148,6 +6149,10 @@ const Modals = {
   _hrEmployeeForm(e=null){
     const branches=DB.branches();
     const bid=Auth.branchId()||e?.branchId||branches[0]?.id||'';
+    const linkedUser=e?DB.users().find(u=>u.id===e.userId||u.employeeId===e.id):null;
+    const suggestedU=linkedUser?.username||(e?.name?_slugFromArabic(e.name):'');
+    const accRole=linkedUser?.role||'teacher';
+    const accPeriod=linkedUser?.period||'morning';
     return `
     <input type="hidden" id="hr-id" value="${e?.id||''}">
     <div style="display:flex;flex-direction:column;gap:14px">
@@ -6155,8 +6160,27 @@ const Modals = {
         👷 بيانات الموظف (وفق نظام العمل السعودي)
       </div>
       <div class="grid-2">
-        <div class="input-group"><label>الاسم الكامل *</label><input class="input" id="hr-name" value="${esc(e?.name||'')}"></div>
+        <div class="input-group"><label>الاسم الكامل *</label><input class="input" id="hr-name" value="${esc(e?.name||'')}" oninput="_hrSuggestUsername()"></div>
         <div class="input-group"><label>المسمى الوظيفي *</label><input class="input" id="hr-job" value="${esc(e?.jobTitle||'')}"></div>
+      </div>
+      <div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:10px 14px;font-size:12px;color:#4338ca;font-weight:600">🔑 حساب الدخول للنظام (منفصل تماماً عن رمز التحضير)</div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;color:#374151"><input type="checkbox" id="hr-acc-enable" ${(linkedUser||!e)?'checked':''} onchange="_hrToggleAcc()" style="width:16px;height:16px"> إنشاء/ربط حساب دخول لهذا الموظف</label>
+      <div id="hr-acc-fields">
+        <div class="grid-2">
+          <div class="input-group" style="margin:0"><label>اسم المستخدم</label><input class="input" id="hr-username" value="${esc(suggestedU)}" oninput="this.dataset.touched='1'" placeholder="يُولّد تلقائياً"></div>
+          <div class="input-group" style="margin:0"><label>كلمة المرور</label><input class="input" id="hr-password" value="${esc(linkedUser?.password||'123456')}"></div>
+        </div>
+        <div class="grid-2" style="margin-top:10px">
+          <div class="input-group" style="margin:0"><label>دور الحساب</label><select class="input" id="hr-acc-role" onchange="_hrToggleAcc()">
+            <option value="teacher" ${accRole==='teacher'?'selected':''}>👩‍🏫 معلمة</option>
+            <option value="school_admin" ${accRole==='school_admin'?'selected':''}>🏢 مدير فرع</option>
+          </select></div>
+          <div class="input-group" id="hr-acc-period-wrap" style="margin:0"><label>الفترة</label><select class="input" id="hr-acc-period">
+            <option value="morning" ${accPeriod==='morning'?'selected':''}>🌅 صباحي</option>
+            <option value="evening" ${accPeriod==='evening'?'selected':''}>🌙 مسائي</option>
+          </select></div>
+        </div>
+        ${linkedUser?`<div style="font-size:11px;color:#059669;margin-top:6px">✅ مرتبط بحساب: <b>${esc(linkedUser.username)}</b></div>`:''}
       </div>
       <div class="grid-2">
         <div class="input-group"><label>الفرع</label><select class="input" id="hr-branch">${branches.map(b=>`<option value="${b.id}" ${(e?.branchId||bid)===b.id?'selected':''}>${esc(b.name.split(' - ')[0])}</option>`).join('')}</select></div>
@@ -7018,6 +7042,32 @@ function printHrEmployee(id){
   </body></html>`);
   win.document.close();
 }
+// توليد اسم مستخدم لاتيني من الاسم العربي
+const _AR2LAT={'ا':'a','أ':'a','إ':'i','آ':'a','ب':'b','ت':'t','ث':'th','ج':'j','ح':'h','خ':'kh','د':'d','ذ':'z','ر':'r','ز':'z','س':'s','ش':'sh','ص':'s','ض':'d','ط':'t','ظ':'z','ع':'a','غ':'gh','ف':'f','ق':'q','ك':'k','ل':'l','م':'m','ن':'n','ه':'h','و':'w','ي':'y','ى':'a','ة':'h','ء':'','ئ':'y','ؤ':'w'};
+function _slugFromArabic(name){
+  const words=(name||'').trim().split(/\s+/).slice(0,2);
+  let out=words.map(w=>w.split('').map(ch=>_AR2LAT[ch]!==undefined?_AR2LAT[ch]:(/[a-z0-9]/i.test(ch)?ch:'')).join('')).join('');
+  out=out.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,18);
+  return out||'staff';
+}
+function _uniqueUsername(base,exceptId){
+  base=(base||'staff').toLowerCase();
+  const taken=new Set(DB.users().filter(u=>u.id!==exceptId).map(u=>(u.username||'').toLowerCase()));
+  if(!taken.has(base)) return base;
+  let i=1;while(taken.has(base+i)) i++;
+  return base+i;
+}
+function _hrSuggestUsername(){
+  const u=document.getElementById('hr-username'),n=document.getElementById('hr-name');
+  if(!u||!n||u.dataset.touched==='1') return;
+  u.value=_uniqueUsername(_slugFromArabic(n.value),(document.getElementById('hr-id')?.value?DB.users().find(x=>x.employeeId===document.getElementById('hr-id').value)?.id:null));
+}
+function _hrToggleAcc(){
+  const on=document.getElementById('hr-acc-enable')?.checked;
+  const f=document.getElementById('hr-acc-fields');if(f)f.style.opacity=on?'1':'.45',f.style.pointerEvents=on?'auto':'none';
+  const role=document.getElementById('hr-acc-role')?.value;
+  const pw=document.getElementById('hr-acc-period-wrap');if(pw)pw.style.display=role==='teacher'?'block':'none';
+}
 function saveHrEmployee(edit=false){
   const id=document.getElementById('hr-id')?.value;
   const name=(document.getElementById('hr-name')?.value||'').trim();
@@ -7050,10 +7100,32 @@ function saveHrEmployee(edit=false){
     status:document.getElementById('hr-status')?.value||'active',
     notes:document.getElementById('hr-notes')?.value||'',
     addedAt:edit?(DB.hrEmployees().find(e=>e.id===id)?.addedAt||T0):T0,
+    userId:edit?(DB.hrEmployees().find(e=>e.id===id)?.userId||null):null,
   };
+  // ===== حساب الدخول للنظام (ربط تلقائي موظف ↔ مستخدم) =====
+  const accEnable=document.getElementById('hr-acc-enable')?.checked;
+  if(accEnable){
+    let username=(document.getElementById('hr-username')?.value||'').trim().toLowerCase();
+    const password=(document.getElementById('hr-password')?.value||'123456').trim()||'123456';
+    const accRole=document.getElementById('hr-acc-role')?.value||'teacher';
+    const accPeriod=document.getElementById('hr-acc-period')?.value||'morning';
+    const existingUser=DB.users().find(u=>u.id===obj.userId||u.employeeId===obj.id);
+    if(!username) username=_uniqueUsername(_slugFromArabic(name),existingUser?.id);
+    const dupe=DB.users().find(u=>(u.username||'').toLowerCase()===username&&u.id!==existingUser?.id);
+    if(dupe){toast('اسم المستخدم «'+username+'» مستخدم مسبقاً — غيّريه','error');return;}
+    const schoolId=DB.schools()[0]?.id||'s1';
+    if(existingUser){
+      DB.updateUser({...existingUser,name,username,password,role:accRole,schoolId,branchId:obj.branchId,period:accPeriod,phone:obj.phone,employeeId:obj.id});
+      obj.userId=existingUser.id;
+    } else {
+      const nuid=uid();
+      DB.addUser({id:nuid,name,username,password,role:accRole,schoolId,branchId:obj.branchId,period:accPeriod,phone:obj.phone,employeeId:obj.id});
+      obj.userId=nuid;
+    }
+  }
   if(edit) DB.updateHrEmployee(obj); else DB.addHrEmployee(obj);
-  DB.addAuditLog({action:edit?'تعديل موظف':'إضافة موظف',entity:'HR',entityId:obj.id,details:`${name} · ${jobTitle}`,by:Auth.user?.name||'—'});
-  toast('✅ '+(edit?'تم تحديث بيانات الموظف':'تمت إضافة الموظف بنجاح'));
+  DB.addAuditLog({action:edit?'تعديل موظف':'إضافة موظف',entity:'HR',entityId:obj.id,details:`${name} · ${jobTitle}${accEnable?' · حساب: '+(document.getElementById('hr-username')?.value||''):''}`,by:Auth.user?.name||'—'});
+  toast('✅ '+(edit?'تم تحديث بيانات الموظف':'تمت إضافة الموظف')+(accEnable?' + حساب الدخول':''));
   App.closeModal();App.go('hr',{hrTab:'employees'});
 }
 function saveHrLeave(){
@@ -7186,6 +7258,26 @@ function genAllPins(){
   });
   DB.addAuditLog({action:'توليد رموز تحضير',entity:'HR',entityId:'bulk',details:`${missing.length} موظف`,by:Auth.user?.name||'—'});
   toast(`✅ تم توليد رموز لـ ${missing.length} موظف`);App.refresh();
+}
+// إنشاء حساب دخول تلقائي لكل موظف بلا حساب (اسم مستخدم مولّد + كلمة مرور 123456)
+function genAllAccounts(){
+  const bid=Auth.branchId();
+  const emps=DB.hrEmployees().filter(e=>e.status!=='deleted'&&(!bid||e.branchId===bid));
+  const missing=emps.filter(e=>!DB.users().find(u=>u.id===e.userId||u.employeeId===e.id));
+  if(!missing.length){toast('كل الموظفين لديهم حسابات دخول ✅','warn');return;}
+  if(!confirm(`إنشاء حساب دخول لـ ${missing.length} موظف بدون حساب؟\nالدور: معلمة · كلمة المرور: 123456 (يمكن تعديلها لاحقاً)`)) return;
+  const schoolId=DB.schools()[0]?.id||'s1';
+  const created=[];
+  missing.forEach(e=>{
+    const username=_uniqueUsername(_slugFromArabic(e.name));
+    const nuid=uid();
+    DB.addUser({id:nuid,name:e.name,username,password:'123456',role:'teacher',schoolId,branchId:e.branchId,period:e.period||'morning',phone:e.phone||'',employeeId:e.id});
+    DB.updateHrEmployee({...e,userId:nuid});
+    created.push(`${e.name}: ${username}`);
+  });
+  DB.addAuditLog({action:'إنشاء حسابات دخول',entity:'HR',entityId:'bulk',details:created.join(' | '),by:Auth.user?.name||'—'});
+  alert('✅ أُنشئت '+created.length+' حسابات (كلمة المرور: 123456):\n\n'+created.join('\n'));
+  App.refresh();
 }
 function deleteHrLeave(id){
   if(!confirm('هل تريد حذف هذه الإجازة؟')) return;
