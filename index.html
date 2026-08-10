@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v67 -->
+<!-- BUILD: 2026-06-24-v68 -->
 <script>
 (function(){
-  var BUILD='v67-20260624-1';
+  var BUILD='v68-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -6667,13 +6667,14 @@ function printPickupCards(ids){
   if(!kids.length){toast('لا يوجد أطفال للطباعة','error');return;}
   const school=DB.schools()[0]||{};
   const centerName=esc(school.name||'مدارك الطفل');
+  const logoUrl=location.origin+location.pathname.replace(/[^/]*$/,'')+'logo.png';
   const card=(c)=>{
     const branch=esc(DB.branchName(c.branchId)||'');
     const code=(c.id||'').replace(/[^a-z0-9]/gi,'').slice(-6).toUpperCase()||'------';
     const phone=esc(c.parentPhone||'—');
     const period=c.period==='morning'?'صباحي':c.period==='evening'?'مسائي':'';
     return `<div class="pc">
-      <div class="pc-h"><span>🌱 ${centerName}</span><span class="pc-code">${code}</span></div>
+      <div class="pc-h"><span class="pc-brand"><img src="${logoUrl}" class="pc-logo" onerror="this.style.display='none'"> ${centerName}</span><span class="pc-code">${code}</span></div>
       <div class="pc-b">
         <div class="pc-name">${esc(c.name)}</div>
         <div class="pc-row"><span>ولي الأمر:</span> ${esc(c.parentName||'—')}</div>
@@ -6691,6 +6692,8 @@ function printPickupCards(ids){
     body{margin:0;display:flex;flex-wrap:wrap;gap:5mm;align-content:flex-start}
     .pc{width:85.6mm;height:53.98mm;border:1.4pt solid #0f766e;border-radius:3.5mm;overflow:hidden;display:flex;flex-direction:column;page-break-inside:avoid;background:linear-gradient(135deg,#effefb,#ffffff)}
     .pc-h{background:#0f766e;color:#fff;padding:2.4mm 3.6mm;display:flex;justify-content:space-between;align-items:center;font-size:3.3mm;font-weight:800}
+    .pc-brand{display:flex;align-items:center;gap:1.6mm}
+    .pc-logo{width:6mm;height:6mm;object-fit:contain;background:#fff;border-radius:1.4mm;padding:.4mm}
     .pc-code{background:rgba(255,255,255,.25);padding:.4mm 2mm;border-radius:1.6mm;font-size:3mm;letter-spacing:.6mm;font-family:monospace}
     .pc-b{flex:1;padding:2.6mm 3.6mm}
     .pc-name{font-size:6.4mm;font-weight:900;color:#0f766e;margin-bottom:1.6mm;line-height:1.1}
