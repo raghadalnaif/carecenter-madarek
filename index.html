@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v61 -->
+<!-- BUILD: 2026-06-24-v62 -->
 <script>
 (function(){
-  var BUILD='v61-20260624-1';
+  var BUILD='v62-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -377,9 +377,11 @@ function _onKeyValue(k,val){
   if(k==='internalMessages'&&Array.isArray(val)&&Auth.user){
     const me=Auth.user;
     const oldIds=new Set((Array.isArray(_mem[k])?_mem[k]:[]).map(m=>m.id));
+    const tBranch={};(_mem.users||[]).filter(u=>u&&u.role==='teacher').forEach(t=>{tBranch[t.id]=t.branchId;});
     const forMe=val.filter(m=>m&&!oldIds.has(m.id)&&m.fromUserId!==me.id&&(
-      me.role==='superadmin'?m.toRole==='superadmin':
-      me.role==='school_admin'?(m.toBranchId===me.branchId||m.toUserId===me.id):false
+      me.role==='teacher'?m.tThread===me.id:
+      me.role==='superadmin'?(m.tThread?true:m.toRole==='superadmin'):
+      me.role==='school_admin'?(m.tThread?tBranch[m.tThread]===me.branchId:((m.toBranchId===me.branchId||m.toUserId===me.id)&&m.fromRole!=='teacher')):false
     ));
     if(forMe.length){
       const newest=forMe[0];
@@ -787,11 +789,14 @@ const DB = {
   },
   unreadInternalCount(userId,role,branchId){
     if(!userId) return 0;
+    const tBranch={};this.users().filter(u=>u.role==='teacher').forEach(t=>{tBranch[t.id]=t.branchId;});
     return this.internalMessages().filter(m=>{
       if(m.recalled) return false;
       if((m.readBy||[]).includes(userId)) return false;
-      if(role==='superadmin') return m.toRole==='superadmin'||m.toUserId==='all_superadmins';
-      if(role==='school_admin') return m.toBranchId===branchId||m.toUserId===userId;
+      if(m.fromUserId===userId) return false;
+      if(role==='teacher') return m.tThread===userId;
+      if(role==='superadmin') return m.tThread?true:(m.toRole==='superadmin'||m.toUserId==='all_superadmins');
+      if(role==='school_admin') return m.tThread?(tBranch[m.tThread]===branchId):((m.toBranchId===branchId||m.toUserId===userId)&&m.fromRole!=='teacher');
       return false;
     }).length;
   },
@@ -1039,6 +1044,7 @@ const App = {
         {v:'my_reports',icon:'📊',label:'تقارير الحضور'},
         {v:'myAttendance',icon:'🕐',label:'حضوري'},
         {v:'activities',icon:'🎯',label:'أنشطتي'},
+        {v:'messages',icon:'💬',label:'الرسائل الداخلية'},
       ]},
     ];
     return `
@@ -1197,7 +1203,7 @@ const App = {
       auditLog:()=>Auth.isSuperAdmin(),
       branchReport:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       childNotes:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
-      messages:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
+      messages:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin()||role==='teacher',
       settings:()=>Auth.isSuperAdmin(),
       govDocs:()=>Auth.isSuperAdmin(),
       hr:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
@@ -4221,27 +4227,15 @@ childNotes(){
 
 // ---------- INTERNAL MESSAGES ----------
 messages(){
-  if(!Auth.isSchoolAdmin()&&!Auth.isSuperAdmin()) return Views._forbidden();
   const me=Auth.user;
-  const isSA=Auth.isSuperAdmin();
+  const role=me?.role;
+  if(role!=='superadmin'&&role!=='school_admin'&&role!=='teacher') return Views._forbidden();
+  const isSA=role==='superadmin';
+  const isTeacher=role==='teacher';
   const myBid=Auth.branchId();
   const allMsgs=DB.internalMessages();
   const branches=DB.branches();
-  const visible=allMsgs.filter(m=>{
-    if(isSA) return m.toRole==='superadmin'||m.fromRole==='superadmin';
-    if(Auth.isSchoolAdmin()) return m.fromBranchId===myBid||m.toBranchId===myBid||m.toUserId===me.id||m.fromUserId===me.id;
-    return false;
-  });
-  const activeThread=App.params.thread||(isSA?(branches[0]?.id||''):'sa');
-  let threadMsgs;
-  if(isSA){
-    threadMsgs=visible.filter(m=>m.fromBranchId===activeThread||m.toBranchId===activeThread);
-  } else {
-    threadMsgs=visible;
-  }
-  threadMsgs=[...threadMsgs].sort((a,b)=>(a.at||'').localeCompare(b.at||''));
-  const toMark=threadMsgs.filter(m=>!(m.readBy||[]).includes(me.id)).map(m=>m.id);
-  if(toMark.length) setTimeout(()=>DB.markInternalRead(toMark,me.id),300);
+  const teachers=DB.users().filter(u=>u.role==='teacher');
 
   const branchColor=(bid)=>{
     if(!bid) return {bg:'#f1f5f9',fg:'#475569',light:'#fff'};
@@ -4250,29 +4244,53 @@ messages(){
     return cols[idx>=0?idx%cols.length:0];
   };
 
-  let sidebar='';
-  if(isSA){
-    sidebar=branches.map(b=>{
-      const c=branchColor(b.id);
-      const bMsgs=visible.filter(m=>m.fromBranchId===b.id||m.toBranchId===b.id);
-      const unread=bMsgs.filter(m=>!m.recalled&&!(m.readBy||[]).includes(me.id)).length;
-      const last=bMsgs.sort((a,b)=>(b.at||'').localeCompare(a.at||''))[0];
-      const lastPreview=last?(last.recalled?'🚫 رسالة مُسترجَعة':(last.message||'📎 مرفق').slice(0,40)):'';
-      return `<div onclick="App.go('messages',{thread:'${b.id}'})" style="cursor:pointer;padding:14px;border-bottom:1px solid #e2e8f0;background:${activeThread===b.id?c.light:'#fff'};border-right:4px solid ${activeThread===b.id?c.fg:'transparent'}">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <strong style="color:${c.fg};font-size:14px">🏢 ${esc(b.name.split(' - ')[0]||b.name)}</strong>
-          ${unread>0?`<span style="background:#ef4444;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">${unread}</span>`:''}
-        </div>
-        <div style="font-size:11px;color:#64748b;line-height:1.4">${esc(lastPreview)||'لا توجد رسائل بعد'}</div>
-        ${last?`<div style="font-size:10px;color:#94a3b8;margin-top:3px">${formatRelTime(last.at)}</div>`:''}
-      </div>`;
-    }).join('');
+  // بناء قائمة المحادثات حسب الدور
+  let threads=[];
+  if(isTeacher){
+    threads=[{key:'t:'+me.id,label:'الإدارة',type:'teacher',tid:me.id,bid:me.branchId}];
+  } else if(role==='school_admin'){
+    threads=[{key:'b:'+myBid,label:'👔 المدير العام',type:'branch',bid:myBid}];
+    teachers.filter(t=>t.branchId===myBid).forEach(t=>threads.push({key:'t:'+t.id,label:'👩‍🏫 '+t.name,type:'teacher',tid:t.id,bid:myBid}));
+  } else { // superadmin
+    branches.forEach(b=>threads.push({key:'b:'+b.id,label:'🏢 '+(b.name.split(' - ')[0]||b.name),type:'branch',bid:b.id}));
+    teachers.forEach(t=>threads.push({key:'t:'+t.id,label:'👩‍🏫 '+t.name+' — '+((DB.branchName(t.branchId)||'').split(' - ')[0]||''),type:'teacher',tid:t.id,bid:t.branchId}));
   }
+  // ترقية قيمة thread القديمة (معرّف فرع) إلى صيغة b:
+  let activeKey=App.params.thread||'';
+  if(activeKey&&!activeKey.includes(':')) activeKey='b:'+activeKey;
+  const active=threads.find(t=>t.key===activeKey)||threads[0];
+  const activeThread=active?active.key:'';
 
-  const activeBranchInfo=isSA?branches.find(b=>b.id===activeThread):branches.find(b=>b.id===myBid);
-  const activeColor=branchColor(activeBranchInfo?.id);
-  const headerLabel=isSA?(activeBranchInfo?`💬 محادثة مع مديرة ${esc(activeBranchInfo.name)}`:'💬 اختر فرعاً'):'💬 محادثة مع المدير العام';
-  const subHint=isSA?'الرسائل هنا داخلية بينك ومديرة الفرع فقط — لا تُرسل عبر واتساب':'الرسائل هنا داخلية بينك والمدير العام فقط — لا تُرسل عبر واتساب';
+  const inThread=(m,t)=>{
+    if(!t) return false;
+    if(t.type==='teacher') return m.tThread===t.tid;
+    return !m.tThread&&(m.fromBranchId===t.bid||m.toBranchId===t.bid)&&m.fromRole!=='teacher';
+  };
+  let threadMsgs=allMsgs.filter(m=>inThread(m,active)).sort((a,b)=>(a.at||'').localeCompare(b.at||''));
+  const toMark=threadMsgs.filter(m=>!(m.readBy||[]).includes(me.id)&&m.fromUserId!==me.id).map(m=>m.id);
+  if(toMark.length) setTimeout(()=>DB.markInternalRead(toMark,me.id),300);
+
+  const sidebar=threads.map(t=>{
+    const c=branchColor(t.bid);
+    const tMsgs=allMsgs.filter(m=>inThread(m,t));
+    const unread=tMsgs.filter(m=>!m.recalled&&m.fromUserId!==me.id&&!(m.readBy||[]).includes(me.id)).length;
+    const last=[...tMsgs].sort((a,b)=>(b.at||'').localeCompare(a.at||''))[0];
+    const lastPreview=last?(last.recalled?'🚫 رسالة مُسترجَعة':(last.message||'📎 مرفق').slice(0,36)):'';
+    const on=t.key===activeThread;
+    return `<div onclick="App.go('messages',{thread:'${t.key}'})" style="cursor:pointer;padding:12px 14px;border-bottom:1px solid #e2e8f0;background:${on?c.light:'#fff'};border-right:4px solid ${on?c.fg:'transparent'}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <strong style="color:${c.fg};font-size:13px">${esc(t.label)}</strong>
+        ${unread>0?`<span style="background:#ef4444;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">${unread}</span>`:''}
+      </div>
+      <div style="font-size:11px;color:#64748b;line-height:1.4">${esc(lastPreview)||'لا توجد رسائل بعد'}</div>
+      ${last?`<div style="font-size:10px;color:#94a3b8;margin-top:2px">${formatRelTime(last.at)}</div>`:''}
+    </div>`;
+  }).join('');
+
+  const showSidebar=!isTeacher;
+  const activeColor=branchColor(active?active.bid:null);
+  const headerLabel=active?('💬 '+esc(active.label)):'💬 اختر محادثة';
+  const subHint='رسائل داخلية آمنة — لا تُرسل عبر واتساب';
 
   return `
   <div class="card no-print msg-intro" style="padding:14px;margin-bottom:14px;background:linear-gradient(135deg,#0f766e,#065f46);color:#fff">
@@ -4280,10 +4298,10 @@ messages(){
     <p style="opacity:.9;font-size:13px;margin-top:4px">قناة تواصل مباشرة وآمنة بين المدير العام ومديرات الفروع — للملاحظات الإدارية والاستفسارات اليومية</p>
   </div>
 
-  <div class="msg-layout ${isSA?'':'solo'}">
-    ${isSA?`<div class="card" style="padding:0;overflow:hidden">
-      <div style="padding:12px 14px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:13px;font-weight:700;color:#1e293b">📥 المحادثات حسب الفرع</div>
-      <div class="msg-conv">${sidebar||'<div style="padding:32px;text-align:center;color:#94a3b8">لا توجد فروع</div>'}</div>
+  <div class="msg-layout ${showSidebar?'':'solo'}">
+    ${showSidebar?`<div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:12px 14px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:13px;font-weight:700;color:#1e293b">📥 المحادثات</div>
+      <div class="msg-conv">${sidebar||'<div style="padding:32px;text-align:center;color:#94a3b8">لا توجد محادثات</div>'}</div>
     </div>`:''}
 
     <div class="card msg-thread" style="padding:0">
@@ -4332,10 +4350,10 @@ messages(){
           </div>`;
         }).join('')}
       </div>
-      ${(isSA&&!activeBranchInfo)?'':`<div class="msg-composer" style="display:flex;flex-direction:column;gap:8px">
+      ${!active?'':`<div class="msg-composer" style="display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;gap:8px;align-items:flex-end">
-          <textarea id="msg-input" class="input" rows="1" placeholder="اكتب رسالتك... (Enter للإرسال · Shift+Enter سطر جديد)" style="flex:1;resize:none;font-family:inherit;max-height:120px" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendInternalMessage('${isSA?activeThread:''}');}"></textarea>
-          <button class="btn btn-primary" style="flex-shrink:0" onclick="sendInternalMessage('${isSA?activeThread:''}')"><span class="msg-send-lbl">📤 إرسال</span><span class="msg-send-ic">📤</span></button>
+          <textarea id="msg-input" class="input" rows="1" placeholder="اكتب رسالتك... (Enter للإرسال · Shift+Enter سطر جديد)" style="flex:1;resize:none;font-family:inherit;max-height:120px" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendInternalMessage('${activeThread}');}"></textarea>
+          <button class="btn btn-primary" style="flex-shrink:0" onclick="sendInternalMessage('${activeThread}')"><span class="msg-send-lbl">📤 إرسال</span><span class="msg-send-ic">📤</span></button>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <label style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;color:#64748b;padding:6px 10px;border:1px dashed #cbd5e1;border-radius:8px;background:#f8fafc">
@@ -8586,32 +8604,39 @@ function clearMsgAttachment(){
   if(nm) nm.textContent='';
   if(cl) cl.style.display='none';
 }
-function sendInternalMessage(targetBranchId){
+function sendInternalMessage(threadKey){
   const me=Auth.user;
   if(!me) return;
   const text=document.getElementById('msg-input')?.value?.trim();
   if(!text&&!_msgAttachment){toast('اكتب رسالة أو أرفق ملفاً','error');return;}
-  const isSA=Auth.isSuperAdmin();
-  let msg;
-  if(isSA){
-    if(!targetBranchId){toast('اختر فرعاً أولاً','error');return;}
-    const branchAdmin=DB.users().find(u=>u.role==='school_admin'&&u.branchId===targetBranchId);
+  if(!threadKey){toast('اختر محادثة أولاً','error');return;}
+  // توافقية: قيمة قديمة (معرّف فرع فقط)
+  if(!String(threadKey).includes(':')) threadKey='b:'+threadKey;
+  let msg,toLabel='';
+  if(threadKey.startsWith('t:')){
+    const tid=threadKey.slice(2);
+    const teacher=DB.users().find(u=>u.id===tid);
+    toLabel=me.role==='teacher'?'الإدارة':('المعلمة '+(teacher?.name||''));
     msg={
-      fromUserId:me.id,fromName:me.name,fromRole:'superadmin',fromBranchId:null,
-      toUserId:branchAdmin?.id||null,toRole:'school_admin',toBranchId:targetBranchId,
-      message:text||'',
+      fromUserId:me.id,fromName:me.name,fromRole:me.role,fromBranchId:me.branchId||teacher?.branchId||null,
+      toUserId:tid,toRole:'teacher',toBranchId:teacher?.branchId||null,
+      tThread:tid,message:text||'',
     };
   } else {
-    msg={
-      fromUserId:me.id,fromName:me.name,fromRole:'school_admin',fromBranchId:me.branchId,
-      toUserId:'all_superadmins',toRole:'superadmin',toBranchId:null,
-      message:text||'',
-    };
+    const bid=threadKey.replace(/^b:/,'');
+    if(Auth.isSuperAdmin()){
+      const branchAdmin=DB.users().find(u=>u.role==='school_admin'&&u.branchId===bid);
+      toLabel=DB.branchName(bid);
+      msg={fromUserId:me.id,fromName:me.name,fromRole:'superadmin',fromBranchId:null,toUserId:branchAdmin?.id||null,toRole:'school_admin',toBranchId:bid,message:text||''};
+    } else {
+      toLabel='المدير العام';
+      msg={fromUserId:me.id,fromName:me.name,fromRole:'school_admin',fromBranchId:me.branchId,toUserId:'all_superadmins',toRole:'superadmin',toBranchId:null,message:text||''};
+    }
   }
   msg.fromId=me.id;
   if(_msgAttachment) msg.attachment=_msgAttachment;
   DB.addInternalMessage(msg);
-  DB.addAuditLog({action:'رسالة داخلية',entity:'رسائل',entityId:msg.fromUserId,details:`من ${me.name} إلى ${isSA?DB.branchName(targetBranchId):'المدير العام'}: ${(text||'').slice(0,80)}${(text||'').length>80?'...':''}${_msgAttachment?' [مع مرفق]':''}`,by:me.name});
+  DB.addAuditLog({action:'رسالة داخلية',entity:'رسائل',entityId:msg.fromUserId,details:`من ${me.name} إلى ${toLabel}: ${(text||'').slice(0,80)}${(text||'').length>80?'...':''}${_msgAttachment?' [مع مرفق]':''}`,by:me.name});
   const inp=document.getElementById('msg-input');
   if(inp) inp.value='';
   clearMsgAttachment();
