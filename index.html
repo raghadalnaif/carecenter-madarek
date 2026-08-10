@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v60 -->
+<!-- BUILD: 2026-06-24-v61 -->
 <script>
 (function(){
-  var BUILD='v60-20260624-1';
+  var BUILD='v61-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -1037,6 +1037,7 @@ const App = {
       {items:[
         {v:'attendance',icon:'✅',label:'تسجيل الحضور'},
         {v:'my_reports',icon:'📊',label:'تقارير الحضور'},
+        {v:'myAttendance',icon:'🕐',label:'حضوري'},
         {v:'activities',icon:'🎯',label:'أنشطتي'},
       ]},
     ];
@@ -1056,7 +1057,7 @@ const App = {
     </div>`;
   },
   topbar(){
-    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات',accounting:'🧾 المحاسبة',monthlyClose:'🔒 الإقفال الشهري',branchReport:'📈 تقرير الفرع الشهري',childNotes:'📝 ملاحظات الأطفال',expenses:'💸 مصروفات الفرع',messages:'💬 الرسائل الداخلية',auditLog:'🔍 سجل النشاط',govDocs:'🏛️ الوثائق الحكومية',hr:'👥 الموارد البشرية'};
+    const titles={dashboard:'الرئيسية',schools:'إدارة المدارس',branches:'إدارة الفروع',children:'إدارة الأطفال',subscriptions:'الاشتراكات',reports:'التقارير',users:'المستخدمون',attendance:'الحضور والانصراف',whatsapp:'رسائل واتساب',my_reports:'تقارير الحضور',myAttendance:'🕐 حضوري',teachers:'المعلمات',activities:'دليل الأنشطة',settings:'⚙️ الإعدادات',sales:'🛍️ المبيعات',accounting:'🧾 المحاسبة',monthlyClose:'🔒 الإقفال الشهري',branchReport:'📈 تقرير الفرع الشهري',childNotes:'📝 ملاحظات الأطفال',expenses:'💸 مصروفات الفرع',messages:'💬 الرسائل الداخلية',auditLog:'🔍 سجل النشاط',govDocs:'🏛️ الوثائق الحكومية',hr:'👥 الموارد البشرية'};
     const now=new Date();
     const hm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
     const unread=DB.unreadCount();
@@ -1183,6 +1184,7 @@ const App = {
       whatsapp:()=>role!=='teacher',
       teachers:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
       my_reports:()=>role==='teacher',
+      myAttendance:()=>role==='teacher',
       activities:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin()||role==='teacher',
       sales:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       accounting:()=>Auth.isSuperAdmin(),
@@ -1202,7 +1204,7 @@ const App = {
     };
     const guard=guards[App.view];
     if(guard&&!guard()) return Views._forbidden();
-    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,monthlyClose:Views.monthlyClose,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,childNotes:Views.childNotes,messages:Views.messages,settings:Views.settings,govDocs:Views.govDocs,hr:Views.hr};
+    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,myAttendance:Views.myAttendance,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,monthlyClose:Views.monthlyClose,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,childNotes:Views.childNotes,messages:Views.messages,settings:Views.settings,govDocs:Views.govDocs,hr:Views.hr};
     const fn=map[App.view]||Views.dashboard;
     try{return fn();}
     catch(e){console.error('[CCS]',App.view,e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة: ${App.view}</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
@@ -2593,6 +2595,70 @@ whatsapp(){
 },
 
 // ---------- MY REPORTS (Teacher) ----------
+// ربط حساب المعلمة بملفها في الموارد البشرية (بالمعرّف المرتبط أو بالاسم)
+_teacherEmployee(u){
+  u=u||Auth.user;if(!u)return null;
+  const emps=DB.hrEmployees().filter(e=>e.status!=='deleted');
+  if(u.employeeId){const byId=emps.find(e=>e.id===u.employeeId);if(byId)return byId;}
+  const nm=(u.name||'').trim();
+  return emps.find(e=>(e.name||'').trim()===nm)||null;
+},
+// سجل حضور المعلمة الشخصي — عرض فقط
+myAttendance(){
+  const me=Auth.user;
+  if(me?.role!=='teacher') return Views._forbidden();
+  const emp=Views._teacherEmployee(me);
+  const month=App.params.myMonth||T0.slice(0,7);
+  const monthLabel=Views._monthLabel?Views._monthLabel(month):month;
+  if(!emp){
+    return `<div style="padding:20px"><div class="card"><div class="empty-state"><div class="es-icon">🔗</div>
+      <p style="font-weight:700;color:#64748b">لم يُربط حسابك بملف موظف في الموارد البشرية</p>
+      <p style="font-size:13px;margin-top:6px">راجعي الإدارة لربط اسمك (${esc(me.name)}) بملفك، ليظهر سجل حضورك.</p>
+    </div></div></div>`;
+  }
+  const recs=DB.hrAttendance().filter(a=>a.employeeId===emp.id&&(a.date||'').startsWith(month)).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const present=recs.filter(a=>a.status==='present').length;
+  const late=recs.filter(a=>a.status==='late').length;
+  const absent=recs.filter(a=>a.status==='absent').length;
+  const leave=recs.filter(a=>a.status==='leave').length;
+  const totalLate=recs.reduce((s,a)=>s+(+a.lateMinutes||0),0);
+  const totalHours=recs.reduce((s,a)=>s+(+a.workedMinutes||0),0);
+  const stMap={present:['✅ حاضر','#16a34a'],late:['⏰ متأخر','#d97706'],absent:['❌ غائب','#dc2626'],leave:['🏖️ إجازة','#7c3aed']};
+  return `
+  <div style="padding:20px">
+    <div style="background:linear-gradient(135deg,#0f766e,#065f46);color:#fff;border-radius:16px;padding:22px 26px;margin-bottom:18px">
+      <div style="font-size:20px;font-weight:800">🕐 سجل حضوري</div>
+      <div style="opacity:.9;font-size:13px;margin-top:4px">${esc(emp.name)} · ${esc(emp.jobTitle||'معلمة')}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <input type="month" class="input" style="width:170px" value="${month}" max="${T0.slice(0,7)}" onchange="App.go('myAttendance',{myMonth:this.value})">
+      <span style="font-size:15px;font-weight:700;color:#0f766e">${monthLabel}</span>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card green"><div class="stat-val">${present}</div><div class="stat-lbl">✅ أيام حضور</div></div>
+      <div class="stat-card yellow"><div class="stat-val">${late}</div><div class="stat-lbl">⏰ أيام تأخّر (${totalLate} دقيقة)</div></div>
+      <div class="stat-card red"><div class="stat-val">${absent}</div><div class="stat-lbl">❌ أيام غياب</div></div>
+      <div class="stat-card blue"><div class="stat-val">${_fmtDur?_fmtDur(totalHours):Math.round(totalHours/60)+'س'}</div><div class="stat-lbl">⏳ إجمالي ساعات العمل</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">📋 تفاصيل الشهر (${recs.length} يوم)</div>
+      ${recs.length===0?`<div class="empty-state"><div class="es-icon">📭</div><p>لا يوجد حضور مسجّل لهذا الشهر</p></div>`:`
+      <div class="table-wrap"><table>
+        <thead><tr><th>التاريخ</th><th>الحالة</th><th>دخول</th><th>خروج</th><th>ساعات</th><th>تأخّر</th></tr></thead>
+        <tbody>
+          ${recs.map(a=>{const s=stMap[a.status]||['—','#64748b'];return `<tr>
+            <td style="white-space:nowrap">${formatDate(a.date)}</td>
+            <td style="font-weight:600;color:${s[1]}">${s[0]}</td>
+            <td style="text-align:center">${a.checkIn||'—'}</td>
+            <td style="text-align:center">${a.checkOut||'—'}</td>
+            <td style="text-align:center">${a.workedMinutes?(_fmtDur?_fmtDur(a.workedMinutes):a.workedMinutes+'د'):'—'}</td>
+            <td style="text-align:center;color:${(+a.lateMinutes||0)>0?'#dc2626':'#94a3b8'}">${(+a.lateMinutes||0)>0?a.lateMinutes+' د':'—'}</td>
+          </tr>`;}).join('')}
+        </tbody>
+      </table></div>`}
+    </div>
+  </div>`;
+},
 myReports(){
   const u=Auth.user;
   const sid=Auth.schoolId();
