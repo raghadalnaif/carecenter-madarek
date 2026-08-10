@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v59 -->
+<!-- BUILD: 2026-06-24-v60 -->
 <script>
 (function(){
-  var BUILD='v59-20260624-1';
+  var BUILD='v60-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -822,6 +822,28 @@ const DB = {
   sales(){return this.get('sales')||[]},
   addSale(s){const a=this.sales();a.push(s);this.save('sales',a)},
   deleteSale(id){this.save('sales',this.sales().filter(x=>x.id!==id))},
+  // ===== مكتبة الأنشطة القابلة للتوسّع =====
+  // أنشطة تكتبها الإدارة وتُحفظ دائماً وتُنشر لكل الفروع (مشتركة)
+  customActivities(){return this.get('custom_activities')||[]},
+  addCustomActivity(a){const l=this.customActivities();l.unshift({...a,id:uid(),createdAt:new Date().toISOString()});this.save('custom_activities',l);},
+  updateCustomActivity(a){const l=this.customActivities();const i=l.findIndex(x=>x.id===a.id);if(i>=0)l[i]={...l[i],...a};this.save('custom_activities',l);},
+  deleteCustomActivity(id){this.save('custom_activities',this.customActivities().filter(x=>x.id!==id));},
+  // إرسال نشاط للمعلمات (كل/فرع/معلمة) — كل إرسال سجل مستقل
+  activityAssignments(){return this.get('activity_assignments')||[]},
+  addActivityAssignment(a){const l=this.activityAssignments();l.unshift({...a,id:uid(),sentAt:new Date().toISOString()});this.save('activity_assignments',l);},
+  deleteActivityAssignment(id){
+    this.save('activity_assignments',this.activityAssignments().filter(x=>x.id!==id));
+    this.save('activity_reports',this.activityReports().filter(r=>r.assignmentId!==id));
+  },
+  // تنفيذ المعلمة للنشاط (تم/لم يتم + ملاحظة + صورة)
+  activityReports(){return this.get('activity_reports')||[]},
+  setActivityReport(r){
+    const l=this.activityReports();
+    const i=l.findIndex(x=>x.assignmentId===r.assignmentId&&x.teacherId===r.teacherId);
+    if(i>=0) l[i]={...l[i],...r,at:new Date().toISOString()};
+    else l.unshift({...r,id:uid(),at:new Date().toISOString()});
+    this.save('activity_reports',l);
+  },
   weeklyActivities(){return this.get('weekly_activities')||[]},
   toggleWeeklyActivity(act){
     const list=this.weeklyActivities();
@@ -1015,6 +1037,7 @@ const App = {
       {items:[
         {v:'attendance',icon:'✅',label:'تسجيل الحضور'},
         {v:'my_reports',icon:'📊',label:'تقارير الحضور'},
+        {v:'activities',icon:'🎯',label:'أنشطتي'},
       ]},
     ];
     return `
@@ -1160,7 +1183,7 @@ const App = {
       whatsapp:()=>role!=='teacher',
       teachers:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
       my_reports:()=>role==='teacher',
-      activities:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
+      activities:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin()||role==='teacher',
       sales:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       accounting:()=>Auth.isSuperAdmin(),
       monthlyClose:()=>Auth.isSuperAdmin(),
@@ -2764,137 +2787,189 @@ activities(){
   ACTS.forEach(cat=>cat.items.forEach(act=>{_actsIndex[act.n]={...act,cat:cat.cat,catKey:act.catKey};}));
 
   const isSA=Auth.isSuperAdmin();
-  const weeklyActs=DB.weeklyActivities();
-  const publishedNums=new Set(weeklyActs.map(a=>a.n));
-  const catColors={cognitive:'#6366f1',motor:'#f59e0b',values:'#ec4899',islamic:'#10b981',life:'#f97316',language:'#3b82f6',emotional:'#eab308',summer:'#f43f5e',national:'#14b8a6',eco:'#22c55e',relax:'#a855f7',handmade:'#e11d48',mind_heart:'#8b5cf6',social:'#0ea5e9'};
+  const isTeacher=Auth.user?.role==='teacher';
+  const catColors={cognitive:'#6366f1',motor:'#f59e0b',values:'#ec4899',islamic:'#10b981',life:'#f97316',language:'#3b82f6',emotional:'#eab308',summer:'#f43f5e',national:'#14b8a6',eco:'#22c55e',relax:'#a855f7',handmade:'#e11d48',mind_heart:'#8b5cf6',social:'#0ea5e9',custom:'#0d9488'};
+  // خزّن الفهرس عالمياً لاستخدامه عند الإرسال
+  window._actsIndex=window._actsIndex||{};ACTS.forEach(cat=>cat.items.forEach(a=>{window._actsIndex[a.n]={...a,cat:cat.cat};}));
 
-  const actCard=(act)=>`
-    <details style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-      <summary style="background:${catColors[act.catKey]||'#6366f1'}11;border-bottom:2px solid ${catColors[act.catKey]||'#6366f1'}33;padding:14px 16px;cursor:pointer;list-style:none;outline:none">
-        <div style="display:flex;align-items:center;justify-content:space-between">
+  // ===== واجهة المعلمة: الأنشطة المُسندة لها =====
+  if(isTeacher) return Views._teacherActivities(catColors);
+
+  // ===== الإدارة (مدير عام / مدير فرع): المكتبة + المتابعة =====
+  const custom=DB.customActivities();
+  const actTab=App.params.actTab||'library';
+  if(actTab==='track') return Views._activityTracking(catColors);
+
+  // مكتبة موحّدة: الجاهزة + المخصّصة
+  const libCats=ACTS.map(c=>({cat:c.cat,catKey:c.catKey,items:c.items.map(a=>({...a,key:'static:'+a.n,custom:false}))}));
+  if(custom.length){
+    libCats.unshift({cat:'✍️ أنشطة الإدارة (مضافة)',catKey:'custom',items:custom.map(a=>({...a,key:'custom:'+a.id,custom:true,n:'✍️'}))});
+  }
+  const selCat=App.params?.actCat||'all';
+  const filtered=selCat==='all'?libCats:libCats.filter(c=>c.catKey===selCat);
+  const totalStatic=ACTS.reduce((s,c)=>s+c.items.length,0);
+  const actCardAdmin=(act,catKey)=>`
+    <details style="background:#fff;border-radius:12px;border:2px solid ${act.custom?'#5eead4':'#e2e8f0'};overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+      <summary style="background:${catColors[catKey]||'#6366f1'}11;border-bottom:2px solid ${catColors[catKey]||'#6366f1'}33;padding:14px 16px;cursor:pointer;list-style:none;outline:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
           <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
-            <div style="background:${catColors[act.catKey]||'#6366f1'};color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0">${act.n}</div>
-            <span style="font-weight:700;font-size:15px;color:#1e293b">${esc(act.name)}</span>
+            <div style="background:${catColors[catKey]||'#6366f1'};color:#fff;min-width:28px;height:28px;padding:0 6px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0">${act.n}</div>
+            <span style="font-weight:700;font-size:14px;color:#1e293b">${esc(act.name)}</span>
           </div>
-          <span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;flex-shrink:0">✅ هذا الأسبوع</span>
+          <div onclick="event.stopPropagation()" style="flex-shrink:0;display:flex;gap:4px">
+            <button onclick="Modals.sendActivity('${act.key}')" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">📤 إرسال للمعلمات</button>
+            ${(act.custom&&isSA)?`<button onclick="deleteCustomActivity('${act.id}')" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;border-radius:8px;padding:5px 8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🗑️</button>`:''}
+          </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:8px;margin-right:38px;flex-wrap:wrap">
-          <span style="background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:12px;font-size:11px">⏱ ${esc(act.time)}</span>
-          <span style="background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:12px;font-size:11px">👶 ${esc(act.age)}</span>
+          <span style="background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:12px;font-size:11px">⏱ ${esc(act.time||'—')}</span>
+          <span style="background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:12px;font-size:11px">👶 ${esc(act.age||'—')}</span>
+          ${act.custom?`<span style="background:#ccfbf1;color:#0f766e;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700">✍️ مضاف</span>`:''}
         </div>
       </summary>
       <div style="padding:16px">
-        <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px">الهدف</div><div style="font-size:13px;color:#334155;line-height:1.7">${esc(act.goal)}</div></div>
-        <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px">المواد المطلوبة</div><div style="font-size:13px;color:#334155;line-height:1.7">${esc(act.materials)}</div></div>
-        <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:6px">خطوات التنفيذ</div><div style="font-size:13px;color:#334155;line-height:1.9;white-space:pre-line">${esc(act.steps)}</div></div>
-        <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px">
-          <div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:3px">💡 نصيحة للمعلمة</div>
-          <div style="font-size:12px;color:#78350f;line-height:1.7">${esc(act.tips)}</div>
-        </div>
+        <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px">الهدف</div><div style="font-size:13px;color:#334155;line-height:1.7">${esc(act.goal||'—')}</div></div>
+        <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px">المواد المطلوبة</div><div style="font-size:13px;color:#334155;line-height:1.7">${esc(act.materials||'—')}</div></div>
+        <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:6px">خطوات التنفيذ</div><div style="font-size:13px;color:#334155;line-height:1.9;white-space:pre-line">${esc(act.steps||'—')}</div></div>
+        ${act.tips?`<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px"><div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:3px">💡 نصيحة للمعلمة</div><div style="font-size:12px;color:#78350f;line-height:1.7">${esc(act.tips)}</div></div>`:''}
       </div>
     </details>`;
-
-  // ── SCHOOL ADMIN: show only published (weekly) activities ─────────────────
-  if(!isSA){
-    const pubByKey={};
-    weeklyActs.forEach(act=>{
-      if(!pubByKey[act.catKey]) pubByKey[act.catKey]={cat:act.cat,catKey:act.catKey,items:[]};
-      pubByKey[act.catKey].items.push(act);
-    });
-    const pubCats=Object.values(pubByKey);
-    return `
-    <div style="padding:20px">
-      <div style="background:linear-gradient(135deg,#16a34a 0%,#059669 100%);color:#fff;border-radius:16px;padding:28px 32px;margin-bottom:24px;position:relative;overflow:hidden">
-        <div style="position:absolute;top:-20px;left:-20px;font-size:120px;opacity:.07">📅</div>
-        <h2 style="margin:0 0 8px;font-size:22px;font-weight:800">الأنشطة الأسبوعية المنشورة</h2>
-        <p style="margin:0 0 16px;opacity:.85;font-size:14px">الأنشطة التي اختارها المدير العام لهذا الأسبوع</p>
-        <div style="display:flex;gap:16px;flex-wrap:wrap">
-          <div style="background:rgba(255,255,255,.18);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700">✅ ${weeklyActs.length} نشاط منشور</div>
-        </div>
-      </div>
-      ${pubCats.length===0?`
-        <div style="text-align:center;padding:60px 20px;color:#94a3b8">
-          <div style="font-size:56px;margin-bottom:16px">📭</div>
-          <div style="font-size:18px;font-weight:700;margin-bottom:8px;color:#64748b">لا توجد أنشطة أسبوعية حتى الآن</div>
-          <div style="font-size:14px">سيظهر هنا ما ينشره المدير العام من أنشطة لهذا الأسبوع</div>
-        </div>`:
-      pubCats.map(cat=>`
-        <div style="margin-bottom:28px">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-            <div style="width:4px;height:24px;background:${catColors[cat.catKey]||'#6366f1'};border-radius:2px"></div>
-            <h3 style="margin:0;font-size:17px;font-weight:800;color:#1e293b">${cat.cat}</h3>
-            <span style="background:${catColors[cat.catKey]||'#6366f1'}22;color:${catColors[cat.catKey]||'#6366f1'};padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700">${cat.items.length} أنشطة</span>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">
-            ${cat.items.map(actCard).join('')}
-          </div>
-        </div>`).join('')}
-    </div>`;
-  }
-
-  // ── SUPER ADMIN: full guide with publish/unpublish buttons ────────────────
-  const selCat=App.params?.actCat||'all';
-  const filtered=selCat==='all'?ACTS:ACTS.filter(c=>c.catKey===selCat);
-  const total=ACTS.reduce((s,c)=>s+c.items.length,0);
   return `
   <div style="padding:20px">
-    <div style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff;border-radius:16px;padding:28px 32px;margin-bottom:24px;position:relative;overflow:hidden">
+    <div style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff;border-radius:16px;padding:24px 28px;margin-bottom:20px;position:relative;overflow:hidden">
       <div style="position:absolute;top:-20px;left:-20px;font-size:120px;opacity:.07">🎯</div>
-      <h2 style="margin:0 0 8px;font-size:22px;font-weight:800">دليل الأنشطة المبتكرة</h2>
-      <p style="margin:0 0 16px;opacity:.85;font-size:14px">١٠٠ نشاط مطوَّع للأطفال السعوديين من ٣ إلى ٦ سنوات — مركز ضيافة الأطفال</p>
-      <div style="display:flex;gap:16px;flex-wrap:wrap">
-        <div style="background:rgba(255,255,255,.18);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700">🎯 ${total} نشاط</div>
-        <div style="background:rgba(255,255,255,.18);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700">📂 ${ACTS.length} تصنيف</div>
-        <div style="background:rgba(255,255,255,.18);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700">👶 أعمار ٣–٦ سنوات</div>
-        ${publishedNums.size>0?`<div style="background:rgba(255,255,255,.25);border:1px solid rgba(255,255,255,.5);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700">📢 ${publishedNums.size} منشور هذا الأسبوع</div>`:''}
+      <h2 style="margin:0 0 8px;font-size:22px;font-weight:800">📚 مكتبة الأنشطة</h2>
+      <p style="margin:0 0 14px;opacity:.85;font-size:14px">${totalStatic} نشاط جاهز + ${custom.length} نشاط مضاف — قابلة للتوسّع وجاهزة للإرسال للمعلمات</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" style="background:#fff;color:#4f46e5;font-weight:800;border:none" onclick="Modals.createActivity()">➕ إنشاء نشاط جديد</button>
+        <button class="btn" style="background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.4);font-weight:700" onclick="App.go('activities',{actTab:'track'})">📊 متابعة التنفيذ</button>
       </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
-      <span class="chip ${selCat==='all'?'active':''}" style="font-size:13px;padding:7px 14px" onclick="App.go('activities',{actCat:'all'})">الكل (${total})</span>
-      ${ACTS.map(c=>`<span class="chip ${selCat===c.catKey?'active':''}" style="font-size:12px;padding:6px 12px" onclick="App.go('activities',{actCat:'${c.catKey}'})">${c.cat} (${c.items.length})</span>`).join('')}
+      <span class="chip ${selCat==='all'?'active':''}" style="font-size:13px;padding:7px 14px" onclick="App.go('activities',{actCat:'all'})">الكل</span>
+      ${libCats.map(c=>`<span class="chip ${selCat===c.catKey?'active':''}" style="font-size:12px;padding:6px 12px" onclick="App.go('activities',{actCat:'${c.catKey}'})">${c.cat.replace(/ \(.*/,'')} (${c.items.length})</span>`).join('')}
     </div>
-    ${filtered.map(cat=>(`
+    ${filtered.map(cat=>`
       <div style="margin-bottom:28px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
           <div style="width:4px;height:24px;background:${catColors[cat.catKey]||'#6366f1'};border-radius:2px"></div>
           <h3 style="margin:0;font-size:17px;font-weight:800;color:#1e293b">${cat.cat}</h3>
-          <span style="background:${catColors[cat.catKey]||'#6366f1'}22;color:${catColors[cat.catKey]||'#6366f1'};padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700">${cat.items.length} أنشطة</span>
+          <span style="background:${catColors[cat.catKey]||'#6366f1'}22;color:${catColors[cat.catKey]||'#6366f1'};padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700">${cat.items.length}</span>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">
-          ${cat.items.map(act=>{
-            const pub=publishedNums.has(act.n);
-            return `
-            <details style="background:#fff;border-radius:12px;border:2px solid ${pub?'#86efac':'#e2e8f0'};overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-              <summary style="background:${catColors[cat.catKey]||'#6366f1'}11;border-bottom:2px solid ${catColors[cat.catKey]||'#6366f1'}33;padding:14px 16px;cursor:pointer;list-style:none;outline:none">
-                <div style="display:flex;align-items:center;justify-content:space-between">
-                  <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
-                    <div style="background:${catColors[cat.catKey]||'#6366f1'};color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0">${act.n}</div>
-                    <span style="font-weight:700;font-size:14px;color:#1e293b">${esc(act.name)}</span>
-                  </div>
-                  <div onclick="event.stopPropagation()" style="flex-shrink:0;margin-right:6px">
-                    <button onclick="publishActivity(${act.n})" style="background:${pub?'#dcfce7':'#eff6ff'};color:${pub?'#15803d':'#1d4ed8'};border:1px solid ${pub?'#86efac':'#bfdbfe'};border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">${pub?'✅ منشور':'📢 نشر'}</button>
-                  </div>
-                </div>
-                <div style="display:flex;gap:8px;margin-top:8px;margin-right:38px;flex-wrap:wrap">
-                  <span style="background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:12px;font-size:11px">⏱ ${esc(act.time)}</span>
-                  <span style="background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:12px;font-size:11px">👶 ${esc(act.age)}</span>
-                </div>
-              </summary>
-              <div style="padding:16px">
-                <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px">الهدف</div><div style="font-size:13px;color:#334155;line-height:1.7">${esc(act.goal)}</div></div>
-                <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px">المواد المطلوبة</div><div style="font-size:13px;color:#334155;line-height:1.7">${esc(act.materials)}</div></div>
-                <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:6px">خطوات التنفيذ</div><div style="font-size:13px;color:#334155;line-height:1.9;white-space:pre-line">${esc(act.steps)}</div></div>
-                <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px">
-                  <div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:3px">💡 نصيحة للمعلمة</div>
-                  <div style="font-size:12px;color:#78350f;line-height:1.7">${esc(act.tips)}</div>
-                </div>
-              </div>
-            </details>`;
-          }).join('')}
+          ${cat.items.map(act=>actCardAdmin(act,cat.catKey)).join('')}
         </div>
-      </div>`)).join('')}
+      </div>`).join('')}
   </div>`;
 },
+
+// ===== واجهة المعلمة: الأنشطة المُسندة لها + تعليم التنفيذ =====
+_teacherActivities(catColors){
+  const me=Auth.user;
+  const assigns=DB.activityAssignments().filter(a=>
+    a.scope==='all'||(a.scope==='branch'&&a.branchId===me.branchId)||(a.scope==='teacher'&&a.teacherId===me.id)
+  ).sort((a,b)=>(b.sentAt||'').localeCompare(a.sentAt||''));
+  const reports=DB.activityReports();
+  const myRep=(aid)=>reports.find(r=>r.assignmentId===aid&&r.teacherId===me.id);
+  const doneCnt=assigns.filter(a=>myRep(a.id)?.done===true).length;
+  return `
+  <div style="padding:20px">
+    <div style="background:linear-gradient(135deg,#16a34a 0%,#059669 100%);color:#fff;border-radius:16px;padding:24px 28px;margin-bottom:20px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:-20px;left:-20px;font-size:120px;opacity:.07">🎯</div>
+      <h2 style="margin:0 0 6px;font-size:22px;font-weight:800">🎯 أنشطتي</h2>
+      <p style="margin:0 0 12px;opacity:.9;font-size:14px">الأنشطة المُرسلة لك من الإدارة — علّمي كل نشاط بعد تنفيذه</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div style="background:rgba(255,255,255,.18);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700">📋 ${assigns.length} نشاط</div>
+        <div style="background:rgba(255,255,255,.18);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700">✅ ${doneCnt} منفّذ</div>
+      </div>
+    </div>
+    ${assigns.length===0?`<div style="text-align:center;padding:60px 20px;color:#94a3b8"><div style="font-size:56px;margin-bottom:16px">📭</div><div style="font-size:18px;font-weight:700;color:#64748b">لا توجد أنشطة مُرسلة لك بعد</div><div style="font-size:14px;margin-top:6px">ستظهر هنا الأنشطة التي ترسلها الإدارة</div></div>`:
+    assigns.map(a=>{
+      const r=myRep(a.id);
+      const cc=catColors[a.catKey]||'#16a34a';
+      const done=r?.done===true, notDone=r?.done===false;
+      return `<div style="background:#fff;border-radius:12px;border:2px solid ${done?'#86efac':notDone?'#fca5a5':'#e2e8f0'};overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:14px">
+        <div style="background:${cc}11;border-bottom:2px solid ${cc}33;padding:14px 16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:800;font-size:16px;color:#1e293b">${esc(a.name)}</span>
+            ${done?'<span class="badge badge-green">✅ نُفّذ</span>':notDone?'<span class="badge badge-red">❌ لم يُنفّذ</span>':'<span class="badge badge-yellow">⏳ بانتظار التنفيذ</span>'}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <span style="background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:12px;font-size:11px">⏱ ${esc(a.time||'—')}</span>
+            <span style="background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:12px;font-size:11px">👶 ${esc(a.age||'—')}</span>
+            <span style="background:#eef2ff;color:#4338ca;padding:2px 8px;border-radius:12px;font-size:11px">👤 من: ${esc(a.sentByName||'الإدارة')}</span>
+          </div>
+        </div>
+        <div style="padding:16px">
+          <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px">الهدف</div><div style="font-size:13px;color:#334155;line-height:1.7">${esc(a.goal||'—')}</div></div>
+          <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px">المواد المطلوبة</div><div style="font-size:13px;color:#334155;line-height:1.7">${esc(a.materials||'—')}</div></div>
+          <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:6px">خطوات التنفيذ</div><div style="font-size:13px;color:#334155;line-height:1.9;white-space:pre-line">${esc(a.steps||'—')}</div></div>
+          ${a.tips?`<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;margin-bottom:14px"><div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:3px">💡 نصيحة</div><div style="font-size:12px;color:#78350f;line-height:1.7">${esc(a.tips)}</div></div>`:''}
+          <div style="border-top:1px solid #e2e8f0;padding-top:14px">
+            <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">هل نفّذتِ النشاط؟</div>
+            <textarea id="actnote-${a.id}" class="input" rows="2" placeholder="ملاحظة (اختياري): كيف تم التنفيذ، عدد الأطفال..." style="resize:none;margin-bottom:8px">${esc(r?.note||'')}</textarea>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <button class="btn ${done?'btn-success':'btn-secondary'}" onclick="teacherReportActivity('${a.id}',true)">✅ تم التنفيذ</button>
+              <button class="btn ${notDone?'btn-danger':'btn-secondary'}" onclick="teacherReportActivity('${a.id}',false)">❌ لم يُنفّذ</button>
+              <label style="cursor:pointer;font-size:12px;color:#64748b;padding:8px 12px;border:1px dashed #cbd5e1;border-radius:8px;background:#f8fafc">
+                📷 صورة إثبات
+                <input type="file" accept="image/*" style="display:none" onchange="teacherActivityPhoto('${a.id}',this)">
+              </label>
+              ${r?.photo?`<a href="${r.photo}" target="_blank" style="font-size:12px;color:#0f766e;font-weight:700">📎 عرض الصورة المرفقة</a>`:''}
+            </div>
+            ${r?`<div style="font-size:11px;color:#94a3b8;margin-top:8px">آخر تحديث: ${formatRelTime(r.at)}</div>`:''}
+          </div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+},
+
+// ===== متابعة تنفيذ الأنشطة (للإدارة) =====
+_activityTracking(catColors){
+  const bid=Auth.branchId();
+  let assigns=DB.activityAssignments();
+  if(bid) assigns=assigns.filter(a=>a.scope==='all'||a.branchId===bid);
+  assigns=assigns.sort((a,b)=>(b.sentAt||'').localeCompare(a.sentAt||''));
+  const reports=DB.activityReports();
+  const teachers=DB.users().filter(u=>u.role==='teacher');
+  const targetTeachers=(a)=>{
+    if(a.scope==='teacher') return teachers.filter(t=>t.id===a.teacherId);
+    if(a.scope==='branch') return teachers.filter(t=>t.branchId===a.branchId);
+    return teachers; // all
+  };
+  return `
+  <div style="padding:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+      <h2 style="margin:0;font-size:20px;font-weight:800;color:#4f46e5">📊 متابعة تنفيذ الأنشطة</h2>
+      <button class="btn btn-secondary" onclick="App.go('activities')">← رجوع للمكتبة</button>
+    </div>
+    ${assigns.length===0?`<div class="empty-state"><div class="es-icon">📊</div><p>لم تُرسل أي أنشطة للمعلمات بعد</p></div>`:
+    assigns.map(a=>{
+      const tt=targetTeachers(a);
+      const recs=tt.map(t=>({t,r:reports.find(r=>r.assignmentId===a.id&&r.teacherId===t.id)}));
+      const doneN=recs.filter(x=>x.r?.done===true).length;
+      const cc=catColors[a.catKey]||'#4f46e5';
+      const scopeLbl=a.scope==='all'?'كل المعلمات':a.scope==='branch'?('فرع: '+DB.branchName(a.branchId)):('معلمة: '+esc(a.teacherName||'—'));
+      return `<div class="card" style="border-right:5px solid ${cc}">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <div><span style="font-size:16px;font-weight:800">${esc(a.name)}</span><div style="font-size:12px;color:#64748b;margin-top:2px">🎯 ${esc(scopeLbl)} · أُرسل ${formatRelTime(a.sentAt)} · من ${esc(a.sentByName||'—')}</div></div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span class="badge badge-green">✅ ${doneN}/${tt.length}</span>
+            <button class="btn btn-danger btn-xs" onclick="deleteActivityAssignment('${a.id}')">🗑️ حذف الإرسال</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${recs.map(({t,r})=>{
+            const st=r?.done===true?['#dcfce7','#15803d','✅']:r?.done===false?['#fee2e2','#b91c1c','❌']:['#f1f5f9','#64748b','⏳'];
+            return `<span title="${r?.note?esc(r.note):''}" style="background:${st[0]};color:${st[1]};font-size:12px;font-weight:600;padding:3px 9px;border-radius:7px">${st[2]} ${esc(t.name)}${r?.photo?' 📷':''}</span>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+},
+
 
 // ---------- ACCOUNTING (super admin only) ----------
 accounting(){
@@ -4907,6 +4982,72 @@ const Modals = {
       <div class="input-group"><label>نطاق السماح للتحضير (متر)</label><input class="input" id="br-radius" type="number" min="30" max="1000" value="${b?.geoRadius||150}">
         <small style="font-size:11px;color:#64748b;margin-top:2px;display:block">المسافة المسموحة من موقع الفرع لقبول تحضير الموظف</small>
       </div>`;
+  },
+  // إنشاء / تعديل نشاط مخصّص في المكتبة
+  createActivity(id){
+    const e=id?DB.customActivities().find(x=>x.id===id):null;
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-header"><h2>${e?'✏️ تعديل نشاط':'➕ إنشاء نشاط جديد'}</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        ${e?`<input type="hidden" id="ca-id" value="${e.id}">`:''}
+        <div class="input-group"><label>اسم النشاط *</label><input class="input" id="ca-name" value="${esc(e?.name||'')}" placeholder="مثال: رحلة الأرقام"></div>
+        <div class="grid-2">
+          <div class="input-group"><label>الفئة العمرية</label><input class="input" id="ca-age" value="${esc(e?.age||'٣-٦ سنوات')}"></div>
+          <div class="input-group"><label>المدة</label><input class="input" id="ca-time" value="${esc(e?.time||'٢٠ دقيقة')}"></div>
+        </div>
+        <div class="input-group"><label>الهدف</label><textarea class="input" id="ca-goal" rows="2">${esc(e?.goal||'')}</textarea></div>
+        <div class="input-group"><label>المواد المطلوبة</label><textarea class="input" id="ca-materials" rows="2">${esc(e?.materials||'')}</textarea></div>
+        <div class="input-group"><label>خطوات التنفيذ</label><textarea class="input" id="ca-steps" rows="4" placeholder="١. ...&#10;٢. ...">${esc(e?.steps||'')}</textarea></div>
+        <div class="input-group"><label>💡 نصيحة للمعلمة (اختياري)</label><textarea class="input" id="ca-tips" rows="2">${esc(e?.tips||'')}</textarea></div>
+        <div style="font-size:12px;color:#0f766e;background:#f0fdf4;border-radius:8px;padding:8px 12px">📢 النشاط يُحفظ في المكتبة ويصبح متاحاً لكل الفروع.</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveCustomActivity()">💾 حفظ في المكتبة</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+  },
+  // إرسال نشاط للمعلمات (كل / فرع / معلمة)
+  sendActivity(key){
+    // استخراج محتوى النشاط من المفتاح
+    let act=null;
+    if(key.startsWith('static:')){const n=+key.split(':')[1];act=(window._actsIndex||{})[n];}
+    else if(key.startsWith('custom:')){act=DB.customActivities().find(x=>x.id===key.split(':')[1]);}
+    if(!act){toast('تعذّر إيجاد النشاط','error');return;}
+    const branches=DB.branches();
+    const teachers=DB.users().filter(u=>u.role==='teacher');
+    const myBid=Auth.branchId();
+    App.showModal(`
+    <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header"><h2>📤 إرسال «${esc(act.name)}»</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <input type="hidden" id="sa-key" value="${esc(key)}">
+        <div class="input-group"><label>إرسال إلى</label>
+          <select class="input" id="sa-scope" onchange="_saUpdateScope()">
+            ${myBid?'':'<option value="all">كل المعلمات (جميع الفروع)</option>'}
+            <option value="branch">فرع كامل</option>
+            <option value="teacher">معلمة معيّنة</option>
+          </select>
+        </div>
+        <div class="input-group" id="sa-branch-wrap"><label>الفرع</label>
+          <select class="input" id="sa-branch" onchange="_saFillTeachers()">
+            ${myBid?branches.filter(b=>b.id===myBid).map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join(''):branches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="input-group" id="sa-teacher-wrap" style="display:none"><label>المعلمة</label>
+          <select class="input" id="sa-teacher"></select>
+        </div>
+        <div style="font-size:12px;color:#64748b;background:#f8fafc;border-radius:8px;padding:8px 12px">ستصل النشاط للمعلمة في قسم «أنشطتي» وتعلّم تنفيذه، وتتابعينه من «متابعة التنفيذ».</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="sendActivityConfirm()">📤 إرسال</button>
+        <button class="btn btn-secondary" onclick="App.closeModal()">إلغاء</button>
+      </div>
+    </div></div>`);
+    _saFillTeachers();_saUpdateScope();
   },
   branchQR(id){
     const b=DB.branches().find(x=>x.id===id);if(!b)return;
@@ -8586,6 +8727,94 @@ function publishActivity(n){
   if(!act) return;
   DB.toggleWeeklyActivity(act);
   App.render();
+}
+// ===== مكتبة الأنشطة: إنشاء / حذف / إرسال / تنفيذ =====
+function saveCustomActivity(){
+  const name=(document.getElementById('ca-name')?.value||'').trim();
+  if(!name){toast('اسم النشاط مطلوب','error');return;}
+  const obj={
+    name,
+    age:(document.getElementById('ca-age')?.value||'').trim(),
+    time:(document.getElementById('ca-time')?.value||'').trim(),
+    goal:(document.getElementById('ca-goal')?.value||'').trim(),
+    materials:(document.getElementById('ca-materials')?.value||'').trim(),
+    steps:(document.getElementById('ca-steps')?.value||'').trim(),
+    tips:(document.getElementById('ca-tips')?.value||'').trim(),
+    catKey:'custom',cat:'✍️ أنشطة الإدارة',
+    createdByName:Auth.user?.name||'—',createdById:Auth.user?.id||''
+  };
+  const id=document.getElementById('ca-id')?.value;
+  if(id){DB.updateCustomActivity({...obj,id});} else {DB.addCustomActivity(obj);}
+  DB.addAuditLog({action:id?'تعديل نشاط':'إضافة نشاط',entity:'أنشطة',entityId:id||name,details:name,by:Auth.user?.name||'—'});
+  toast('✅ تم حفظ النشاط في المكتبة — منشور لكل الفروع');
+  App.closeModal();App.go('activities');
+}
+function deleteCustomActivity(id){
+  if(!Auth.isSuperAdmin()){toast('الحذف للمدير العام فقط','error');return;}
+  const a=DB.customActivities().find(x=>x.id===id);
+  if(!confirm(`حذف النشاط «${a?.name||''}» من المكتبة نهائياً؟`)) return;
+  DB.deleteCustomActivity(id);
+  DB.addAuditLog({action:'حذف نشاط',entity:'أنشطة',entityId:id,details:a?.name||'',by:Auth.user?.name||'—'});
+  toast('🗑️ تم حذف النشاط');App.go('activities');
+}
+// نوافذ الإرسال — تعبئة القوائم
+function _saFillTeachers(){
+  const bid=document.getElementById('sa-branch')?.value;
+  const sel=document.getElementById('sa-teacher');if(!sel)return;
+  const teachers=DB.users().filter(u=>u.role==='teacher'&&(!bid||u.branchId===bid));
+  sel.innerHTML=teachers.length?teachers.map(t=>`<option value="${t.id}">${esc(t.name)}${t.period?' ('+(t.period==='morning'?'صباحي':'مسائي')+')':''}</option>`).join(''):'<option value="">لا توجد معلمات في هذا الفرع</option>';
+}
+function _saUpdateScope(){
+  const scope=document.getElementById('sa-scope')?.value;
+  const bw=document.getElementById('sa-branch-wrap'),tw=document.getElementById('sa-teacher-wrap');
+  if(bw)bw.style.display=(scope==='branch'||scope==='teacher')?'block':'none';
+  if(tw)tw.style.display=scope==='teacher'?'block':'none';
+}
+function sendActivityConfirm(){
+  const key=document.getElementById('sa-key')?.value;
+  const scope=document.getElementById('sa-scope')?.value||'branch';
+  let act=null;
+  if(key.startsWith('static:')){const n=+key.split(':')[1];act=(window._actsIndex||{})[n];}
+  else if(key.startsWith('custom:')){act=DB.customActivities().find(x=>x.id===key.split(':')[1]);}
+  if(!act){toast('تعذّر إيجاد النشاط','error');return;}
+  const branchId=(scope==='branch'||scope==='teacher')?document.getElementById('sa-branch')?.value:null;
+  const teacherId=scope==='teacher'?document.getElementById('sa-teacher')?.value:null;
+  const teacherName=teacherId?(DB.users().find(u=>u.id===teacherId)?.name||''):'';
+  if(scope==='teacher'&&!teacherId){toast('اختر المعلمة','error');return;}
+  DB.addActivityAssignment({
+    actKey:key,name:act.name,goal:act.goal,age:act.age,time:act.time,materials:act.materials,steps:act.steps,tips:act.tips,catKey:act.catKey||'custom',
+    scope,branchId:branchId||null,teacherId:teacherId||null,teacherName,
+    sentBy:Auth.user?.id||'',sentByName:Auth.user?.name||'الإدارة'
+  });
+  DB.addAuditLog({action:'إرسال نشاط',entity:'أنشطة',entityId:key,details:`${act.name} → ${scope==='all'?'الكل':scope==='branch'?DB.branchName(branchId):teacherName}`,by:Auth.user?.name||'—'});
+  toast('📤 تم إرسال النشاط للمعلمات');
+  App.closeModal();App.go('activities',{actTab:'track'});
+}
+// المعلمة تعلّم التنفيذ
+function teacherReportActivity(assignmentId,done){
+  const me=Auth.user;if(!me)return;
+  const note=(document.getElementById('actnote-'+assignmentId)?.value||'').trim();
+  const prev=DB.activityReports().find(r=>r.assignmentId===assignmentId&&r.teacherId===me.id);
+  DB.setActivityReport({assignmentId,teacherId:me.id,teacherName:me.name,branchId:me.branchId,done,note,photo:prev?.photo||''});
+  toast(done?'✅ تم تعليم النشاط كمنفّذ':'❌ تم تعليمه كغير منفّذ');
+  App.refresh();
+}
+function teacherActivityPhoto(assignmentId,input){
+  const me=Auth.user;if(!me)return;
+  const file=input.files[0];if(!file)return;
+  if(file.size>3*1024*1024){toast('حجم الصورة يجب أن لا يتجاوز 3 ميجابايت','error');input.value='';return;}
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    const prev=DB.activityReports().find(r=>r.assignmentId===assignmentId&&r.teacherId===me.id)||{};
+    DB.setActivityReport({assignmentId,teacherId:me.id,teacherName:me.name,branchId:me.branchId,done:prev.done,note:prev.note||'',photo:ev.target.result});
+    toast('📷 تم إرفاق الصورة');App.refresh();
+  };
+  reader.readAsDataURL(file);
+}
+function deleteActivityAssignment(id){
+  if(!confirm('حذف هذا الإرسال وسجلات تنفيذه؟')) return;
+  DB.deleteActivityAssignment(id);
+  toast('🗑️ تم حذف الإرسال');App.refresh();
 }
 
 // =========================================================
