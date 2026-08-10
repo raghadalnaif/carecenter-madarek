@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v62 -->
+<!-- BUILD: 2026-06-24-v63 -->
 <script>
 (function(){
-  var BUILD='v62-20260624-1';
+  var BUILD='v63-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -1040,10 +1040,8 @@ const App = {
       ]},
     ] : [
       {items:[
-        {v:'attendance',icon:'✅',label:'تسجيل الحضور'},
-        {v:'my_reports',icon:'📊',label:'تقارير الحضور'},
-        {v:'myAttendance',icon:'🕐',label:'حضوري'},
         {v:'activities',icon:'🎯',label:'أنشطتي'},
+        {v:'myAttendance',icon:'🕐',label:'حضوري'},
         {v:'messages',icon:'💬',label:'الرسائل الداخلية'},
       ]},
     ];
@@ -1189,7 +1187,8 @@ const App = {
       reports:()=>role!=='teacher',
       whatsapp:()=>role!=='teacher',
       teachers:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
-      my_reports:()=>role==='teacher',
+      attendance:()=>role!=='teacher',
+      my_reports:()=>false,
       myAttendance:()=>role==='teacher',
       activities:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin()||role==='teacher',
       sales:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
@@ -1332,7 +1331,7 @@ dashboard(){
   const u=Auth.user;
   if(u.role==='superadmin') return Views._superDash();
   if(u.role==='school_admin') return Views._schoolDash();
-  return Views.attendance();
+  return Views.activities(); // المعلمة: صفحة الأنشطة هي الرئيسية
 },
 
 _superDash(){
