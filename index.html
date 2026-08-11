@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v71 -->
+<!-- BUILD: 2026-06-24-v72 -->
 <script>
 (function(){
-  var BUILD='v71-20260624-1';
+  var BUILD='v72-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -3051,10 +3051,10 @@ _teacherActivities(catColors){
           ${a.tips?`<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:3px">💡 نصيحة</div><div style="font-size:12px;color:#78350f;line-height:1.7">${esc(a.tips)}</div></div>`:''}
           ${a.attachment?`<a href="${a.attachment.data}" download="${esc(a.attachment.name)}" style="display:inline-flex;align-items:center;gap:6px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;text-decoration:none;margin-bottom:14px">📎 ${esc(a.attachment.name)} (${a.attachment.size||''})</a>`:''}
           <div style="border-top:1px solid #e2e8f0;padding-top:14px">
-            <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">هل نفّذتِ النشاط؟ <span style="color:#dc2626">(صورة الإثبات إلزامية للتنفيذ)</span></div>
+            <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">هل نفّذتِ النشاط؟ <span style="color:#dc2626">(الصورة إلزامية للتنفيذ)</span></div>
             <textarea id="actnote-${a.id}" class="input" rows="2" placeholder="ملاحظة (اختياري): كيف تم التنفيذ، عدد الأطفال..." style="resize:none;margin-bottom:8px">${esc(r?.note||'')}</textarea>
             <label style="cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;padding:9px 12px;border:1.5px ${r?.photo?'solid #86efac':'dashed #f59e0b'};border-radius:8px;background:${r?.photo?'#f0fdf4':'#fffbeb'};color:${r?.photo?'#166534':'#92400e'};margin-bottom:10px">
-              ${r?.photo?'✅ تم إرفاق صورة الإثبات — اضغطي لتغييرها':'📷 أرفقي صورة إثبات التنفيذ (إلزامية) *'}
+              ${r?.photo?'✅ تم إرفاق الصورة — اضغطي لتغييرها':'📷 أرفقي صورة التنفيذ (إلزامية) *'}
               <input type="file" accept="image/*" capture="environment" style="display:none" onchange="teacherActivityPhoto('${a.id}',this)">
             </label>
             ${r?.photo?`<div style="margin-bottom:10px"><a href="${r.photo}" target="_blank"><img src="${r.photo}" style="max-height:90px;border-radius:8px;border:1px solid #e2e8f0"></a></div>`:''}
@@ -9236,8 +9236,8 @@ function teacherReportActivity(assignmentId,done){
   const me=Auth.user;if(!me)return;
   const note=(document.getElementById('actnote-'+assignmentId)?.value||'').trim();
   const prev=DB.activityReports().find(r=>r.assignmentId===assignmentId&&r.teacherId===me.id);
-  // صورة الإثبات إلزامية عند تعليم «تم التنفيذ»
-  if(done&&!(prev&&prev.photo)){toast('📷 أرفقي صورة إثبات التنفيذ أولاً — إلزامية','error');return;}
+  // الصورة إلزامية عند تعليم «تم التنفيذ»
+  if(done&&!(prev&&prev.photo)){toast('📷 أرفقي صورة التنفيذ أولاً — إلزامية','error');return;}
   DB.setActivityReport({assignmentId,teacherId:me.id,teacherName:me.name,branchId:me.branchId,done,note,photo:prev?.photo||''});
   toast(done?'✅ تم تعليم النشاط كمنفّذ':'❌ تم تعليمه كغير منفّذ');
   App.refresh();
