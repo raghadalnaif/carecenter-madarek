@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v69 -->
+<!-- BUILD: 2026-06-24-v70 -->
 <script>
 (function(){
-  var BUILD='v69-20260624-1';
+  var BUILD='v70-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -6666,6 +6666,7 @@ function doLogin(){
 // ===== تحضير الموظفين الذاتي (باركود + GPS) =====
 function _nowHM(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
 function _minsBetween(t1,t2){if(!t1||!t2)return 0;const[a,b]=t1.split(':').map(Number),[c,d]=t2.split(':').map(Number);return (c*60+d)-(a*60+b);}
+function _fmtDur(min){min=Math.max(0,Math.round(+min||0));const h=Math.floor(min/60),m=min%60;return (h?h+'س ':'')+m+'د';}
 // المسافة بالأمتار بين إحداثيتين (Haversine)
 function _geoDistance(lat1,lng1,lat2,lng2){
   const R=6371000,rad=x=>x*Math.PI/180;
