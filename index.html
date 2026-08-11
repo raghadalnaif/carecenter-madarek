@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v68 -->
+<!-- BUILD: 2026-06-24-v69 -->
 <script>
 (function(){
-  var BUILD='v68-20260624-1';
+  var BUILD='v69-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -2478,38 +2478,52 @@ reports(){
 
 // ---------- USERS ----------
 users(){
-  const users=DB.users();
-  const schools=DB.schools();
   const branches=DB.branches();
   const roleMap={superadmin:'مدير عام',school_admin:'مديرة فرع',teacher:'معلمة'};
+  const emps=DB.hrEmployees().filter(e=>e.status!=='deleted');
+  const linkedEmp=(u)=>emps.find(e=>e.id===u.employeeId||e.userId===u.id);
+  // ترتيب: مدير عام ← مدراء فروع ← معلمات، ثم بالفرع، ثم بالاسم
+  const roleOrder={superadmin:0,school_admin:1,teacher:2};
+  const bName=(id)=>branches.find(x=>x.id===id)?.name||'';
+  const users=[...DB.users()].sort((a,b)=>{
+    const r=(roleOrder[a.role]??9)-(roleOrder[b.role]??9);if(r)return r;
+    const bn=bName(a.branchId).localeCompare(bName(b.branchId),'ar');if(bn)return bn;
+    return (a.name||'').localeCompare(b.name||'','ar');
+  });
+  const unlinkedTeachers=users.filter(u=>(u.role==='teacher'||u.role==='school_admin')&&!linkedEmp(u)).length;
   return `
   <div class="section-header">
-    <h2>إدارة المستخدمين</h2>
+    <h2>إدارة المستخدمين (${users.length})</h2>
     <button class="btn btn-primary btn-sm" onclick="Modals.addUser()">+ إضافة مستخدم</button>
   </div>
+  ${unlinkedTeachers?`<div class="alert-box alert-yellow" style="margin-bottom:12px">🔗 <div><strong>${unlinkedTeachers} حساب غير مربوط بموظف</strong> — اربطيه من زر «🔗 ربط» ليعمل سجل الحضور والإجازات.</div></div>`:''}
   <div class="card">
-    <table>
-      <thead><tr><th>الاسم</th><th>اسم المستخدم</th><th>كلمة المرور</th><th>الدور</th><th>الفرع المُعيَّن</th><th>الهاتف</th><th>إجراءات</th></tr></thead>
+    <div class="table-wrap"><table>
+      <thead><tr><th>الاسم</th><th>اسم المستخدم</th><th>كلمة المرور</th><th>الدور</th><th>الفرع</th><th>🔗 الموظف المرتبط</th><th>الهاتف</th><th>إجراءات</th></tr></thead>
       <tbody>
         ${users.map(u=>{
           const branch=branches.find(b=>b.id===u.branchId);
-          const branchLabel=u.role==='school_admin'
-            ? (branch?`<span class="badge badge-blue">🏢 ${esc(branch.name)}</span>`:`<span class="badge badge-red" style="cursor:pointer" onclick="Modals.editUser('${u.id}')">⚠️ لم يُحدَّد الفرع</span>`)
+          const branchLabel=(u.role==='school_admin'||u.role==='teacher')
+            ? (branch?`<span class="badge badge-blue">🏢 ${esc(branch.name.split(' - ')[0]||branch.name)}</span>`:`<span class="badge badge-red">⚠️ بدون فرع</span>`)
             : '—';
+          const le=linkedEmp(u);
+          const linkCell=le?`<span class="badge badge-green">🔗 ${esc(le.name)}</span>`
+            :(u.role==='teacher'||u.role==='school_admin')?`<button class="btn btn-xs" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe" onclick="Modals.editUser('${u.id}')">🔗 ربط بموظف</button>`:'—';
           return `<tr>
           <td><strong>${esc(u.name)}</strong></td>
           <td><code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:13px">${esc(u.username)}</code></td>
           <td><code style="background:#fef9c3;padding:2px 8px;border-radius:4px;font-size:13px;letter-spacing:1px">${esc(u.password||'—')}</code></td>
           <td><span class="badge ${u.role==='superadmin'?'badge-red':u.role==='school_admin'?'badge-blue':'badge-green'}">${roleMap[u.role]||u.role}</span></td>
           <td>${branchLabel}</td>
+          <td>${linkCell}</td>
           <td>${u.phone||'—'}</td>
-          <td>
+          <td style="white-space:nowrap">
             <button class="btn btn-secondary btn-xs" onclick="Modals.editUser('${u.id}')">تعديل</button>
             ${u.id!=='sa1'?`<button class="btn btn-danger btn-xs" onclick="deleteUser('${u.id}')">حذف</button>`:''}
           </td>
         </tr>`;}).join('')}
       </tbody>
-    </table>
+    </table></div>
   </div>`;
 },
 
@@ -6226,6 +6240,18 @@ const Modals = {
           <select class="input" id="u-school">${schools.map(s=>`<option value="${s.id}" ${u.schoolId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select>
         </div>
         <div class="input-group"><label>الهاتف</label><input class="input" id="u-phone" value="${esc(u.phone||'')}"></div>
+        ${(()=>{
+          const emps=DB.hrEmployees().filter(e=>e.status!=='deleted');
+          const cur=emps.find(e=>e.id===u.employeeId||e.userId===u.id);
+          return `<div class="input-group" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px">
+            <label style="color:#166534">🔗 ربط بموظف في الموارد البشرية</label>
+            <select class="input" id="u-emplink">
+              <option value="">— بدون ربط —</option>
+              ${emps.map(e=>`<option value="${e.id}" ${cur?.id===e.id?'selected':''}>${esc(e.name)}${e.jobTitle?' · '+esc(e.jobTitle):''}${(e.userId&&e.userId!==u.id)?' (مرتبط بحساب آخر)':''}</option>`).join('')}
+            </select>
+            <small style="font-size:11px;color:#64748b;margin-top:4px;display:block">الربط يفعّل «حضوري» و«إجازاتي» لهذا الحساب. ${cur?'مرتبط حالياً بـ: '+esc(cur.name):'غير مربوط'}</small>
+          </div>`;
+        })()}
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" onclick="saveUser(true)">حفظ التعديلات</button>
@@ -8550,15 +8576,31 @@ function saveUser(edit=false){
   const branchId=document.getElementById('u-branch')?.value||'';
   const period=document.getElementById('u-period')?.value||'morning';
   if(role==='school_admin'&&!branchId){alert('⚠️ يجب تحديد الفرع لمديرة الفرع');return}
+  let savedUserId=null;
   if(edit){
     const orig=DB.users().find(x=>x.id===document.getElementById('u-id')?.value);
     if(!orig){toast('⚠️ المستخدم غير موجود','error');App.closeModal();return;}
     const u={...orig,name,username,role,schoolId,branchId,period,phone};
     if(pass) u.password=pass;
-    DB.updateUser(u);
+    DB.updateUser(u);savedUserId=u.id;
   } else {
     if(DB.users().find(x=>x.username===username)){alert('اسم المستخدم مستخدم مسبقاً');return}
-    DB.addUser({id:uid(),name,username,password:pass,role,schoolId,branchId,period,phone});
+    savedUserId=uid();
+    DB.addUser({id:savedUserId,name,username,password:pass,role,schoolId,branchId,period,phone});
+  }
+  // ===== ربط الحساب بموظف في الموارد البشرية =====
+  const linkEl=document.getElementById('u-emplink');
+  if(linkEl){
+    const empId=linkEl.value;
+    // فك أي ربط سابق لهذا الحساب
+    DB.hrEmployees().forEach(e=>{if(e.userId===savedUserId&&e.id!==empId)DB.updateHrEmployee({...e,userId:null});});
+    const usr=DB.users().find(x=>x.id===savedUserId);
+    if(empId){
+      const emp=DB.hrEmployees().find(e=>e.id===empId);
+      if(emp){DB.updateHrEmployee({...emp,userId:savedUserId});if(usr)DB.updateUser({...usr,employeeId:empId});}
+    } else if(usr&&usr.employeeId){
+      DB.updateUser({...usr,employeeId:null});
+    }
   }
   DB.addAuditLog({action:edit?'تعديل مستخدم':'إضافة مستخدم',entity:'مستخدم',entityId:username,details:`${name} (${username}) — دور: ${role}`,by:Auth.user?.name||'—'});
   toast(edit?'✅ تم حفظ المستخدم':'✅ تم إضافة المستخدم');
