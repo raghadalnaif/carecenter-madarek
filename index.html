@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v79 -->
+<!-- BUILD: 2026-06-24-v80 -->
 <script>
 (function(){
-  var BUILD='v79-20260624-1';
+  var BUILD='v80-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -2660,7 +2660,7 @@ myLeaves(){
   const emp=Views._teacherEmployee(me);
   if(!emp) return `<div style="padding:20px"><div class="card"><div class="empty-state"><div class="es-icon">🔗</div><p style="font-weight:700;color:#64748b">لم يُربط حسابك بملف موظف</p><p style="font-size:13px;margin-top:6px">راجعي الإدارة لربط اسمك (${esc(me.name)}) بملفك في الموارد البشرية.</p></div></div></div>`;
   const bal=Views._annualBalance(emp);
-  const typeLabel={annual:'سنوية',sick:'مرضية',haj:'حج',maternity:'أمومة',emergency:'طارئة',unpaid:'بدون راتب',official:'إذن رسمي'};
+  const typeLabel={annual:'سنوية',sick:'مرضية',haj:'حج',maternity:'أمومة',emergency:'طارئة',unpaid:'بدون راتب',official:'إذن رسمي',permission:'⏰ استئذان'};
   const mine=DB.hrLeaves().filter(l=>l.employeeId===emp.id).sort((a,b)=>(b.startDate||'').localeCompare(a.startDate||''));
   return `
   <div style="padding:20px">
@@ -2685,8 +2685,8 @@ myLeaves(){
           const st=l.status==='approved'?'<span class="badge badge-green">✅ موافق</span>':l.status==='rejected'?'<span class="badge badge-red">❌ مرفوض</span>':'<span class="badge badge-yellow">⏳ قيد المراجعة</span>';
           return `<tr>
             <td style="font-weight:600">${typeLabel[l.type]||l.type}</td>
-            <td>${formatDate(l.startDate)}</td><td>${formatDate(l.endDate)}</td>
-            <td style="text-align:center;font-weight:700">${l.days}</td>
+            <td>${formatDate(l.startDate)}</td><td>${l.type==='permission'?'—':formatDate(l.endDate)}</td>
+            <td style="text-align:center;font-weight:700">${l.type==='permission'?`⏰ ${l.fromTime||''}–${l.toTime||''}`:l.days}</td>
             <td>${st}</td>
             <td style="font-size:12px;color:#64748b;max-width:160px">${esc(l.reason||'—')}</td>
             <td>${l.attachment?`<a href="${l.attachment.data}" download="${esc(l.attachment.name)}" style="color:#1d4ed8">📎</a>`:'—'}</td>
@@ -5037,7 +5037,7 @@ hr(){
     if(empFilter!=='all') leaves=leaves.filter(l=>l.employeeId===empFilter);
     if(typeFilter!=='all') leaves=leaves.filter(l=>l.type===typeFilter);
     leaves.sort((a,b)=>b.startDate>a.startDate?1:-1);
-    const typeLabel={annual:'سنوية',sick:'مرضية',haj:'حج',maternity:'أمومة',emergency:'طارئة',unpaid:'بدون راتب',official:'إذن رسمي'};
+    const typeLabel={annual:'سنوية',sick:'مرضية',haj:'حج',maternity:'أمومة',emergency:'طارئة',unpaid:'بدون راتب',official:'إذن رسمي',permission:'⏰ استئذان'};
     const typeColor={annual:'#059669',sick:'#ef4444',haj:'#0284c7',maternity:'#c026d3',emergency:'#f59e0b',unpaid:'#64748b',official:'#8b5cf6'};
     content=`
     <div>
@@ -5068,8 +5068,8 @@ hr(){
               <td style="text-align:center;font-size:12px" title="متبقٍ من أصل ${bal.accrued} تراكمي"><b style="color:${(+bal.remaining||0)<0?'#dc2626':'#059669'}">${bal.remaining}</b><span style="color:#94a3b8">/${bal.accrued}</span></td>
               <td><span style="color:${tc};font-weight:600;font-size:12px">${typeLabel[l.type]||l.type}</span></td>
               <td>${formatDate(l.startDate)}</td>
-              <td>${formatDate(l.endDate)}</td>
-              <td style="font-weight:700;text-align:center">${l.days}</td>
+              <td>${l.type==='permission'?'—':formatDate(l.endDate)}</td>
+              <td style="font-weight:700;text-align:center">${l.type==='permission'?`⏰ ${l.fromTime||''}–${l.toTime||''}`:l.days}</td>
               <td>${stBadge}</td>
               <td style="font-size:12px;color:#64748b;max-width:150px">${esc(l.reason||'—')}${l.decidedBy?`<br><small style="color:#94a3b8">${l.status==='approved'?'وافق':'رفض'}: ${esc(l.decidedBy)}</small>`:''}</td>
               <td style="white-space:nowrap">
@@ -5166,18 +5166,22 @@ const Modals = {
   requestLeave(){
     const emp=Views._teacherEmployee(Auth.user);
     const bal=Views._annualBalance(emp);
-    const typeLabel={annual:'سنوية',sick:'مرضية',emergency:'طارئة',official:'إذن رسمي',unpaid:'بدون راتب'};
+    const typeLabel={annual:'سنوية',sick:'مرضية',emergency:'طارئة',official:'إذن رسمي',unpaid:'بدون راتب',permission:'⏰ استئذان (خلال اليوم)'};
     _hlAttach=null;
     App.showModal(`
     <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
     <div class="modal" style="max-width:480px">
-      <div class="modal-header"><h2>➕ طلب إجازة</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+      <div class="modal-header"><h2>➕ طلب إجازة / استئذان</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
       <div class="modal-body">
         <div style="background:#f0fdf4;border-radius:8px;padding:8px 12px;font-size:12px;color:#166534;margin-bottom:12px">🏖️ رصيدك المتبقي (تراكمي): <b>${bal.remaining}</b> يوم — مستحق ${bal.accrued} − مستخدم ${bal.used}</div>
-        <div class="input-group"><label>نوع الإجازة</label><select class="input" id="lr-type">${Object.entries(typeLabel).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div>
+        <div class="input-group"><label>النوع</label><select class="input" id="lr-type" onchange="_lrTypeChange()">${Object.entries(typeLabel).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div>
         <div class="grid-2">
           <div class="input-group"><label>من *</label><input class="input" id="lr-start" type="date" value="${T0}" onchange="_lrDays()"></div>
-          <div class="input-group"><label>إلى *</label><input class="input" id="lr-end" type="date" value="${T0}" onchange="_lrDays()"></div>
+          <div class="input-group" id="lr-end-wrap"><label>إلى *</label><input class="input" id="lr-end" type="date" value="${T0}" onchange="_lrDays()"></div>
+        </div>
+        <div class="grid-2" id="lr-time-row" style="display:none">
+          <div class="input-group"><label>من الساعة *</label><input class="input" id="lr-from-time" type="time" value="10:00"></div>
+          <div class="input-group"><label>إلى الساعة *</label><input class="input" id="lr-to-time" type="time" value="11:00"></div>
         </div>
         <div id="lr-days" style="font-size:13px;font-weight:700;color:#0f766e;margin-bottom:10px">١ يوم</div>
         <div class="input-group"><label>السبب (اختياري)</label><textarea class="input" id="lr-reason" rows="2"></textarea></div>
@@ -7158,7 +7162,7 @@ function printHrEmployee(id){
   const gratFull=Math.min(gratYears,5)*((+e.basicSalary||0)/2)+Math.max(0,gratYears-5)*(+e.basicSalary||0);
   const totalSalary=(+e.basicSalary||0)+(+e.housingAllowance||0)+(+e.transportAllowance||0)+(+e.otherAllowances||0);
   const recentLeaves=DB.hrLeaves().filter(l=>l.employeeId===id&&l.status==='approved').sort((a,b)=>b.startDate>a.startDate?1:-1).slice(0,8);
-  const typeLabel={annual:'سنوية',sick:'مرضية',haj:'حج',maternity:'أمومة',emergency:'طارئة',unpaid:'بدون راتب',official:'إذن رسمي'};
+  const typeLabel={annual:'سنوية',sick:'مرضية',haj:'حج',maternity:'أمومة',emergency:'طارئة',unpaid:'بدون راتب',official:'إذن رسمي',permission:'⏰ استئذان'};
   const win=window.open('','_blank','width=800,height=900');
   win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>ملف الموظف - ${esc(e.name)}</title>
   <style>
@@ -7488,9 +7492,10 @@ function deleteHrLeave(id){
 function approveLeave(id){
   const l=DB.hrLeaves().find(x=>x.id===id);if(!l)return;
   DB.updateHrLeave({...l,status:'approved',decidedBy:Auth.user?.name||'—',decidedAt:new Date().toISOString()});
-  if(l.startDate<=T0&&l.endDate>=T0){const e=DB.hrEmployees().find(x=>x.id===l.employeeId);if(e&&e.status==='active')DB.updateHrEmployee({...e,status:'on_leave'});}
-  DB.addAuditLog({action:'قبول إجازة',entity:'HR',entityId:id,details:`${l.days} يوم`,by:Auth.user?.name||'—'});
-  toast('✅ تمت الموافقة على الإجازة');App.refresh();
+  // الاستئذان (ساعات) لا يغيّر حالة الموظف ليوم كامل
+  if(l.type!=='permission'&&l.startDate<=T0&&l.endDate>=T0){const e=DB.hrEmployees().find(x=>x.id===l.employeeId);if(e&&e.status==='active')DB.updateHrEmployee({...e,status:'on_leave'});}
+  DB.addAuditLog({action:l.type==='permission'?'قبول استئذان':'قبول إجازة',entity:'HR',entityId:id,details:l.type==='permission'?`${l.fromTime}-${l.toTime}`:`${l.days} يوم`,by:Auth.user?.name||'—'});
+  toast(l.type==='permission'?'✅ تمت الموافقة على الاستئذان':'✅ تمت الموافقة على الإجازة');App.refresh();
 }
 function rejectLeave(id){
   const l=DB.hrLeaves().find(x=>x.id===id);if(!l)return;
@@ -7509,14 +7514,32 @@ function _lrDays(){
   const s=document.getElementById('lr-start')?.value,e=document.getElementById('lr-end')?.value,d=document.getElementById('lr-days');
   if(s&&e&&e>=s&&d) d.textContent=(diffDays(e,s)+1)+' يوم';
 }
+// تبديل حقول الاستئذان (وقت) بدل تواريخ الإجازة
+function _lrTypeChange(){
+  const isPerm=document.getElementById('lr-type')?.value==='permission';
+  const tr=document.getElementById('lr-time-row');if(tr)tr.style.display=isPerm?'grid':'none';
+  const endWrap=document.getElementById('lr-end-wrap');if(endWrap)endWrap.style.display=isPerm?'none':'block';
+  const daysEl=document.getElementById('lr-days');if(daysEl)daysEl.style.display=isPerm?'none':'block';
+}
 function saveLeaveRequest(){
   const me=Auth.user;const emp=Views._teacherEmployee(me);
   if(!emp){toast('حسابك غير مربوط بموظف','error');return;}
   const type=document.getElementById('lr-type')?.value;
   const startDate=document.getElementById('lr-start')?.value;
-  const endDate=document.getElementById('lr-end')?.value;
   const reason=(document.getElementById('lr-reason')?.value||'').trim();
-  if(!type||!startDate||!endDate){toast('عبّي النوع والتواريخ','error');return;}
+  if(!type||!startDate){toast('عبّي النوع والتاريخ','error');return;}
+  // استئذان خلال اليوم (بالساعات)
+  if(type==='permission'){
+    const fromTime=document.getElementById('lr-from-time')?.value;
+    const toTime=document.getElementById('lr-to-time')?.value;
+    if(!fromTime||!toTime){toast('حددي وقت الاستئذان','error');return;}
+    if(toTime<=fromTime){toast('وقت النهاية بعد البداية','error');return;}
+    DB.addHrLeave({id:uid(),employeeId:emp.id,type:'permission',startDate,endDate:startDate,days:0,fromTime,toTime,reason,status:'pending',attachment:_hlAttach||null,addedAt:T0,addedBy:me.name,requestedByTeacher:true});
+    DB.addAuditLog({action:'طلب استئذان',entity:'HR',entityId:emp.id,details:`${startDate} ${fromTime}-${toTime}`,by:me.name});
+    _hlAttach=null;toast('✅ تم رفع طلب الاستئذان للإدارة');App.closeModal();App.go('myLeaves');return;
+  }
+  const endDate=document.getElementById('lr-end')?.value;
+  if(!endDate){toast('عبّي تاريخ النهاية','error');return;}
   if(endDate<startDate){toast('تاريخ الانتهاء قبل البداية','error');return;}
   const days=diffDays(endDate,startDate)+1;
   DB.addHrLeave({id:uid(),employeeId:emp.id,type,startDate,endDate,days,reason,status:'pending',attachment:_hlAttach||null,addedAt:T0,addedBy:me.name,requestedByTeacher:true});
