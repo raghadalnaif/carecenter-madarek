@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v75 -->
+<!-- BUILD: 2026-06-24-v76 -->
 <script>
 (function(){
-  var BUILD='v75-20260624-1';
+  var BUILD='v76-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -2628,14 +2628,20 @@ _teacherEmployee(u){
   const nm=(u.name||'').trim();
   return emps.find(e=>(e.name||'').trim()===nm)||null;
 },
-// رصيد الإجازة السنوية (نظام العمل السعودي: 21 يوم <5 سنوات، 30 يوم ≥5)
+// رصيد الإجازة السنوية التراكمي (نظام العمل السعودي: 21 يوم/سنة أول 5 سنوات، ثم 30 يوم/سنة)
+// يُحسب المستحق عن كل سنوات الخدمة منذ التعيين، ناقص كل الإجازات السنوية المستخدمة (كل السنوات)
 _annualBalance(e){
-  if(!e||!e.contractStart) return {entitled:21,used:0,remaining:21,years:0};
-  const years=Math.max(0,(new Date(T0)-new Date(e.contractStart))/31557600000);
-  const entitled=years>=5?30:21;
-  const yS=T0.slice(0,4)+'-01-01',yE=T0.slice(0,4)+'-12-31';
-  const used=DB.hrLeaves().filter(l=>l.employeeId===e.id&&l.type==='annual'&&l.status==='approved'&&l.startDate>=yS&&l.startDate<=yE).reduce((a,l)=>a+(+l.days||0),0);
-  return {entitled,used,remaining:Math.max(0,entitled-used),years:Math.round(years*10)/10};
+  if(!e||!e.contractStart) return {entitled:21,accrued:21,used:0,remaining:21,years:0};
+  const start=new Date(e.contractStart+'T00:00:00'), now=new Date(T0+'T00:00:00');
+  const years=Math.max(0,(now-start)/31557600000);
+  const fullYears=Math.floor(years);
+  let accrued=0;
+  for(let i=0;i<fullYears;i++) accrued += (i>=5?30:21);       // سنوات كاملة
+  accrued += (fullYears>=5?30:21)*(years-fullYears);           // جزء السنة الحالية
+  accrued=Math.round(accrued);
+  const used=DB.hrLeaves().filter(l=>l.employeeId===e.id&&l.type==='annual'&&l.status==='approved').reduce((a,l)=>a+(+l.days||0),0);
+  const entitled=years>=5?30:21; // استحقاق السنة الحالية (للعرض)
+  return {entitled,accrued,used,remaining:accrued-used,years:Math.round(years*10)/10};
 },
 // واجهة المعلمة: إجازاتي (رصيد + رفع طلب + متابعة الحالة)
 myLeaves(){
@@ -2656,8 +2662,8 @@ myLeaves(){
       <button class="btn" style="background:#fff;color:#0369a1;font-weight:800;border:none" onclick="Modals.requestLeave()">➕ طلب إجازة</button>
     </div>
     <div class="stats-grid">
-      <div class="stat-card green"><div class="stat-val">${bal.remaining}</div><div class="stat-lbl">رصيد سنوي متبقٍ (من ${bal.entitled} يوم)</div></div>
-      <div class="stat-card yellow"><div class="stat-val">${bal.used}</div><div class="stat-lbl">مستخدم هذا العام</div></div>
+      <div class="stat-card green"><div class="stat-val">${bal.remaining}</div><div class="stat-lbl">الرصيد المتبقي (تراكمي)<br><small style="color:#94a3b8">مستحق ${bal.accrued} − مستخدم ${bal.used}</small></div></div>
+      <div class="stat-card yellow"><div class="stat-val">${bal.used}</div><div class="stat-lbl">إجمالي الأيام المستخدمة</div></div>
       <div class="stat-card blue"><div class="stat-val">${mine.filter(l=>l.status==='pending').length}</div><div class="stat-lbl">طلبات قيد المراجعة</div></div>
     </div>
     <div class="card">
@@ -4826,15 +4832,7 @@ hr(){
     return alerts.join(' · ');
   };
   // رصيد الإجازة السنوية (نظام العمل السعودي: أقل من 5 سنوات 21 يوم، 5 سنوات فأكثر 30 يوم)
-  const annualBalance=(e)=>{
-    if(!e.contractStart) return {entitled:21,used:0,remaining:21};
-    const years=Math.max(0,(new Date(T0)-new Date(e.contractStart))/31557600000);
-    const entitled=years>=5?30:21;
-    const yearStart=T0.slice(0,4)+'-01-01';
-    const yearEnd=T0.slice(0,4)+'-12-31';
-    const used=DB.hrLeaves().filter(l=>l.employeeId===e.id&&l.type==='annual'&&l.status==='approved'&&l.startDate>=yearStart&&l.startDate<=yearEnd).reduce((a,l)=>a+(+l.days||0),0);
-    return {entitled,used,remaining:Math.max(0,entitled-used),years:Math.round(years*10)/10};
-  };
+  const annualBalance=(e)=>Views._annualBalance(e); // رصيد تراكمي موحّد
   let content='';
   if(tab==='employees'){
     const q=(App.params.hrQ||'').trim();
@@ -5049,10 +5047,10 @@ hr(){
             const emp=emps.find(e=>e.id===l.employeeId)||DB.hrEmployees().find(e=>e.id===l.employeeId);
             const stBadge=l.status==='approved'?'<span class="badge badge-green">موافق</span>':l.status==='rejected'?'<span class="badge badge-red">مرفوض</span>':'<span class="badge badge-yellow">⏳ معلق</span>';
             const tc=typeColor[l.type]||'#475569';
-            const bal=emp?annualBalance(emp):{remaining:'—',entitled:''};
+            const bal=emp?annualBalance(emp):{remaining:'—',accrued:''};
             return `<tr style="${l.status==='pending'?'background:#fffdf5':''}">
               <td><strong>${esc(emp?.name||'—')}</strong></td>
-              <td style="text-align:center;font-size:12px"><b style="color:#059669">${bal.remaining}</b><span style="color:#94a3b8">/${bal.entitled}</span></td>
+              <td style="text-align:center;font-size:12px" title="متبقٍ من أصل ${bal.accrued} تراكمي"><b style="color:${(+bal.remaining||0)<0?'#dc2626':'#059669'}">${bal.remaining}</b><span style="color:#94a3b8">/${bal.accrued}</span></td>
               <td><span style="color:${tc};font-weight:600;font-size:12px">${typeLabel[l.type]||l.type}</span></td>
               <td>${formatDate(l.startDate)}</td>
               <td>${formatDate(l.endDate)}</td>
@@ -5160,7 +5158,7 @@ const Modals = {
     <div class="modal" style="max-width:480px">
       <div class="modal-header"><h2>➕ طلب إجازة</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
       <div class="modal-body">
-        <div style="background:#f0fdf4;border-radius:8px;padding:8px 12px;font-size:12px;color:#166534;margin-bottom:12px">🏖️ رصيدك السنوي المتبقي: <b>${bal.remaining}</b> يوم من ${bal.entitled}</div>
+        <div style="background:#f0fdf4;border-radius:8px;padding:8px 12px;font-size:12px;color:#166534;margin-bottom:12px">🏖️ رصيدك المتبقي (تراكمي): <b>${bal.remaining}</b> يوم — مستحق ${bal.accrued} − مستخدم ${bal.used}</div>
         <div class="input-group"><label>نوع الإجازة</label><select class="input" id="lr-type">${Object.entries(typeLabel).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div>
         <div class="grid-2">
           <div class="input-group"><label>من *</label><input class="input" id="lr-start" type="date" value="${T0}" onchange="_lrDays()"></div>
@@ -6422,11 +6420,10 @@ const Modals = {
     const branches=DB.branches();
     // رصيد الإجازة (نظام العمل السعودي)
     const years=e.contractStart?Math.max(0,(new Date(T0)-new Date(e.contractStart))/31557600000):0;
-    const entitled=years>=5?30:21;
-    const yearStart=T0.slice(0,4)+'-01-01';
-    const yearEnd=T0.slice(0,4)+'-12-31';
-    const usedAnnual=DB.hrLeaves().filter(l=>l.employeeId===id&&l.type==='annual'&&l.status==='approved'&&l.startDate>=yearStart&&l.startDate<=yearEnd).reduce((a,l)=>a+(+l.days||0),0);
-    const usedSick=DB.hrLeaves().filter(l=>l.employeeId===id&&l.type==='sick'&&l.status==='approved'&&l.startDate>=yearStart&&l.startDate<=yearEnd).reduce((a,l)=>a+(+l.days||0),0);
+    const _abal=Views._annualBalance(e);
+    const entitled=_abal.accrued; // المستحق التراكمي
+    const usedAnnual=_abal.used;  // كل المستخدم
+    const usedSick=DB.hrLeaves().filter(l=>l.employeeId===id&&l.type==='sick'&&l.status==='approved').reduce((a,l)=>a+(+l.days||0),0);
     // مكافأة نهاية الخدمة (م. العمل السعودي)
     const gratYears=Math.floor(years);
     const gratFull=Math.min(gratYears,5)*((+e.basicSalary||0)/2)+Math.max(0,gratYears-5)*(+e.basicSalary||0);
@@ -6479,7 +6476,7 @@ const Modals = {
           <div style="display:flex;gap:16px;flex-wrap:wrap">
             <div style="text-align:center">
               <div style="font-size:22px;font-weight:700;color:#0f766e">${entitled-usedAnnual}</div>
-              <div style="font-size:11px;color:#475569">متبقي سنوية<br><small>${entitled} يوم ${years>=5?'(5+ سنوات)':'(أقل من 5 سنوات)'}</small></div>
+              <div style="font-size:11px;color:#475569">متبقي سنوية (تراكمي)<br><small>من ${entitled} يوم · ${_abal.years} سنة خدمة</small></div>
             </div>
             <div style="text-align:center">
               <div style="font-size:22px;font-weight:700;color:#f59e0b">${usedAnnual}</div>
