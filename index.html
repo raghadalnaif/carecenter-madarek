@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v76 -->
+<!-- BUILD: 2026-06-24-v77 -->
 <script>
 (function(){
-  var BUILD='v76-20260624-1';
+  var BUILD='v77-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -3112,10 +3112,15 @@ _activityTracking(catColors){
             <button class="btn btn-danger btn-xs" onclick="deleteActivityAssignment('${a.id}')">🗑️ حذف الإرسال</button>
           </div>
         </div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
           ${recs.map(({t,r})=>{
-            const st=r?.done===true?['#dcfce7','#15803d','✅']:r?.done===false?['#fee2e2','#b91c1c','❌']:['#f1f5f9','#64748b','⏳'];
-            return `<span title="${r?.note?esc(r.note):''}" style="background:${st[0]};color:${st[1]};font-size:12px;font-weight:600;padding:3px 9px;border-radius:7px">${st[2]} ${esc(t.name)}${r?.photo?' 📷':''}</span>`;
+            const st=r?.done===true?['#dcfce7','#15803d','✅ نُفّذ']:r?.done===false?['#fee2e2','#b91c1c','❌ لم يُنفّذ']:['#f1f5f9','#64748b','⏳ بانتظار'];
+            return `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;min-width:150px;max-width:190px;background:#fff">
+              <div style="display:flex;align-items:center;gap:6px"><span style="background:${st[0]};color:${st[1]};font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px">${st[2]}</span><span style="font-size:12px;font-weight:600">${esc(t.name)}</span></div>
+              ${r?.note?`<div style="font-size:11px;color:#64748b;margin-top:5px">📝 ${esc(r.note)}</div>`:''}
+              ${r?.photo?`<a href="${r.photo}" target="_blank" title="اضغطي لعرض الصورة كاملة"><img src="${r.photo}" style="width:100%;max-height:110px;object-fit:cover;border-radius:6px;margin-top:6px;border:1px solid #e2e8f0"></a>`:''}
+              ${r?.at?`<div style="font-size:9px;color:#cbd5e1;margin-top:4px">${formatRelTime(r.at)}</div>`:''}
+            </div>`;
           }).join('')}
         </div>
       </div>`;
@@ -6318,6 +6323,13 @@ const Modals = {
           <option value="part" ${e?.contractType==='part'?'selected':''}>دوام جزئي</option>
         </select></div>
       </div>
+      <div class="grid-2">
+        <div class="input-group"><label>🚑 دورة الإسعافات الأولية</label><select class="input" id="hr-firstaid">
+          <option value="no" ${!e?.firstAid?'selected':''}>❌ لا</option>
+          <option value="yes" ${e?.firstAid?'selected':''}>✅ نعم — حاصلة على الدورة</option>
+        </select></div>
+        <div class="input-group"><label>📅 انتهاء شهادة الإسعافات (اختياري)</label><input class="input" id="hr-firstaid-exp" type="date" value="${e?.firstAidExpiry||''}"></div>
+      </div>
       <div style="background:#f0fdf4;border-radius:8px;padding:10px 14px;font-size:12px;color:#166534;font-weight:600">🕐 دوام الموظف الأسبوعي (لحساب التأخير بدقة — الدوام قد يختلف كل يوم)</div>
       ${(()=>{
         const DAYS=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
@@ -6449,6 +6461,7 @@ const Modals = {
             <div style="font-size:12px;color:#475569;margin-top:4px">📱 ${esc(e.phone||'—')}</div>
             <div style="font-size:12px;color:#475569">🌍 ${esc(e.nationality||'—')} · هوية: ${esc(e.nationalId||e.iqamaNo||'—')}</div>
             <div style="font-size:12px;color:#475569;margin-top:4px">📅 تاريخ التوظيف: ${formatDate(e.contractStart)} (${Math.round(years*10)/10} سنوات)</div>
+            <div style="margin-top:6px"><span class="badge ${e.firstAid?'badge-green':'badge-gray'}" style="font-size:11px">🚑 الإسعافات الأولية: ${e.firstAid?'حاصلة ✅':'لا ❌'}</span></div>
           </div>
           <div style="flex:1;min-width:220px;background:#eff6ff;border-radius:10px;padding:14px">
             <div style="font-size:12px;color:#64748b;font-weight:700;margin-bottom:8px">💰 الراتب</div>
@@ -7252,6 +7265,8 @@ function saveHrEmployee(edit=false){
     contractEnd:document.getElementById('hr-end')?.value||'',
     healthCertExpiry:document.getElementById('hr-health-exp')?.value||'',
     contractType:document.getElementById('hr-ctype')?.value||'full',
+    firstAid:document.getElementById('hr-firstaid')?.value==='yes',
+    firstAidExpiry:document.getElementById('hr-firstaid-exp')?.value||'',
     schedule:_readSchedule(),
     dutyStart:(_readSchedule().find(s=>!s.off)||{start:'07:00'}).start, // توافقية: بداية أول يوم عمل
     graceMinutes:+(document.getElementById('hr-grace')?.value||15),
