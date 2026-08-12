@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v73 -->
+<!-- BUILD: 2026-06-24-v74 -->
 <script>
 (function(){
-  var BUILD='v73-20260624-1';
+  var BUILD='v74-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -280,11 +280,13 @@ details[open]>summary span:last-child{transform:rotate(180deg)}
 // =========================================================
 //  HELPERS
 // =========================================================
-const today = () => new Date().toISOString().split('T')[0];
+// صيغة YYYY-MM-DD بالتوقيت المحلي (مو UTC) — يمنع اختفاء الحضور عند منتصف ليل UTC
+const _ymd = (d) => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today = () => _ymd(new Date());
 const addDays = (date, n) => {
   const d = new Date(date + 'T00:00:00');
   d.setDate(d.getDate() + n);
-  return d.toISOString().split('T')[0];
+  return _ymd(d);
 };
 const diffDays = (d1, d2) => Math.round((new Date(d1) - new Date(d2)) / 86400000);
 const formatDate = d => {
@@ -8528,7 +8530,7 @@ function exportAllData(){
     XLSX.utils.book_append_sheet(wb,wsExp,'المصروفات');
   }
 
-  const date=new Date().toISOString().split('T')[0];
+  const date=today();
   XLSX.writeFile(wb,'مدارك-الطفل-تصدير-شامل-'+date+'.xlsx');
 }
 
