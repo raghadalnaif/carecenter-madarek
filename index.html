@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v74 -->
+<!-- BUILD: 2026-06-24-v75 -->
 <script>
 (function(){
-  var BUILD='v74-20260624-1';
+  var BUILD='v75-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -9042,7 +9042,7 @@ function formatRelTime(iso){
   if(m<60) return `منذ ${m} دقيقة`;
   if(h<24) return `منذ ${h} ساعة`;
   if(d<7) return `منذ ${d} يوم`;
-  return formatDate(iso.split('T')[0]);
+  return formatDate(_ymd(new Date(iso))); // تاريخ محلي (ميلادي) بدل UTC
 }
 function toggleNotifPanel(){
   const p=document.getElementById('notif-panel');
