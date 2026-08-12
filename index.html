@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v81 -->
+<!-- BUILD: 2026-06-24-v82 -->
 <script>
 (function(){
-  var BUILD='v81-20260624-1';
+  var BUILD='v82-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -391,14 +391,55 @@ function _onKeyValue(k,val){
       if(typeof toast==='function') setTimeout(()=>toast('💬 رسالة من '+(newest.fromName||'')+': '+((newest.message||'').slice(0,50)||'📎 مرفق')),100);
     }
   }
+  // حماية من مسح الحضور: تجاهل مزامنة فارغة تحاول استبدال حضور موجود محلياً
+  if((k==='attendance'||k==='hr_attendance')&&Array.isArray(val)&&val.length===0){
+    const cur=Array.isArray(_mem[k])?_mem[k]:[];
+    if(cur.length>0){console.warn('[sync] تم تجاهل مزامنة فارغة لـ'+k+' لحماية '+cur.length+' سجل');return;}
+  }
   _mem[k]=val;
   try{localStorage.setItem('ccs_'+k,incoming);}catch{}
+  _backupData(k,val); // نسخ احتياطي للحضور القادم من المزامنة أيضاً
   // ضمان تحديث بيانات المستخدم الحالي إن تغيّر المستخدمون
   if(k==='users'&&Auth.user&&Auth.user.id){
     const fresh=val.find(u=>u.id===Auth.user.id);
     if(fresh){Auth.user=fresh;try{sessionStorage.setItem('ccs_user',JSON.stringify(fresh));}catch{}}
   }
   _scheduleRender();
+}
+// ===== نسخ احتياطي دوري للحضور (حماية من الفقدان) =====
+function _backupData(k,v){
+  if(k!=='attendance'&&k!=='hr_attendance') return;
+  if(!Array.isArray(v)||v.length===0) return; // لا نحفظ نسخة فارغة
+  try{
+    const key='ccs_bak_'+k;
+    let arr=[];try{arr=JSON.parse(localStorage.getItem(key)||'[]');}catch{}
+    // تجنّب حفظ نسخ متطابقة متتالية
+    if(arr[0]&&arr[0].n===v.length&&(Date.now()-arr[0].t)<120000) return;
+    arr.unshift({t:Date.now(),n:v.length,d:v});
+    if(arr.length>6) arr=arr.slice(0,6);
+    localStorage.setItem(key,JSON.stringify(arr));
+  }catch(e){/* تجاوز حد التخزين — نُبقي النسخ القديمة */}
+}
+// استرجاع الحضور من نسخة احتياطية (دمج — لا يخسر أي سجل موجود)
+function restoreAttBackup(kind){
+  if(!Auth.isSuperAdmin()){toast('الاسترجاع للمدير العام فقط','error');return;}
+  let arr=[];try{arr=JSON.parse(localStorage.getItem('ccs_bak_'+kind)||'[]');}catch{}
+  if(!arr.length){alert('لا توجد نسخ احتياطية على هذا الجهاز بعد.');return;}
+  const curArr=DB.get(kind)||[];
+  const list=arr.map((b,i)=>`${i}: ${new Date(b.t).toLocaleString('en-GB')} — ${b.n} سجل`).join('\n');
+  const pick=prompt(`النسخ الاحتياطية للحضور (الحالي: ${curArr.length} سجل):\n\n${list}\n\nاكتبي رقم النسخة للاسترجاع (دمج آمن):`,'0');
+  if(pick===null) return;
+  const b=arr[+pick]; if(!b||!Array.isArray(b.d)){alert('رقم غير صحيح');return;}
+  const keyOf=(a)=>kind==='hr_attendance'?((a.employeeId||'')+'|'+(a.date||'')):((a.childId||'')+'|'+(a.date||''));
+  const map=new Map();
+  curArr.forEach(a=>{if(a)map.set(keyOf(a),a);});
+  let added=0;
+  b.d.forEach(a=>{if(a&&!map.has(keyOf(a))){map.set(keyOf(a),a);added++;}});
+  if(!confirm(`النسخة تحتوي ${b.n} سجل. سيُضاف ${added} سجل مفقود للموجود (${curArr.length}) بدون حذف أي شيء. متابعة؟`)) return;
+  const merged=Array.from(map.values());
+  if(kind==='hr_attendance') DB.saveHrAttendance(merged); else DB.saveAttendance(merged);
+  DB.addAuditLog({action:'استرجاع نسخة حضور',entity:kind,entityId:'backup',details:`أُضيف ${added} سجل`,by:Auth.user?.name||'—'});
+  toast(`🛟 تم استرجاع ودمج ${added} سجل`);App.refresh();
 }
 // تحديث شارة الجرس ونقطة المزامنة في الشريط العلوي مباشرة عند وصول بيانات جديدة
 function _refreshNotifBadge(){
@@ -543,6 +584,7 @@ const DB = {
     let serialized=null;
     try{serialized=JSON.stringify(v);}catch{}
     try{if(serialized!==null)localStorage.setItem('ccs_'+k,serialized)}catch{}
+    _backupData(k,v); // نسخ احتياطي دوري للحضور (حماية من الفقدان)
     // وضع التخزين على الخادم (الأساسي)
     if(_storageMode==='backend'){
       if(serialized===null) return;
@@ -2168,6 +2210,7 @@ attendance(){
     <button class="btn btn-primary btn-sm" onclick="saveAttendance('${date}','${sid||''}')">💾 حفظ الحضور</button>
     <button class="btn btn-success btn-sm" onclick="markAllPresent('${date}','${sid||''}','att-all')">✅ الكل حاضر</button>
     <button class="btn btn-secondary btn-sm" onclick="printAttendanceSheet('${date}','${sid||''}')" title="طباعة ورقة الحضور">🖨️ طباعة</button>
+    ${Auth.isSuperAdmin()?`<button class="btn btn-secondary btn-sm" onclick="restoreAttBackup('attendance')" title="استرجاع الحضور من نسخة احتياطية">🛟 استرجاع</button>`:''}
     ${hiddenNoSub>0?`<button class="btn ${!showNoSub?'btn-warning':'btn-secondary'} btn-sm" onclick="App.go('attendance',{...App.params,showNoSub:'${showNoSub?'0':'1'}'})" title="الأطفال بدون اشتراك فعال أو منتهي">${showNoSub?`🙈 إخفاء غير المشتركين (${hiddenNoSub})`:'👁️ إظهار الكل'}</button>`:''}
     <div style="margin-right:auto;display:flex;gap:8px">
       <span class="badge badge-green">✅ ${Object.values(attMap).filter(a=>a.status==='present').length} حاضر</span>
@@ -4962,6 +5005,7 @@ hr(){
         <button class="btn btn-primary" onclick="markAllHrPresent('${date}')">✅ تسجيل الكل حاضر</button>
         ${_hrAttUndo?`<button class="btn btn-warning" onclick="undoHrAtt()" title="التراجع عن آخر إجراء">↩️ تراجع (${esc(_hrAttUndo.label)})</button>`:''}
         ${Auth.isSuperAdmin()?`<button class="btn btn-secondary" style="color:#dc2626" onclick="clearHrAttDay('${date}')" title="مسح كل حضور هذا اليوم (المدير العام فقط)">🗑️ مسح حضور اليوم</button>`:''}
+        ${Auth.isSuperAdmin()?`<button class="btn btn-secondary" onclick="restoreAttBackup('hr_attendance')" title="استرجاع الحضور من نسخة احتياطية">🛟 استرجاع الحضور</button>`:''}
         <button class="btn btn-secondary" onclick="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:'${date}',hrAttReport:'1'})" style="${App.params.hrAttReport?'background:#0f766e;color:#fff':''}">📊 تقرير الحضور</button>
         <button class="btn btn-secondary" onclick="exportHrAttendanceExcel('${date.slice(0,7)}','${filterBranch}')">📤 تصدير الشهر Excel</button>
       </div>
