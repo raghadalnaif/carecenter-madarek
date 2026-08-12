@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v77 -->
+<!-- BUILD: 2026-06-24-v78 -->
 <script>
 (function(){
-  var BUILD='v77-20260624-1';
+  var BUILD='v78-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -728,7 +728,12 @@ const DB = {
   updateHrLeave(l){const a=this.hrLeaves();const i=a.findIndex(x=>x.id===l.id);if(i>=0)a[i]=l;else a.push(l);this.save('hr_leaves',a)},
   deleteHrLeave(id){this.save('hr_leaves',this.hrLeaves().filter(x=>x.id!==id))},
   hrAttendance(){return this.get('hr_attendance')||[]},
-  saveHrAttendance(list){this.save('hr_attendance',list)},
+  saveHrAttendance(list){
+    // منع التكرار: سجل واحد لكل موظف/يوم (نُبقي الأحدث)
+    const seen=new Map();
+    (list||[]).forEach(a=>{if(!a)return;const k=(a.employeeId&&a.date)?a.employeeId+'|'+a.date:(a.id||Math.random());seen.set(k,a);});
+    this.save('hr_attendance',Array.from(seen.values()));
+  },
   hrPayroll(){return this.get('hr_payroll')||[]},
   addHrPayroll(p){const a=this.hrPayroll();a.push(p);this.save('hr_payroll',a)},
   updateHrPayroll(p){const a=this.hrPayroll();const i=a.findIndex(x=>x.id===p.id);if(i>=0)a[i]=p;else a.push(p);this.save('hr_payroll',a)},
@@ -802,7 +807,12 @@ const DB = {
       return false;
     }).length;
   },
-  saveAttendance(list){this.save('attendance',list)},
+  saveAttendance(list){
+    // منع التكرار: سجل حضور واحد لكل طفل/يوم (نُبقي الأحدث)
+    const seen=new Map();
+    (list||[]).forEach(a=>{if(!a)return;const k=(a.childId&&a.date)?a.childId+'|'+a.date:(a.id||Math.random());seen.set(k,a);});
+    this.save('attendance',Array.from(seen.values()));
+  },
   notifications(){return this.get('notifications')||[]},
   addNotification(n){
     const a=this.notifications();
@@ -4949,7 +4959,7 @@ hr(){
         <input type="date" class="input" style="width:180px" value="${date}" max="${T0}" onchange="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:this.value})">
         <button class="btn btn-primary" onclick="markAllHrPresent('${date}')">✅ تسجيل الكل حاضر</button>
         ${_hrAttUndo?`<button class="btn btn-warning" onclick="undoHrAtt()" title="التراجع عن آخر إجراء">↩️ تراجع (${esc(_hrAttUndo.label)})</button>`:''}
-        <button class="btn btn-secondary" style="color:#dc2626" onclick="clearHrAttDay('${date}')" title="مسح كل حضور هذا اليوم">🗑️ مسح حضور اليوم</button>
+        ${Auth.isSuperAdmin()?`<button class="btn btn-secondary" style="color:#dc2626" onclick="clearHrAttDay('${date}')" title="مسح كل حضور هذا اليوم (المدير العام فقط)">🗑️ مسح حضور اليوم</button>`:''}
         <button class="btn btn-secondary" onclick="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:'${date}',hrAttReport:'1'})" style="${App.params.hrAttReport?'background:#0f766e;color:#fff':''}">📊 تقرير الحضور</button>
         <button class="btn btn-secondary" onclick="exportHrAttendanceExcel('${date.slice(0,7)}','${filterBranch}')">📤 تصدير الشهر Excel</button>
       </div>
@@ -7345,6 +7355,7 @@ function undoHrAtt(){
 }
 // مسح كل حضور يوم معيّن (لتصحيح «تسجيل الكل حاضر» الخاطئ) — قابل للتراجع
 function clearHrAttDay(date){
+  if(!Auth.isSuperAdmin()){toast('حذف/مسح الحضور صلاحية المدير العام فقط','error');return;}
   const bid=Auth.branchId();
   const emps=DB.hrEmployees().filter(e=>e.status!=='deleted'&&(!bid||e.branchId===bid));
   const ids=new Set(emps.map(e=>e.id));
@@ -7356,6 +7367,7 @@ function clearHrAttDay(date){
   toast('🗑️ تم مسح حضور اليوم — اضغط «تراجع» للاستعادة');App.refresh();
 }
 function setHrAtt(empId,date,status){
+  if(!status&&!Auth.isSuperAdmin()){toast('مسح سجل الحضور صلاحية المدير العام فقط','error');return;}
   _snapHrAtt('تغيير حالة موظف');
   // حافظ على أوقات الدخول/الخروج (باركود+GPS) عند التعديل اليدوي للحالة
   const prev=DB.hrAttendance().find(a=>a.employeeId===empId&&a.date===date)||{};
