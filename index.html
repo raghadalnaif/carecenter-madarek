@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v82 -->
+<!-- BUILD: 2026-06-24-v83 -->
 <script>
 (function(){
-  var BUILD='v82-20260624-1';
+  var BUILD='v83-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -2758,7 +2758,7 @@ myAttendance(){
   const absent=recs.filter(a=>a.status==='absent').length;
   const leave=recs.filter(a=>a.status==='leave').length;
   const totalLate=recs.reduce((s,a)=>s+(+a.lateMinutes||0),0);
-  const totalHours=recs.reduce((s,a)=>s+(+a.workedMinutes||0),0);
+  const totalHours=recs.reduce((s,a)=>s+_recWorkedMin(a),0);
   const stMap={present:['✅ حاضر','#16a34a'],late:['⏰ متأخر','#d97706'],absent:['❌ غائب','#dc2626'],leave:['🏖️ إجازة','#7c3aed']};
   return `
   <div style="padding:20px">
@@ -2787,7 +2787,7 @@ myAttendance(){
             <td style="font-weight:600;color:${s[1]}">${s[0]}</td>
             <td style="text-align:center">${a.checkIn||'—'}</td>
             <td style="text-align:center">${a.checkOut||'—'}</td>
-            <td style="text-align:center">${a.workedMinutes?(_fmtDur?_fmtDur(a.workedMinutes):a.workedMinutes+'د'):'—'}</td>
+            <td style="text-align:center">${_recWorkedMin(a)?_fmtDur(_recWorkedMin(a)):'—'}</td>
             <td style="text-align:center;color:${(+a.lateMinutes||0)>0?'#dc2626':'#94a3b8'}">${(+a.lateMinutes||0)>0?a.lateMinutes+' د':'—'}</td>
           </tr>`;}).join('')}
         </tbody>
@@ -5007,6 +5007,7 @@ hr(){
         ${Auth.isSuperAdmin()?`<button class="btn btn-secondary" style="color:#dc2626" onclick="clearHrAttDay('${date}')" title="مسح كل حضور هذا اليوم (المدير العام فقط)">🗑️ مسح حضور اليوم</button>`:''}
         ${Auth.isSuperAdmin()?`<button class="btn btn-secondary" onclick="restoreAttBackup('hr_attendance')" title="استرجاع الحضور من نسخة احتياطية">🛟 استرجاع الحضور</button>`:''}
         <button class="btn btn-secondary" onclick="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:'${date}',hrAttReport:'1'})" style="${App.params.hrAttReport?'background:#0f766e;color:#fff':''}">📊 تقرير الحضور</button>
+        <button class="btn btn-secondary" onclick="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:'${date}',hrHours:'1'})" style="${App.params.hrHours?'background:#0f766e;color:#fff':''}">⏱️ ساعات العمل الشهرية</button>
         <button class="btn btn-secondary" onclick="exportHrAttendanceExcel('${date.slice(0,7)}','${filterBranch}')">📤 تصدير الشهر Excel</button>
       </div>
       ${App.params.hrAttReport?`<div class="card">
@@ -5039,6 +5040,30 @@ hr(){
           <strong>حاسبة التأخر:</strong> كل دقيقة تأخر = راتب يومي ÷ (8 ساعات × 60 دقيقة). الراتب اليومي = الأساسي ÷ 26 يوم عمل.
         </div>
       </div>`:''}
+      ${App.params.hrHours?(()=>{
+        const month=date.slice(0,7);
+        const monthRecs=DB.hrAttendance().filter(a=>(a.date||'').startsWith(month)&&activeEmps.some(e=>e.id===a.employeeId));
+        const byEmp={};
+        monthRecs.forEach(a=>{if(!byEmp[a.employeeId])byEmp[a.employeeId]={min:0,days:0,late:0};byEmp[a.employeeId].min+=_recWorkedMin(a);if(a.status==='present'||a.status==='late')byEmp[a.employeeId].days++;byEmp[a.employeeId].late+=(+a.lateMinutes||0);});
+        const grand=Object.values(byEmp).reduce((s,b)=>s+b.min,0);
+        return `<div class="card">
+          <div class="card-title">⏱️ إجمالي ساعات العمل لكل موظف — ${Views._monthLabel(month)}</div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>الموظف</th><th>أيام الحضور</th><th>إجمالي ساعات العمل</th><th>المتوسط/يوم</th><th>إجمالي التأخر</th></tr></thead>
+            <tbody>
+              ${activeEmps.map(e=>{const b=byEmp[e.id]||{min:0,days:0,late:0};return `<tr>
+                <td><strong>${esc(e.name)}</strong></td>
+                <td style="text-align:center">${b.days}</td>
+                <td style="text-align:center;font-weight:700;color:#0f766e">${b.min?_fmtDur(b.min):'—'}</td>
+                <td style="text-align:center">${b.days?_fmtDur(Math.round(b.min/b.days)):'—'}</td>
+                <td style="text-align:center;color:${b.late?'#dc2626':'#94a3b8'}">${b.late?b.late+' دقيقة':'—'}</td>
+              </tr>`;}).join('')}
+              <tr style="background:#f0fdf4;font-weight:800"><td>الإجمالي</td><td></td><td style="text-align:center;color:#0f766e">${_fmtDur(grand)}</td><td></td><td></td></tr>
+            </tbody>
+          </table></div>
+          <div style="margin-top:10px;font-size:12px;color:#64748b">تُحسب ساعات العمل من وقت الدخول حتى الخروج لكل يوم (باركود/GPS أو يدوي).</div>
+        </div>`;
+      })():''}
       <div class="card">
         <div style="display:flex;flex-direction:column;gap:8px">
           ${activeEmps.length===0?'<p style="color:#94a3b8;text-align:center;padding:32px">لا يوجد موظفون نشطون</p>':''}
@@ -6743,6 +6768,8 @@ function doLogin(){
 function _nowHM(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
 function _minsBetween(t1,t2){if(!t1||!t2)return 0;const[a,b]=t1.split(':').map(Number),[c,d]=t2.split(':').map(Number);return (c*60+d)-(a*60+b);}
 function _fmtDur(min){min=Math.max(0,Math.round(+min||0));const h=Math.floor(min/60),m=min%60;return (h?h+'س ':'')+m+'د';}
+// دقائق العمل الفعلية لسجل حضور (مخزّنة أو محسوبة من الدخول/الخروج)
+function _recWorkedMin(a){if(!a)return 0;if(+a.workedMinutes>0)return +a.workedMinutes;if(a.checkIn&&a.checkOut)return Math.max(0,_minsBetween(a.checkIn,a.checkOut));return 0;}
 // المسافة بالأمتار بين إحداثيتين (Haversine)
 function _geoDistance(lat1,lng1,lat2,lng2){
   const R=6371000,rad=x=>x*Math.PI/180;
@@ -6887,8 +6914,9 @@ function _staffRecord(emp,kind,lat,lng,dist){
     DB.saveHrAttendance(list);
     _scMsg(`✅ تم تسجيل دخولك يا ${esc(emp.name)}<br>🕐 ${now} · 📍 داخل الفرع (${dist}م)${isOff?'<br>🏖️ اليوم إجازتك — سُجّل حضورك بدون احتساب تأخير':(lateBy>0?`<br>⏰ متأخر ${lateBy} دقيقة (دوامك ${dutyStart})`:' · في الوقت 👌')}`,'ok');
   } else {
-    if(prev) list.push({...prev,checkOut:now,checkOutLat:lat,checkOutLng:lng});
-    else list.push({id:uid(),employeeId:emp.id,date,status:'present',checkIn:'',checkOut:now,lateMinutes:0,via:'qr-gps',checkOutLat:lat,checkOutLng:lng});
+    const wm=prev?.checkIn?Math.max(0,_minsBetween(prev.checkIn,now)):0;
+    if(prev) list.push({...prev,checkOut:now,workedMinutes:wm,checkOutLat:lat,checkOutLng:lng});
+    else list.push({id:uid(),employeeId:emp.id,date,status:'present',checkIn:'',checkOut:now,lateMinutes:0,workedMinutes:0,via:'qr-gps',checkOutLat:lat,checkOutLng:lng});
     DB.saveHrAttendance(list);
     const worked=prev?.checkIn?(_minsBetween(prev.checkIn,now)/60).toFixed(1):null;
     _scMsg(`✅ تم تسجيل خروجك يا ${esc(emp.name)}<br>🕐 ${now} · 📍 (${dist}م)${worked?`<br>⏳ ساعات العمل: ${worked} ساعة`:''}`,'ok');
