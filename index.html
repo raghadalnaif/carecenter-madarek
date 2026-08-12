@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v83 -->
+<!-- BUILD: 2026-06-24-v84 -->
 <script>
 (function(){
-  var BUILD='v83-20260624-1';
+  var BUILD='v84-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -7200,13 +7200,9 @@ function hrShowLeaveInfo(){
   } else if(type==='annual'){
     const empId2=document.getElementById('hl-emp')?.value;
     const emp2=empId2?DB.hrEmployees().find(x=>x.id===empId2):null;
-    const years=emp2?.contractStart?Math.max(0,(new Date(T0)-new Date(emp2.contractStart))/31557600000):0;
-    const entitled=years>=5?30:21;
-    const yearStart=T0.slice(0,4)+'-01-01';
-    const yearEnd=T0.slice(0,4)+'-12-31';
-    const used=empId2?DB.hrLeaves().filter(l=>l.employeeId===empId2&&l.type==='annual'&&l.status==='approved'&&l.startDate>=yearStart&&l.startDate<=yearEnd).reduce((a,l)=>a+(+l.days||0),0):0;
+    const b=Views._annualBalance(emp2);
     el.innerHTML=`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#166534">
-      📅 رصيد الإجازة السنوية: <strong>${entitled-used} يوم متبقي</strong> من ${entitled} يوم (${years>=5?'5+ سنوات: 30 يوم':'أقل من 5 سنوات: 21 يوم'}) · مستخدم: ${used} يوم
+      📅 الرصيد التراكمي: <strong>${b.remaining} يوم متبقي</strong> — مستحق ${b.accrued} (21/سنة، 30 بعد 5 سنوات، يُرحّل غير المستخدم) − مستخدم ${b.used} · ${b.years} سنة خدمة
     </div>`;
   } else {
     el.innerHTML='';
