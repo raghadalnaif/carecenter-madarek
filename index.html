@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v78 -->
+<!-- BUILD: 2026-06-24-v79 -->
 <script>
 (function(){
-  var BUILD='v78-20260624-1';
+  var BUILD='v79-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -5370,6 +5370,7 @@ const Modals = {
   },
 
   addChild(){
+    _childPhoto=null;
     const sid=Auth.schoolId();
     const schools=DB.schools();
     const branches=DB.branches();
@@ -5397,6 +5398,7 @@ const Modals = {
           <select class="input" id="c-teacher"><option value="">— اختر المعلمة —</option></select>
         </div>
         <div class="input-group"><label>اسم الطفل *</label><input class="input" id="c-name" placeholder="الاسم الثلاثي"></div>
+        ${_childPhotoField(null)}
         <div class="grid-2">
           <div class="input-group"><label>اسم ولي الأمر *</label><input class="input" id="c-parent" placeholder="الاسم"></div>
           <div class="input-group"><label>هاتف ولي الأمر *</label><input class="input" id="c-phone" placeholder="05xxxxxxxx"></div>
@@ -5475,6 +5477,7 @@ const Modals = {
   editChild(id){
     const c=DB.children().find(x=>x.id===id);
     if(!c) return;
+    _childPhoto=c.photo||null;
     const branches=DB.branches();
     App.showModal(`
     <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
@@ -5501,6 +5504,7 @@ const Modals = {
           </select>
         </div>
         <div class="input-group"><label>اسم الطفل *</label><input class="input" id="c-name" value="${esc(c.name)}"></div>
+        ${_childPhotoField(c)}
         <div class="grid-2">
           <div class="input-group"><label>اسم ولي الأمر</label><input class="input" id="c-parent" value="${esc(c.parentName)}"></div>
           <div class="input-group"><label>الهاتف</label><input class="input" id="c-phone" value="${esc(c.parentPhone)}"></div>
@@ -6725,6 +6729,7 @@ function printPickupCards(ids){
     return `<div class="pc">
       <div class="pc-h"><span class="pc-brand"><img src="${logoUrl}" class="pc-logo" onerror="this.style.display='none'"> ${centerName}</span><span class="pc-code">${code}</span></div>
       <div class="pc-b">
+        ${c.photo?`<img src="${c.photo}" class="pc-photo">`:''}
         <div class="pc-name">${esc(c.name)}</div>
         <div class="pc-row"><span>ولي الأمر:</span> ${esc(c.parentName||'—')}</div>
         <div class="pc-row"><span>📱 الجوال:</span> <b dir="ltr">${phone}</b></div>
@@ -6745,6 +6750,7 @@ function printPickupCards(ids){
     .pc-logo{width:6mm;height:6mm;object-fit:contain;background:#fff;border-radius:1.4mm;padding:.4mm}
     .pc-code{background:rgba(255,255,255,.25);padding:.4mm 2mm;border-radius:1.6mm;font-size:3mm;letter-spacing:.6mm;font-family:monospace}
     .pc-b{flex:1;padding:2.6mm 3.6mm}
+    .pc-photo{width:15mm;height:15mm;object-fit:cover;border-radius:2mm;border:.5mm solid #0f766e;float:left;margin:0 0 1mm 2.5mm}
     .pc-name{font-size:6.4mm;font-weight:900;color:#0f766e;margin-bottom:1.6mm;line-height:1.1}
     .pc-row{font-size:3.7mm;color:#334155;margin-bottom:.8mm}
     .pc-row span{color:#64748b}
@@ -7614,6 +7620,21 @@ function markHrPaid(payId){
   toast('✅ تم تسجيل صرف الراتب');App.refresh();
 }
 
+let _childPhoto=null;
+function _childPickPhoto(input){
+  const f=input.files[0];if(!f)return;
+  if(f.size>2*1024*1024){toast('الصورة يجب ألا تتجاوز 2 ميجابايت','error');input.value='';return;}
+  const r=new FileReader();
+  r.onload=ev=>{_childPhoto=ev.target.result;const p=document.getElementById('c-photo-preview');if(p)p.innerHTML=`<div style="position:relative;display:inline-block"><img src="${_childPhoto}" style="max-height:100px;border-radius:8px;border:1px solid #e2e8f0;object-fit:cover"><button type="button" onclick="_childClearPhoto()" style="position:absolute;top:2px;left:2px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer">✕</button></div>`;};
+  r.readAsDataURL(f);
+}
+function _childClearPhoto(){_childPhoto=null;const p=document.getElementById('c-photo-preview');if(p)p.innerHTML='';const i=document.getElementById('c-photo');if(i)i.value='';}
+function _childPhotoField(c){
+  return `<div class="input-group"><label>📷 صورة الطفل (اختياري)</label>
+    <input type="file" id="c-photo" accept="image/*" onchange="_childPickPhoto(this)">
+    <div id="c-photo-preview" style="margin-top:6px">${c&&c.photo?`<div style="position:relative;display:inline-block"><img src="${c.photo}" style="max-height:100px;border-radius:8px;border:1px solid #e2e8f0;object-fit:cover"><button type="button" onclick="_childClearPhoto()" style="position:absolute;top:2px;left:2px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer">✕</button></div>`:''}</div>
+  </div>`;
+}
 function saveChild(edit=false){
   if(_savingChild) return; // يمنع تسجيل الطفل/الاشتراك مرتين عند الضغط على الحفظ بسرعة
   _savingChild=true;
@@ -7661,6 +7682,7 @@ function saveChild(edit=false){
     isActive:true,
     isVip:document.getElementById('c-vip')?.checked||false,
     discountPct:parseFloat(document.getElementById('c-disc')?.value||0),
+    photo:_childPhoto||'',
   };
   if(edit) DB.updateChild(c); else {
     DB.addChild(c);
