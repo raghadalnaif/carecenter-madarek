@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v86 -->
+<!-- BUILD: 2026-06-24-v87 -->
 <script>
 (function(){
-  var BUILD='v86-20260624-1';
+  var BUILD='v87-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -2088,7 +2088,7 @@ subscriptions(){
           const stMap={active:'badge-green',today:'badge-yellow',soon3:'badge-orange',soon7:'badge-blue',expired:'badge-red',none:'badge-gray'};
           const stLbl={active:'نشط',today:'ينتهي اليوم',soon3:`${daysLeft} أيام`,soon7:`${daysLeft} أيام`,expired:'منتهي',none:'—'};
           const typeMap={daily:'يومي',weekly:'أسبوعي',monthly:'٣٠ يوم',custom:'مخصص'};
-          const pmLabel={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'}[s.paymentMethod]||'—';
+          const pmLabel={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',qurrah:'🟣 قُرّة'}[s.paymentMethod]||'—';
           const _payState=Views._paymentState(s);
           return `<tr>
             <td>
@@ -2508,7 +2508,7 @@ reports(){
           <td>${s.price} ر.س</td>
           <td style="color:#10b981;font-weight:600">${s.paidAmount} ر.س</td>
           <td style="color:${s.price-s.paidAmount>0?'#ef4444':'#10b981'};font-weight:600">${s.price-s.paidAmount} ر.س</td>
-          <td>${{cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'}[s.paymentMethod]||'—'}</td>
+          <td>${{cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',qurrah:'🟣 قُرّة'}[s.paymentMethod]||'—'}</td>
           <td>${Views._payBadge(s)}</td>
         </tr>`).join('')}
       </tbody>
@@ -3193,7 +3193,7 @@ accounting(){
   const subs=DB.subscriptions();
   const children=DB.children();
   const branches=DB.branches();
-  const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
+  const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',qurrah:'🟣 قُرّة'};
   const typeLbl={daily:'يومي',weekly:'أسبوعي',monthly:'٣٠ يوم',custom:'مخصص'};
   const filterBranch=App.params.accBranch||'all';
   const filterPeriod=App.params.accPeriod||'all';
@@ -3473,7 +3473,7 @@ expenses(){
   const fCat=App.params.expCat||'all';
   const fBranch=bid||(App.params.expBranch||'all');
   const catLbl={salary:'👩‍🏫 رواتب',rent:'🏢 إيجار',utilities:'💡 فواتير (كهرباء/ماء/نت)',supplies:'📦 مستلزمات',maintenance:'🔧 صيانة',transport:'🚗 مواصلات',marketing:'📢 تسويق',food:'🍽️ مأكولات',other:'📋 أخرى'};
-  const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',cheque:'📃 شيك'};
+  const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',cheque:'📃 شيك',qurrah:'🟣 قُرّة'};
   let filtered=exps;
   if(fMonth) filtered=filtered.filter(e=>(e.date||'').startsWith(fMonth));
   if(fCat!=='all') filtered=filtered.filter(e=>e.category===fCat);
@@ -3834,10 +3834,10 @@ cashClosing(){
   const payments=allPayments.filter(p=>fBranch==='all'?true:childInBranch(p.childId));
   const sales=allSales.filter(s=>fBranch==='all'?true:(!s.branchId||s.branchId===fBranch));
 
-  const byPM={cash:0,mada:0,transfer:0};
+  const byPM={cash:0,mada:0,transfer:0,qurrah:0};
   payments.forEach(p=>{const pm=p.paymentMethod||'cash';byPM[pm]=(byPM[pm]||0)+(+p.amount||0);});
   sales.forEach(s=>{const pm=s.paymentMethod||'cash';byPM[pm]=(byPM[pm]||0)+(+s.price||0);});
-  const total=byPM.cash+byPM.mada+byPM.transfer;
+  const total=byPM.cash+byPM.mada+byPM.transfer+byPM.qurrah;
 
   // السجل السابق لهذا اليوم/الفرع (إن وجد)
   const closings=DB.cashClosings();
@@ -3880,6 +3880,7 @@ cashClosing(){
     <div class="stat-card green"><div class="stat-val">${byPM.cash.toLocaleString()}</div><div class="stat-lbl">💵 كاش</div></div>
     <div class="stat-card blue"><div class="stat-val">${byPM.mada.toLocaleString()}</div><div class="stat-lbl">💳 مدى/شبكة</div></div>
     <div class="stat-card yellow"><div class="stat-val">${byPM.transfer.toLocaleString()}</div><div class="stat-lbl">🏦 حوالة</div></div>
+    <div class="stat-card" style="border-color:#9333ea"><div class="stat-val" style="color:#9333ea">${byPM.qurrah.toLocaleString()}</div><div class="stat-lbl">🟣 قُرّة (دعم)</div></div>
     <div class="stat-card red" style="border-color:#0f766e"><div class="stat-val" style="color:#0f766e">${total.toLocaleString()}</div><div class="stat-lbl">📊 إجمالي اليوم (ر.س)</div></div>
   </div>
 
@@ -3893,7 +3894,7 @@ cashClosing(){
           <td><span class="badge badge-green" style="font-size:10px">💰 دفعة</span></td>
           <td>${esc(c?.name||'—')}</td>
           <td style="color:#10b981;font-weight:700">${(+p.amount||0).toLocaleString()} ر.س</td>
-          <td style="font-size:12px">${({cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'})[p.paymentMethod]||p.paymentMethod}</td>
+          <td style="font-size:12px">${({cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',qurrah:'🟣 قُرّة'})[p.paymentMethod]||p.paymentMethod}</td>
           <td style="font-size:12px;color:#64748b">${esc(p.addedBy||'—')}</td>
         </tr>`;}).join('')}
         ${sales.map(s=>`<tr>
@@ -3901,7 +3902,7 @@ cashClosing(){
           <td><span class="badge badge-blue" style="font-size:10px">🛍️ بيع</span></td>
           <td>${esc(s.childName||DB.childName(s.childId)||'—')}</td>
           <td style="color:#3b82f6;font-weight:700">${(+s.price||0).toLocaleString()} ر.س</td>
-          <td style="font-size:12px">${({cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'})[s.paymentMethod]||s.paymentMethod}</td>
+          <td style="font-size:12px">${({cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',qurrah:'🟣 قُرّة'})[s.paymentMethod]||s.paymentMethod}</td>
           <td style="font-size:12px;color:#64748b">${esc(s.addedBy||'—')}</td>
         </tr>`).join('')}
       </tbody>
@@ -3971,7 +3972,7 @@ statement(){
   const presentDays=att.filter(a=>a.status==='present').length;
   const absentDays=att.filter(a=>a.status==='absent').length;
   const lateDays=att.filter(a=>a.status==='late').length;
-  const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
+  const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',qurrah:'🟣 قُرّة'};
   const typeLbl={daily:'يومي',weekly:'أسبوعي',monthly:'٣٠ يوم',custom:'مخصص'};
 
   return `
@@ -4193,7 +4194,7 @@ branchReport(){
   const subs=DB.subscriptions();
   const exps=DB.expenses();
   const children=DB.children();
-  const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
+  const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',qurrah:'🟣 قُرّة'};
   const targetBranches=fBranch==='all'?branches:branches.filter(b=>b.id===fBranch);
 
   const branchData=targetBranches.map(b=>{
@@ -4813,7 +4814,7 @@ sales(){
   const totalToday=todaySales.reduce((a,s)=>a+(s.price||0),0);
   const totalAll=allSales.reduce((a,s)=>a+(s.price||0),0);
   const itemLabel={'exit_card':'🪪 بطاقة خروج','uniform':'👕 زي رسمي','other':'📦 أخرى'};
-  const pmLabel={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
+  const pmLabel={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',qurrah:'🟣 قُرّة'};
   const rows=[...allSales].reverse().map(s=>{
     const child=DB.children().find(c=>c.id===s.childId);
     const who=child?esc(child.name):esc(s.parentName||'—');
@@ -5775,6 +5776,7 @@ const Modals = {
             <option value="cash">💵 كاش</option>
             <option value="mada">💳 مدى</option>
             <option value="transfer">🏦 حوالة</option>
+            <option value="qurrah">🟣 قُرّة (دعم)</option>
           </select>
         </div>
         <div class="input-group">
@@ -5800,7 +5802,7 @@ const Modals = {
   payHistory(subId){
     const s=DB.subscriptions().find(x=>x.id===subId);
     if(!s) return;
-    const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
+    const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',qurrah:'🟣 قُرّة'};
     const payments=DB.paymentsForSub(subId);
     const totalPaid=payments.reduce((a,p)=>a+(+p.amount||0),0);
     App.showModal(`
@@ -5952,6 +5954,7 @@ const Modals = {
               <option value="cash" ${s.paymentMethod==='cash'?'selected':''}>💵 كاش</option>
               <option value="mada" ${s.paymentMethod==='mada'?'selected':''}>💳 مدى</option>
               <option value="transfer" ${s.paymentMethod==='transfer'?'selected':''}>🏦 حوالة</option>
+              <option value="qurrah" ${s.paymentMethod==='qurrah'?'selected':''}>🟣 قُرّة (دعم)</option>
             </select>
           </div>
         </div>
@@ -7041,13 +7044,14 @@ function handleGovDocFile(input,hiddenId,previewId){
   reader.readAsDataURL(file);
 }
 
-const PM_LABEL={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
+const PM_LABEL={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',qurrah:'🟣 قُرّة'};
 
 function pmButtons(hiddenId,selected='cash'){
   return `<div style="display:flex;gap:8px;flex-wrap:wrap">
     <button type="button" class="pm-btn ${selected==='cash'?'pm-active':''}" data-v="cash" onclick="setPM(this,'${hiddenId}')">💵 كاش</button>
     <button type="button" class="pm-btn ${selected==='mada'?'pm-active':''}" data-v="mada" onclick="setPM(this,'${hiddenId}')">💳 مدى</button>
     <button type="button" class="pm-btn ${selected==='transfer'?'pm-active':''}" data-v="transfer" onclick="setPM(this,'${hiddenId}')">🏦 حوالة</button>
+    <button type="button" class="pm-btn ${selected==='qurrah'?'pm-active':''}" data-v="qurrah" onclick="setPM(this,'${hiddenId}')">🟣 قُرّة (دعم)</button>
   </div><input type="hidden" id="${hiddenId}" value="${selected}">`;
 }
 
@@ -7855,7 +7859,7 @@ function saveChild(edit=false){
       const subReceipt=document.getElementById('c-receipt-data')?.value||'';
       DB.addSub({id:uid(),childId,schoolId,branchId:c.branchId,period,type:subType,customDays:subCustomDays,startDate:subStart,endDate:subEnd,basePrice,discountPct:parseFloat(document.getElementById('c-disc')?.value||0),price:subPrice,paidAmount:subPaid,paymentStatus:subPay,paymentMethod:subPM,receiptImage:subReceipt,isActive:true,createdAt:T0,invoiceNo});
       const tl={'daily':'يومي','weekly':'أسبوعي','monthly':'٣٠ يوم','custom':'مخصص'};
-      const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
+      const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',qurrah:'🟣 قُرّة'};
       if(Auth.user) DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[subType]||subType} لـ ${name} — ${subPrice} ر.س | الدفع: ${pmLbl[subPM]||subPM} | ${subPay==='paid'?'مدفوع بالكامل':subPay==='partial'?'مدفوع جزئياً':'مؤجل'}`,branchId:c.branchId,period:period,addedBy:Auth.user.name,addedById:Auth.user.id});
     }
   }
@@ -7892,7 +7896,7 @@ function saveSub(){
   const s={id:uid(),childId,schoolId,branchId:child?.branchId||'',period,type,customDays,startDate,endDate,basePrice,discountPct:discPct,price,paidAmount,paymentStatus,paymentMethod,receiptImage,isActive:true,createdAt:T0,invoiceNo};
   DB.addSub(s);
   const tl={'daily':'يومي','weekly':'أسبوعي','monthly':'٣٠ يوم','custom':'مخصص'};
-  const pmLbl2={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة'};
+  const pmLbl2={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',qurrah:'🟣 قُرّة'};
   if(Auth.user) DB.addNotification({type:'new_sub',title:'📋 اشتراك جديد',body:`اشتراك ${tl[type]||type} لـ ${child?.name||''} — ${price} ر.س | الدفع: ${pmLbl2[paymentMethod]||paymentMethod} | ${paymentStatus==='paid'?'مدفوع بالكامل':paymentStatus==='partial'?'مدفوع جزئياً':'مؤجل'}`,branchId:child?.branchId||'',period:period,addedBy:Auth.user.name,addedById:Auth.user.id});
   toast('✅ تم حفظ الاشتراك');
   App.closeModal();
