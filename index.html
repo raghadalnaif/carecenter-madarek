@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v87 -->
+<!-- BUILD: 2026-06-24-v88 -->
 <script>
 (function(){
-  var BUILD='v87-20260624-1';
+  var BUILD='v88-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -3226,12 +3226,46 @@ accounting(){
   const defaulterAmount=defaulterList.reduce((a,s)=>a+(s.price-s.paidAmount),0);
   const pendingAmount=pendingList.reduce((a,s)=>a+(s.price-s.paidAmount),0);
 
+  // تقرير دعم قُرّة (يحترم فلتر الفرع/التاريخ)
+  let qSubs=subs.filter(s=>s.paymentMethod==='qurrah');
+  if(filterBranch!=='all') qSubs=qSubs.filter(s=>s.branchId===filterBranch);
+  if(dateFrom) qSubs=qSubs.filter(s=>(s.endDate||'')>=dateFrom);
+  if(dateTo)   qSubs=qSubs.filter(s=>(s.startDate||'')<=dateTo);
+  qSubs=[...qSubs].sort((a,b)=>(b.startDate||'').localeCompare(a.startDate||''));
+  const qKids=new Set(qSubs.map(s=>s.childId)).size;
+  const qTotal=qSubs.reduce((a,s)=>a+(+s.paidAmount||0),0);
+  const qDue=qSubs.reduce((a,s)=>a+Math.max(0,(+s.price||0)-(+s.paidAmount||0)),0);
+
   return `
   <div class="stats-grid">
     <div class="stat-card green"><div class="stat-val">${totalRevenue.toLocaleString()}</div><div class="stat-lbl">💰 إجمالي المحصّل (ر.س)</div></div>
     <div class="stat-card red"><div class="stat-val">${defaulterAmount.toLocaleString()}</div><div class="stat-lbl">🔴 متعثرون ${infoIcon('defaulter')} (${defaulterList.length}) — مستحق فوراً</div></div>
     <div class="stat-card yellow"><div class="stat-val">${pendingAmount.toLocaleString()}</div><div class="stat-lbl">🟠 معلّقون ${infoIcon('pending')} (${pendingList.length}) — متابعة دورية</div></div>
     <div class="stat-card blue"><div class="stat-val">${totalInvoices}</div><div class="stat-lbl">🧾 إجمالي الفواتير</div></div>
+  </div>
+  <div class="card" style="border-right:5px solid #9333ea">
+    <div class="card-title" style="color:#7c3aed">🟣 تقرير دعم قُرّة${filterBranch!=='all'?` — ${esc(DB.branchName(filterBranch))}`:''}</div>
+    <div class="stats-grid" style="margin-bottom:${qSubs.length?'12px':'0'}">
+      <div class="stat-card" style="border-color:#9333ea"><div class="stat-val" style="color:#9333ea">${qKids}</div><div class="stat-lbl">👶 أطفال مدعومون بقُرّة</div></div>
+      <div class="stat-card" style="border-color:#9333ea"><div class="stat-val" style="color:#9333ea">${qTotal.toLocaleString()}</div><div class="stat-lbl">💰 إجمالي المحصّل من قُرّة (ر.س)</div></div>
+      <div class="stat-card yellow"><div class="stat-val">${qDue.toLocaleString()}</div><div class="stat-lbl">⏳ مبالغ قُرّة المتبقية (ر.س)</div></div>
+      <div class="stat-card blue"><div class="stat-val">${qSubs.length}</div><div class="stat-lbl">🧾 اشتراكات مدعومة</div></div>
+    </div>
+    ${qSubs.length?`<details><summary style="cursor:pointer;font-weight:700;color:#7c3aed;font-size:13px;padding:6px 0">📋 تفاصيل الأطفال المدعومين (${qSubs.length}) — اضغطي للعرض</summary>
+      <div class="table-wrap" style="margin-top:10px"><table>
+        <thead><tr><th>الطفل</th><th>ولي الأمر</th><th>الفرع</th><th>من</th><th>إلى</th><th>المبلغ</th><th>المتبقي</th></tr></thead>
+        <tbody>${qSubs.map(s=>{const c=children.find(x=>x.id===s.childId);const rem=(+s.price||0)-(+s.paidAmount||0);return `<tr>
+          <td><strong>${esc(c?.name||'—')}</strong></td>
+          <td style="font-size:12px">${esc(c?.parentName||'—')}</td>
+          <td><span class="badge badge-blue" style="font-size:10px">${DB.branchName(s.branchId)}</span></td>
+          <td style="font-size:12px">${formatDate(s.startDate)}</td>
+          <td style="font-size:12px">${formatDate(s.endDate)}</td>
+          <td style="font-weight:700;color:#7c3aed">${(+s.paidAmount||0).toLocaleString()}</td>
+          <td style="color:${rem>0?'#ef4444':'#10b981'}">${rem.toLocaleString()}</td>
+        </tr>`;}).join('')}</tbody>
+      </table></div>
+      <button class="btn btn-secondary btn-sm no-print" style="margin-top:10px" onclick="window.print()">🖨️ طباعة تقرير قُرّة</button>
+    </details>`:'<div style="color:#94a3b8;font-size:13px;padding:6px 0">لا توجد اشتراكات مدفوعة عبر قُرّة بهذه المعايير بعد</div>'}
   </div>
   <div class="card no-print" style="padding:14px;margin-bottom:16px">
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
