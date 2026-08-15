@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v85 -->
+<!-- BUILD: 2026-06-24-v86 -->
 <script>
 (function(){
-  var BUILD='v85-20260624-1';
+  var BUILD='v86-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -1916,6 +1916,10 @@ children(){
   if(q) kids=kids.filter(c=>(c.name||'').includes(q)||(c.parentName||'').toLowerCase().includes(q)||(c.parentPhone||'').includes(q));
   if(!bid&&bFilter!=='all') kids=kids.filter(c=>c.branchId===bFilter);
   if(!uPeriod&&pFilter!=='all') kids=kids.filter(c=>c.period===pFilter);
+  // إخفاء الأطفال غير المشتركين (اختياري — لمدير الفرع والمدير العام)
+  const hideNoSub=App.params.hideNoSub==='1';
+  const noSubCount=kids.filter(c=>!DB.activeSub(c.id)).length;
+  if(hideNoSub) kids=kids.filter(c=>DB.activeSub(c.id));
   const childSort=App.params.childSort||'name';
   kids=[...kids];
   if(childSort==='name') kids.sort((a,b)=>(a.name||'').localeCompare(b.name||'','ar'));
@@ -1932,6 +1936,7 @@ children(){
     <button class="btn btn-secondary btn-sm" onclick="Modals.importChildren()">📥 استيراد Excel</button>
     <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('kids-table','الأطفال')">📊 تصدير</button>
     <button class="btn btn-sm" style="background:#0f766e;color:#fff" onclick="printAllPickupCards()" title="طباعة بطاقة خروج لكل طفل">🪪 بطاقات الخروج</button>
+    ${(noSubCount>0||hideNoSub)?`<button class="btn btn-sm ${hideNoSub?'btn-warning':'btn-secondary'}" onclick="App.go('children',{...App.params,hideNoSub:'${hideNoSub?'0':'1'}'})" title="إظهار/إخفاء الأطفال غير المشتركين">${hideNoSub?'👁️ إظهار الكل':`🙈 إخفاء غير المشتركين (${noSubCount})`}</button>`:''}
     <div class="search-bar" style="flex:1;max-width:300px;margin:0">
       <span class="search-icon">🔍</span>
       <input id="search-children" class="input" placeholder="بحث بالاسم أو ولي الأمر أو الهاتف..." value="${esc(App.params.q||'')}" oninput="App.liveSearch('children',{...App.params,q:this.value},this)">
