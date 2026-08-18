@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v88 -->
+<!-- BUILD: 2026-06-24-v89 -->
 <script>
 (function(){
-  var BUILD='v88-20260624-1';
+  var BUILD='v89-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -564,6 +564,8 @@ function _startSyncWatchdog(){
   window.addEventListener('pageshow',()=>{_ensureSSEAlive();_resyncFromServer();});
   // فحص دوري احتياطي حتى لو لم يتغيّر ظهور التبويب أو الشبكة صراحةً
   setInterval(()=>{
+    // انتهى اليوم والصفحة مفتوحة (جهاز الاستقبال) → أعد التحميل لتحديث «تاريخ اليوم»
+    if(typeof today==='function'&&today()!==T0){location.reload();return;}
     if(document.visibilityState!=='visible') return;
     _ensureSSEAlive();
     _resyncFromServer();
@@ -5023,11 +5025,13 @@ hr(){
       </div>
     </div>`;
   } else if(tab==='attendance'){
-    const date=App.params.hrDate||T0;
+    const date=App.params.hrDate||today();
+    const hrPeriod=App.params.hrPeriod||'all';
     const attList=DB.hrAttendance().filter(a=>a.date===date);
     const attMap={};
     attList.forEach(a=>{attMap[a.employeeId]=a;});
-    const activeEmps=emps.filter(e=>(e.status||'active')==='active'||(e.status||'active')==='on_leave');
+    let activeEmps=emps.filter(e=>(e.status||'active')==='active'||(e.status||'active')==='on_leave');
+    if(hrPeriod!=='all') activeEmps=activeEmps.filter(e=>{const p=_empPeriod(e);return hrPeriod==='other'?(p!=='morning'&&p!=='evening'):p===hrPeriod;});
     const presentCnt=Object.values(attMap).filter(a=>a.status==='present').length;
     const absentCnt=Object.values(attMap).filter(a=>a.status==='absent').length;
     const lateCnt=Object.values(attMap).filter(a=>a.status==='late').length;
@@ -5041,8 +5045,14 @@ hr(){
         <div class="stat-card blue"><div class="stat-val">${activeEmps.length-presentCnt-absentCnt-lateCnt}</div><div class="stat-lbl">لم يُسجَّل</div></div>
       </div>
       <div class="actions-bar">
-        <input type="date" class="input" style="width:180px" value="${date}" max="${T0}" onchange="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:this.value})">
+        <input type="date" class="input" style="width:180px" value="${date}" max="${today()}" onchange="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrPeriod:'${hrPeriod}',hrDate:this.value})">
+        <div style="display:flex;gap:4px">
+          <span class="chip ${hrPeriod==='all'?'active':''}" onclick="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:'${date}',hrPeriod:'all'})">الكل</span>
+          <span class="chip ${hrPeriod==='morning'?'active':''}" onclick="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:'${date}',hrPeriod:'morning'})">🌅 صباحي</span>
+          <span class="chip ${hrPeriod==='evening'?'active':''}" onclick="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:'${date}',hrPeriod:'evening'})">🌙 مسائي</span>
+        </div>
         <button class="btn btn-primary" onclick="markAllHrPresent('${date}')">✅ تسجيل الكل حاضر</button>
+        <button class="btn btn-secondary" onclick="printHrAttendance('${date}','${filterBranch}')" title="طباعة كشف حضور الموظفين">🖨️ طباعة الحضور</button>
         ${_hrAttUndo?`<button class="btn btn-warning" onclick="undoHrAtt()" title="التراجع عن آخر إجراء">↩️ تراجع (${esc(_hrAttUndo.label)})</button>`:''}
         ${Auth.isSuperAdmin()?`<button class="btn btn-secondary" style="color:#dc2626" onclick="clearHrAttDay('${date}')" title="مسح كل حضور هذا اليوم (المدير العام فقط)">🗑️ مسح حضور اليوم</button>`:''}
         ${Auth.isSuperAdmin()?`<button class="btn btn-secondary" onclick="restoreAttBackup('hr_attendance')" title="استرجاع الحضور من نسخة احتياطية">🛟 استرجاع الحضور</button>`:''}
@@ -5119,6 +5129,7 @@ hr(){
             return `<div style="background:#fff;border-radius:10px;border:1px solid #e2e8f0;border-right:4px solid ${stColor};padding:10px 14px">
               <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
                 <div style="flex:1;min-width:140px;font-size:14px;font-weight:600">${esc(e.name)}<span style="font-size:11px;color:#64748b;font-weight:400;margin-right:8px">${esc(e.jobTitle||'')}</span>
+                  ${(()=>{const p=_empPeriod(e);return p==='morning'?'<span style="background:#fef3c7;color:#92400e;font-size:9px;font-weight:700;padding:1px 6px;border-radius:5px;margin-right:6px">🌅 صباحي</span>':p==='evening'?'<span style="background:#e0e7ff;color:#3730a3;font-size:9px;font-weight:700;padding:1px 6px;border-radius:5px;margin-right:6px">🌙 مسائي</span>':'';})()}
                   ${a.via==='qr-gps'?`<span style="background:#dcfce7;color:#166534;font-size:9px;font-weight:700;padding:1px 6px;border-radius:5px;margin-right:6px">📷 باركود+GPS${a.checkInDist!=null?` ${a.checkInDist}م`:''}</span>`:''}
                 </div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -7766,6 +7777,45 @@ function printAttendanceSheet(date,schoolId){
   </div>
   </body></html>`);
   win.document.close();
+}
+// فترة الموظف (من حساب الدخول المرتبط، أو حقل الفترة، أو غير محدد)
+function _empPeriod(e){
+  if(!e) return '';
+  const u=DB.users().find(x=>x.id===e.userId||x.employeeId===e.id);
+  return (u&&u.period)||e.period||'';
+}
+// طباعة حضور الموظفين ليوم معيّن — مجمّعاً صباحي/مسائي
+function printHrAttendance(date,branchFilter){
+  const bid=Auth.branchId();
+  let emps=DB.hrEmployees().filter(e=>(e.status||'active')==='active'||(e.status||'active')==='on_leave');
+  if(bid) emps=emps.filter(e=>e.branchId===bid);
+  else if(branchFilter&&branchFilter!=='all') emps=emps.filter(e=>e.branchId===branchFilter);
+  const attMap={};DB.hrAttendance().filter(a=>a.date===date).forEach(a=>{attMap[a.employeeId]=a;});
+  const stLbl={present:'✅ حاضر',absent:'❌ غائب',late:'⏰ متأخر',leave:'🏖️ إجازة'};
+  const groups={morning:[],evening:[],other:[]};
+  emps.forEach(e=>{const p=_empPeriod(e);groups[p==='morning'?'morning':p==='evening'?'evening':'other'].push(e);});
+  const school=DB.schools()[0]||{};
+  const section=(title,list)=>{
+    if(!list.length) return '';
+    return `<h2 style="background:#0f766e;color:#fff;padding:8px 14px;border-radius:8px;margin:16px 0 8px;font-size:15px">${title} (${list.length})</h2>
+    <table><thead><tr><th>م</th><th>الاسم</th><th>المسمى</th><th>الحالة</th><th>دخول</th><th>خروج</th><th>ساعات العمل</th><th>التوقيع</th></tr></thead><tbody>
+    ${list.map((e,i)=>{const a=attMap[e.id]||{};const wm=_recWorkedMin(a);return `<tr><td>${i+1}</td><td><b>${esc(e.name)}</b></td><td>${esc(e.jobTitle||'—')}</td><td>${stLbl[a.status]||'—'}</td><td>${a.checkIn||'—'}</td><td>${a.checkOut||'—'}</td><td>${wm?_fmtDur(wm):'—'}</td><td style="width:90px"></td></tr>`;}).join('')}
+    </tbody></table>`;
+  };
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>حضور الموظفين ${date}</title>
+  <style>*{box-sizing:border-box;font-family:'Tajawal',Tahoma,sans-serif}body{padding:18px;color:#1e293b}h1{color:#0f766e;text-align:center;font-size:20px;margin:0 0 4px}p{text-align:center;color:#64748b;margin:0 0 12px;font-size:13px}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px}th{background:#f1f5f9;padding:7px 8px;border:1px solid #cbd5e1;text-align:right}td{padding:7px 8px;border:1px solid #e2e8f0}
+  @media print{.np{display:none}}@page{size:A4;margin:1.2cm}</style></head><body>
+  <div class="np" style="text-align:center;margin-bottom:12px"><button onclick="print()" style="background:#0f766e;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer">🖨️ طباعة</button></div>
+  <h1>${esc(school.name||'مدارك الطفل')}</h1>
+  <p>كشف حضور الموظفين — ${formatDate(date)}${bid?(' · '+esc(DB.branchName(bid))):''}</p>
+  ${section('🌅 الفترة الصباحية',groups.morning)}
+  ${section('🌙 الفترة المسائية',groups.evening)}
+  ${section('👥 موظفون (فترة غير محددة)',groups.other)}
+  <script>onload=function(){setTimeout(function(){print();},400);}<\/script>
+  </body></html>`);
+  w.document.close();
 }
 function exportHrAttendanceExcel(month,branchFilter){
   if(!window.XLSX){toast('مكتبة Excel غير محملة','error');return;}
