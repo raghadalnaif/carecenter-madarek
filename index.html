@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>مدارك الطفل — نظام الإدارة</title>
+<title>مدار — إدارة المدارس من مكان واحد</title>
 <!-- BUILD: 2026-08-22-v90 -->
 <script>
 (function(){
@@ -385,7 +385,7 @@ const SEED = {
   weekly_activities: [],
   sales: [],
   govDocs: [],
-  settings: {prices:{morning:{daily:150,weekly:600,monthly:1800},evening:{daily:70,weekly:300,monthly:900}},invoicePrefix:'INV',alertDays:{warn:7,urgent:3},waTemplate:'مرحباً {name}، اشتراك طفلك ينتهي بتاريخ {date}. يرجى التواصل للتجديد. مع تحيات مدارك الطفل 🌟',vatRate:15,vatInclusive:true},
+  settings: {prices:{morning:{daily:150,weekly:600,monthly:1800},evening:{daily:70,weekly:300,monthly:900}},invoicePrefix:'INV',alertDays:{warn:7,urgent:3},waTemplate:'مرحباً {name}، اشتراك طفلك ينتهي بتاريخ {date}. يرجى التواصل للتجديد. مع تحياتنا 🌟',vatRate:15,vatInclusive:true},
 };
 
 // =========================================================
@@ -1236,8 +1236,8 @@ const App = {
     <div class="sidebar">
       <div class="sidebar-logo" style="text-align:center">
         <img src="logo.png" alt="" style="width:40px;height:40px;object-fit:contain;display:block;margin:0 auto 4px" onerror="this.style.display='none'">
-        <h1 style="font-size:16px">مدارك الطفل</h1>
-        <p>نظام إدارة متكامل</p>
+        <h1 style="font-size:16px">مدار</h1>
+        <p>إدارة المدارس من مكان واحد</p>
       </div>
       <div class="nav-section">
         ${(()=>{const u=Auth.user;const unreadMsg=u?DB.unreadInternalCount(u.id,u.role,Auth.branchId()):0;return groups.map(g=>{const head=g.label?`<div class="nav-label">${g.label}</div>`:'';const items=g.items.map(l=>{const isMsg=l.v==='messages';const dot=isMsg&&unreadMsg>0?`<span class="nav-msg-dot" title="${unreadMsg} رسالة غير مقروءة"></span>`:'';return `<div class="nav-item ${App.view===l.v?'active':''}" data-v="${l.v}" style="position:relative" onclick="App.go('${l.v}');closeSidebar()">${l.icon} ${l.label}${dot}</div>`;}).join('');return `<div class="nav-group">${head}${items}</div>`;}).join('')})()}
@@ -1437,7 +1437,7 @@ platformGate(){
     ${Views._lpHero()}
     ${Views._lpFeatures()}
     ${Views._lpCtaBand()}
-    <div class="lp-footer">© ${new Date().getFullYear()} مدارك — نظام إدارة وتحويل رقمي متكامل للمدارس، رياض الأطفال، ودور الحضانة</div>
+    <div class="lp-footer">© ${new Date().getFullYear()} مدار — إدارة المدارس من مكان واحد</div>
   </div>
   <div id="auth-modal-root"></div>`;
 },
@@ -1445,7 +1445,7 @@ _lpHeader(){
   return `
   <header class="lp-header">
     <div class="lp-header-inner">
-      <div class="lp-logo"><img src="logo.png" onerror="this.style.display='none'" alt=""> مدارك</div>
+      <div class="lp-logo"><img src="logo.png" onerror="this.style.display='none'" alt=""> مدار</div>
       <div class="lp-header-actions">
         <button class="lp-link-btn" onclick="openAuthModal('login')">تسجيل الدخول</button>
         <button class="lp-btn-accent" onclick="openAuthModal('register')">ابدئي مجاناً</button>
@@ -1528,7 +1528,7 @@ _lpVisual(kind){
     <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:900;color:#0f766e"><span>الإجمالي</span><b>2,070 ر.س</b></div>`);
   if(kind==='wa') return wrap(`
     <div style="font-size:12px;font-weight:800;color:#94a3b8;margin-bottom:12px">واتساب — تذكير تجديد</div>
-    <div style="background:#dcf8c6;border-radius:12px 12px 12px 2px;padding:12px 14px;font-size:13px;color:#1f2937;max-width:85%">مرحباً أم فهد، اشتراك فهد ينتهي بتاريخ 5 رمضان. يسعدنا تجديده — مدارك</div>
+    <div style="background:#dcf8c6;border-radius:12px 12px 12px 2px;padding:12px 14px;font-size:13px;color:#1f2937;max-width:85%">مرحباً أم فهد، اشتراك فهد ينتهي بتاريخ 5 رمضان. يسعدنا تجديده — مدار</div>
     <div style="text-align:left;font-size:10px;color:#94a3b8;margin-top:6px">تم الإرسال 08:03 ص</div>`);
   if(kind==='hr') return wrap(`
     <div style="font-size:12px;font-weight:800;color:#94a3b8;margin-bottom:10px">أ. هيفاء — رصيد الإجازات</div>
@@ -1560,7 +1560,7 @@ authModal(tab){
   return `
   <div class="modal-overlay" onclick="if(event.target===this)closeAuthModal()">
   <div class="modal" style="max-width:440px">
-    <div class="modal-header"><h2>مدارك</h2><button class="close-btn" onclick="closeAuthModal()">✕</button></div>
+    <div class="modal-header"><h2>مدار</h2><button class="close-btn" onclick="closeAuthModal()">✕</button></div>
     <div class="modal-body">
       <div class="tabs" style="margin-bottom:20px">
         <div class="tab ${tab==='login'?'active':''}" onclick="App.showAuthTab('login')">تسجيل دخول المدرسة</div>
@@ -1651,7 +1651,7 @@ providerLogin(err){
     <div class="login-card" style="max-width:400px">
       <div class="login-brand">
         <h1>لوحة مزوّد الخدمة</h1>
-        <p>إدارة كل المدارس المشتركة في منصة مدارك</p>
+        <p>إدارة كل المدارس المشتركة في منصة مدار</p>
       </div>
       <div class="login-form">
         ${err?`<div class="alert-box alert-red" style="margin-bottom:16px">⚠️ ${esc(err)}</div>`:''}
@@ -1759,9 +1759,9 @@ login(){
   <div class="login-page">
     <div class="login-card">
       <div class="login-brand">
-        <img src="logo.png" alt="مدارك الطفل" style="width:150px;height:150px;object-fit:contain;margin-bottom:4px" onerror="this.style.display='none'">
-        <h1>${esc(tenant?.name||'مدارك الطفل')}</h1>
-        <p>Kid Sense — مركز رعاية وتعليم الأطفال</p>
+        <img src="logo.png" alt="مدار" style="width:150px;height:150px;object-fit:contain;margin-bottom:4px" onerror="this.style.display='none'">
+        <h1>${esc(tenant?.name||'مدار')}</h1>
+        <p>بواسطة مدار — إدارة المدارس من مكان واحد</p>
       </div>
       <div class="login-form">
         <div id="login-err" style="display:none;margin-bottom:16px" class="alert-box alert-red">⚠️ اسم المستخدم أو كلمة المرور غير صحيحة</div>
@@ -7344,7 +7344,7 @@ function lpShowFeature(key){
 // ===== تشغيل التطبيق بعد نجاح دخول المدرسة =====
 async function startAppForTenant(){
   API_TOKEN=TenantSession.token;
-  document.getElementById('app').innerHTML=`<div style="height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Tajawal',sans-serif;background:linear-gradient(150deg,#0f766e,#064e3b)"><img src="logo.png" style="width:90px;height:90px;object-fit:contain;margin-bottom:16px" onerror="this.style.display='none'"><p style="color:#fff;font-size:22px;font-weight:700">${esc(TenantSession.tenant?.name||'مدارك')}</p><p style="color:rgba(255,255,255,.7);font-size:14px;margin-top:10px">⏳ جاري الاتصال بقاعدة البيانات...</p></div>`;
+  document.getElementById('app').innerHTML=`<div style="height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Tajawal',sans-serif;background:linear-gradient(150deg,#0f766e,#064e3b)"><img src="logo.png" style="width:90px;height:90px;object-fit:contain;margin-bottom:16px" onerror="this.style.display='none'"><p style="color:#fff;font-size:22px;font-weight:700">${esc(TenantSession.tenant?.name||'مدار')}</p><p style="color:rgba(255,255,255,.7);font-size:14px;margin-top:10px">⏳ جاري الاتصال بقاعدة البيانات...</p></div>`;
   try{
     await DB.initStorage();
   }catch(e){
