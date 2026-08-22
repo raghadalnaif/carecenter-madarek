@@ -1235,7 +1235,7 @@ const App = {
     return `
     <div class="sidebar">
       <div class="sidebar-logo" style="text-align:center">
-        <img src="logo.png" alt="" style="width:40px;height:40px;object-fit:contain;display:block;margin:0 auto 4px" onerror="this.style.display='none'">
+        <img src="${esc(DB.schools()[0]?.logoDataUrl||'logo.png')}" alt="" style="width:40px;height:40px;object-fit:contain;display:block;margin:0 auto 4px" onerror="this.style.display='none'">
         <h1 style="font-size:16px">مدار</h1>
         <p>إدارة المدارس من مكان واحد</p>
       </div>
@@ -1759,7 +1759,7 @@ login(){
   <div class="login-page">
     <div class="login-card">
       <div class="login-brand">
-        <img src="logo.png" alt="مدار" style="width:150px;height:150px;object-fit:contain;margin-bottom:4px" onerror="this.style.display='none'">
+        <img src="${esc(DB.schools()[0]?.logoDataUrl||'logo.png')}" alt="مدار" style="width:150px;height:150px;object-fit:contain;margin-bottom:4px" onerror="this.style.display='none'">
         <h1>${esc(tenant?.name||'مدار')}</h1>
         <p>بواسطة مدار — إدارة المدارس من مكان واحد</p>
       </div>
@@ -1800,7 +1800,7 @@ staffCheckin(){
   <div style="min-height:100vh;background:linear-gradient(160deg,#0f766e 0%,#064e3b 100%);display:flex;align-items:flex-start;justify-content:center;padding:20px;direction:rtl">
     <div style="width:100%;max-width:440px">
       <div style="text-align:center;color:#fff;margin:10px 0 20px">
-        <img src="logo.png" style="width:70px;height:70px;object-fit:contain" onerror="this.style.display='none'">
+        <img src="${esc(DB.schools()[0]?.logoDataUrl||'logo.png')}" style="width:70px;height:70px;object-fit:contain" onerror="this.style.display='none'">
         <h1 style="font-size:22px;font-weight:900;margin-top:6px">تحضير الموظفين</h1>
         <p style="opacity:.8;font-size:13px">سجّل دخولك وخروجك من جوالك</p>
       </div>
@@ -5064,6 +5064,17 @@ settings(){
     content=`
     <div class="card" style="max-width:640px">
       <div class="card-title">🏢 معلومات المركز</div>
+      <div class="input-group">
+        <label>شعار المدرسة</label>
+        <div style="display:flex;align-items:center;gap:14px">
+          <img id="sc-logo-preview" src="${esc(school.logoDataUrl||'logo.png')}" style="width:64px;height:64px;object-fit:contain;border:1px solid #e2e8f0;border-radius:10px;background:#fff" onerror="this.style.visibility='hidden'">
+          <div>
+            <input type="file" id="sc-logo-file" accept="image/*" onchange="_scLogoPick(this)">
+            <div style="font-size:11px;color:#94a3b8;margin-top:4px">صورة مربّعة تقريباً، أقل من 2 ميجابايت. يظهر هذا الشعار بدل شعار مدار الافتراضي في القائمة الجانبية وشاشة الدخول.</div>
+            ${school.logoDataUrl?`<button type="button" class="btn btn-secondary btn-xs" style="margin-top:6px" onclick="_scLogoClear()">إزالة الشعار والعودة للافتراضي</button>`:''}
+          </div>
+        </div>
+      </div>
       <div class="input-group"><label>اسم المركز</label><input class="input" id="sc-name" value="${esc(school.name||'')}"></div>
       <div class="input-group"><label>المسؤول / جهة الاتصال</label><input class="input" id="sc-contact" value="${esc(school.contactPerson||'')}"></div>
       <div class="input-group"><label>الهاتف</label><input class="input" id="sc-phone" value="${esc(school.phone||'')}"></div>
@@ -8732,6 +8743,26 @@ function saveSettingsPrices(){
   showSettingsToast('✅ تم حفظ أسعار الفروع بنجاح');
 }
 
+let _scLogoData; // undefined = لم يتغيّر، null = أُزيل، نص = صورة جديدة (base64)
+function _scLogoPick(input){
+  const file=input.files[0];
+  if(!file) return;
+  if(file.size>2*1024*1024){toast('حجم الصورة يجب أن لا يتجاوز 2 ميجابايت','error');input.value='';return;}
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    _scLogoData=ev.target.result;
+    const prev=document.getElementById('sc-logo-preview');
+    if(prev){prev.src=_scLogoData;prev.style.visibility='visible';}
+  };
+  reader.readAsDataURL(file);
+}
+function _scLogoClear(){
+  _scLogoData=null;
+  const prev=document.getElementById('sc-logo-preview');
+  if(prev) prev.src='logo.png';
+  const inp=document.getElementById('sc-logo-file');
+  if(inp) inp.value='';
+}
 function saveSettingsCenter(){
   if(!Auth.isSuperAdmin()) return;
   const school=DB.schools()[0];
@@ -8742,9 +8773,11 @@ function saveSettingsCenter(){
   school.email=document.getElementById('sc-email')?.value?.trim()||school.email;
   school.vatNumber=document.getElementById('sc-vat')?.value?.trim()||school.vatNumber;
   school.address=document.getElementById('sc-address')?.value?.trim()||school.address;
+  if(_scLogoData!==undefined){ school.logoDataUrl=_scLogoData||''; _scLogoData=undefined; }
   DB.updateSchool(school);
   _lastWrite=Date.now();
   showSettingsToast('✅ تم حفظ معلومات المركز بنجاح');
+  App.render();
 }
 
 function saveSettingsAccount(){
