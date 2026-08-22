@@ -12,7 +12,7 @@ Environment=NODE_ENV=production
 Environment=PORT=3001
 Environment=HOST=127.0.0.1
 Environment=DB_PATH=/var/www/madarek/server/data.db
-# ⚠️ غيّر هذا التوكن إلى قيمة عشوائية (نفس القيمة في api-config.js)
+# PLATFORM_TOKEN يُقرأ من /etc/madarek-api.env (يُولَّد تلقائياً بواسطة setup.sh)
 EnvironmentFile=/etc/madarek-api.env
 
 [Install]

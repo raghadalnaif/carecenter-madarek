@@ -6,3 +6,4 @@ api-config.js
 server/data.db
 server/data.db-shm
 server/data.db-wal
+server/default-tenant-credentials.txt

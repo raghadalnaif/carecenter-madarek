@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v89 -->
+<!-- BUILD: 2026-08-22-v90 -->
 <script>
 (function(){
-  var BUILD='v89-20260624-1';
+  var BUILD='v90-20260822-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -303,23 +303,15 @@ const T0 = today();
 // =========================================================
 //  SEED DATA
 // =========================================================
+// ملاحظة: لم تعد هذه القيم تُستخدم كبيانات افتراضية مشتركة لكل المدارس —
+// كل مدرسة جديدة (Tenant) تبدأ ببيانات فارغة، ويُنشأ مديرها العام وسجلّها
+// من بيانات التسجيل الفعلية (انظر DB.init() ودالة _seedFreshTenant).
 const SEED = {
   branches: [
-    {id:'b1',name:'الفرع الأول - هارون الرشيد',location:''},
-    {id:'b2',name:'الفرع الثاني - زامل بن سليم',location:''},
+    {id:'b1',name:'الفرع الرئيسي',location:''},
   ],
-  users: [
-    {id:'sa1',username:'admin',password:'admin123',role:'superadmin',name:'المدير العام',phone:''},
-    {id:'u1',username:'main',password:'123456',role:'school_admin',schoolId:'s1',branchId:'b1',period:'morning',name:'ادارة الفرع الرئيسي - صباحي',phone:'0501234567'},
-    {id:'u2',username:'second',password:'123456',role:'school_admin',schoolId:'s1',branchId:'b2',period:'morning',name:'ادارة الفرع الثاني - صباحي',phone:'0509876543'},
-    {id:'u3',username:'sarah',password:'123456',role:'teacher',schoolId:'s1',branchId:'b1',period:'morning',name:'الأستاذة سارة',phone:'0507654321'},
-    {id:'u4',username:'hessa',password:'123456',role:'teacher',schoolId:'s1',branchId:'b1',period:'evening',name:'الأستاذة هيفاء',phone:'0508765432'},
-    {id:'u5',username:'noura',password:'123456',role:'teacher',schoolId:'s1',branchId:'b2',period:'morning',name:'الأستاذة نورا',phone:'0506543210'},
-    {id:'u6',username:'lama',password:'123456',role:'teacher',schoolId:'s1',branchId:'b2',period:'evening',name:'الأستاذة لمى',phone:'0505432109'},
-  ],
-  schools: [
-    {id:'s1',name:'مدارك الطفل',contactPerson:'ادارة الفرع الرئيسي',phone:'0501234567',email:'madarik@center.com',isActive:true,joinDate:'2024-09-01',vatNumber:'310123456700003',address:'الرياض، المملكة العربية السعودية'},
-  ],
+  users: [],
+  schools: [],
   children: [],
   subscriptions: [],
   attendance: [],
@@ -505,8 +497,11 @@ function _scheduleRender(){
 //  TRANSPORT: خادم التخزين (يحل محل Firebase) + SSE
 // =========================================================
 const API_BASE=(typeof window!=='undefined'&&window.MADAREK_API_BASE)||'/api';
-const API_TOKEN=(typeof window!=='undefined'&&window.MADAREK_API_TOKEN)||'';
-let _storageMode='firebase'; // 'backend' | 'firebase'
+// كل مدرسة (Tenant) لها توكن جلسة خاص بها، يُضبط بعد تسجيل دخول المدرسة —
+// لم يعد هناك سرّ عام واحد مضمّن في الصفحة (api-config.js لم يعد يُستخدم للتوثيق
+// لأن الصفحة أصبحت عامة يزورها زوّار لتسجيل مدارس جديدة).
+let API_TOKEN='';
+let _storageMode='backend'; // 'backend' فقط الآن — لا يوجد بديل مشترك بين المدارس
 let _sse=null;
 let _lastResync=0; // وقت آخر مزامنة ناجحة مع الخادم (Unix ms)
 let _clientId=(()=>{try{return localStorage.getItem('ccs_clientId')||'';}catch{return '';}})();
@@ -517,6 +512,13 @@ if(!_clientId){
 function _apiHeaders(){return {'Content-Type':'application/json','Authorization':'Bearer '+API_TOKEN,'X-Client-Id':_clientId};}
 async function _backendGetAll(){
   const r=await fetch(API_BASE+'/data',{headers:_apiHeaders()});
+  if(r.status===401||r.status===403){
+    let body=null; try{body=await r.json();}catch(e){}
+    const err=new Error(body&&body.error||'auth');
+    err.code=(r.status===403)?'subscription_inactive':'unauthorized';
+    err.tenantInfo=body&&body.tenant||null;
+    throw err;
+  }
   if(!r.ok) throw new Error('backend GET '+r.status);
   return await r.json();
 }
@@ -629,41 +631,15 @@ const DB = {
       attempt(1);
     }
   },
-  // التهيئة الموحّدة: الخادم أولاً، وإلا Firebase احتياطياً، مع نقل تلقائي آمن
+  // التهيئة: تحميل بيانات المدرسة الحالية (Tenant) من الخادم فقط.
+  // قد ترمي خطأ برمز 'subscription_inactive' أو 'unauthorized' — يتولّى المستدعي (startAppForTenant) عرض الشاشة المناسبة.
   async initStorage(){
-    let backendData=null;
-    try{
-      backendData=await _backendGetAll();
-      _storageMode='backend';
-    }catch(e){
-      _storageMode='firebase';
-      console.warn('[storage] الخادم غير متاح، نعمل على Firebase مؤقتاً:',e?.message||e);
-      await this.initFirebase();
-      _watchForBackendRecovery();
-      return;
-    }
-    // الخادم متصل
-    const hasData=backendData&&((backendData.children&&backendData.children.length)||(backendData.users&&backendData.users.length)||(backendData.subscriptions&&backendData.subscriptions.length));
-    if(hasData){
-      Object.assign(_mem,backendData);
-    }else{
-      // الخادم فارغ — انقل بياناتك من Firebase (متصفحك موثّق) دفعة واحدة
-      let fb=null;
-      try{fb=await this._loadFirebaseRaw();}catch(e){console.warn('[migrate] تعذّر قراءة Firebase:',e?.message||e);}
-      if(fb&&Object.keys(fb).length){
-        Object.assign(_mem,fb);
-        try{await _backendBulk(fb);if(typeof toast==='function')setTimeout(()=>toast('✅ تم نقل بياناتك إلى السيرفر بنجاح'),900);}
-        catch(e){console.error('[migrate] فشل رفع البيانات للخادم:',e);if(typeof toast==='function')setTimeout(()=>toast('⚠️ تعذّر نقل البيانات للخادم','error'),900);}
-      }else{
-        // لا بيانات في Firebase — حمّل من المخزّن المحلي إن وجد وادفعه للخادم
-        Object.keys(SEED).forEach(k=>{let raw=null;try{raw=JSON.parse(localStorage.getItem('ccs_'+k));}catch{}if(raw!=null)_mem[k]=raw;});
-        const toPush={};Object.keys(_mem).forEach(k=>{toPush[k]=_mem[k];});
-        if(Object.keys(toPush).length){try{await _backendBulk(toPush);}catch(e){}}
-      }
-    }
+    const backendData=await _backendGetAll();
+    _storageMode='backend';
+    if(backendData) Object.assign(_mem,backendData);
     _openSSE();
     _startSyncWatchdog();
-    _fbStatus='ok'; // تعطيل شريط خطأ Firebase
+    _fbStatus='ok';
   },
   // قراءة بيانات Firebase مرة واحدة (للنقل فقط — بدون مستمعات ولا كتابة)
   async _loadFirebaseRaw(){
@@ -708,24 +684,29 @@ const DB = {
     }
   },
   init(){
-    // يضيف المفاتيح الناقصة — فقط إن كانت Firebase متصلة بنجاح
+    // يضيف المفاتيح الناقصة (مدرسة جديدة بلا بيانات بعد)
     const missing={};
     Object.keys(SEED).forEach(k=>{
       if(this.get(k)===null){
         _mem[k]=SEED[k];
         try{localStorage.setItem('ccs_'+k,JSON.stringify(SEED[k]));}catch{}
-        // لا نضيف للـ Firebase إلا إذا كان الاتصال ناجحاً (fbStatus=ok)
-        if(_fbStatus==='ok') missing[k]=SEED[k];
+        missing[k]=SEED[k];
       }
     });
-    if(Object.keys(missing).length){
-      if(_storageMode==='backend'){
-        _backendBulk(missing).catch(()=>{});
-      }else if(_fdb&&_fbStatus==='ok'){
-        _lastWrite=Date.now();
-        _fdb.ref('ccs').update(missing).catch(()=>{});
-      }
+    // مدرسة جديدة تماماً: أنشئ مديرها العام من بيانات التسجيل الفعلية بدل بيانات افتراضية مشتركة
+    if((_mem['users']||[]).length===0 && typeof TenantSession!=='undefined' && TenantSession.pendingCreds){
+      const t=TenantSession.tenant||{};
+      const admin={id:'sa1',username:TenantSession.pendingCreds.username,password:TenantSession.pendingCreds.password,role:'superadmin',name:t.contactPerson||t.name||'الإدارة العامة',phone:t.phone||''};
+      _mem['users']=[admin]; missing['users']=[admin];
+      try{localStorage.setItem('ccs_users',JSON.stringify([admin]));}catch{}
     }
+    if((_mem['schools']||[]).length===0 && typeof TenantSession!=='undefined' && TenantSession.tenant){
+      const t=TenantSession.tenant;
+      const sch=[{id:'s1',name:t.name||'مدرستي',contactPerson:t.contactPerson||'',phone:t.phone||'',email:t.email||'',isActive:true,joinDate:T0}];
+      _mem['schools']=sch; missing['schools']=sch;
+      try{localStorage.setItem('ccs_schools',JSON.stringify(sch));}catch{}
+    }
+    if(Object.keys(missing).length) _backendBulk(missing).catch(()=>{});
     // ضمان سلامة دور المدير العام — إصلاح إذا تغيّر
     const usrs=_mem['users'];
     if(Array.isArray(usrs)){
@@ -980,6 +961,73 @@ const Auth = {
 };
 
 // =========================================================
+//  TENANT SESSION — جلسة المدرسة (منصة مدارك متعددة المدارس)
+//  كل مدرسة مشتركة في المنصة لها توكن دخول مستقل وبيانات معزولة تماماً.
+// =========================================================
+const TenantSession = {
+  _KEY:'madarek_tenant_session',
+  data:null,
+  pendingCreds:null, // {username,password} — مؤقت بالذاكرة فقط، لتأسيس أول مدير عام لمدرسة جديدة، يُمسح بعد الاستخدام
+  init(){
+    try{this.data=JSON.parse(localStorage.getItem(this._KEY));}catch(e){this.data=null;}
+  },
+  save(d){
+    this.data=d;
+    try{localStorage.setItem(this._KEY,JSON.stringify(d));}catch(e){}
+  },
+  clear(){
+    this.data=null;
+    try{localStorage.removeItem(this._KEY);}catch(e){}
+  },
+  get token(){return this.data?.token||'';},
+  get tenant(){return this.data?.tenant||null;},
+};
+
+const MEMBERSHIP_LABELS={nursery:'🍼 حضانة / دار ضيافة أطفال',kindergarten:'🧸 روضة أطفال',school:'🏫 مدرسة (كل المراحل)'};
+const TERM_LABELS={term1:'الفصل الدراسي الأول',term2:'الفصل الدراسي الثاني',full_year:'العام الدراسي كاملاً',months:'مدة محددة بالأشهر'};
+const TENANT_STATUS_LABELS={active:'نشطة',pending:'قيد المراجعة',suspended:'موقوفة'};
+
+async function tenantApiCall(path,opts={}){
+  const r=await fetch(API_BASE+path,{...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}});
+  let body=null; try{body=await r.json();}catch(e){}
+  if(!r.ok){const err=new Error(body&&body.error||('http '+r.status));err.code=body&&body.error;err.tenantInfo=body&&body.tenant;throw err;}
+  return body;
+}
+
+function logoutTenant(){
+  TenantSession.clear();
+  API_TOKEN='';
+  location.hash='';
+  location.reload();
+}
+
+// =========================================================
+//  PROVIDER (مزوّد الخدمة) — لوحة تحكم صاحب المنصة لإدارة كل المدارس
+//  التوثيق بمفتاح سرّي يُدخله مزوّد الخدمة يدوياً (لا يُخزَّن داخل الصفحة نفسها لأن الصفحة عامة الآن)
+// =========================================================
+const Provider = {
+  get token(){try{return sessionStorage.getItem('madarek_provider_token')||'';}catch(e){return '';}},
+  set token(v){try{if(v)sessionStorage.setItem('madarek_provider_token',v);else sessionStorage.removeItem('madarek_provider_token');}catch(e){}},
+  async listTenants(){
+    const r=await fetch(API_BASE+'/platform/tenants',{headers:{'Authorization':'Bearer '+this.token}});
+    if(!r.ok) throw new Error('http '+r.status);
+    return r.json();
+  },
+  async createTenant(payload){
+    const r=await fetch(API_BASE+'/platform/tenants',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+this.token},body:JSON.stringify(payload)});
+    const body=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(body.error||('http '+r.status));
+    return body;
+  },
+  async updateTenant(id,payload){
+    const r=await fetch(API_BASE+'/platform/tenants/'+encodeURIComponent(id),{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+this.token},body:JSON.stringify(payload)});
+    const body=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(body.error||('http '+r.status));
+    return body;
+  },
+};
+
+// =========================================================
 //  APP STATE & ROUTER
 // =========================================================
 const App = {
@@ -987,6 +1035,8 @@ const App = {
   modal:null,
   params:{},
   notifFilter:{branch:'all',period:'all'},
+  platformTab:'login',
+  showPlatformTab(tab){this.platformTab=tab;document.getElementById('app').innerHTML=Views.platformGate(tab);},
   go(view,params={}){this.view=view;this.params=params;this.render()},
   // بحث حيّ: يحدّث المعطيات فوراً ويؤجّل إعادة رسم المحتوى فقط (دون الشريط الجانبي)
   // مع الحفاظ على تركيز الحقل وموضع المؤشر — يمنع التعليق أثناء الكتابة
@@ -1299,14 +1349,220 @@ const App = {
 // =========================================================
 const Views = {
 
-// ---------- LOGIN ----------
+// ---------- PLATFORM GATE (تسجيل / دخول المدرسة) ----------
+platformGate(tab){
+  tab=tab||'login';
+  return `
+  <div class="login-page">
+    <div class="login-card" style="max-width:460px">
+      <div class="login-brand">
+        <img src="logo.png" alt="مدارك" style="width:120px;height:120px;object-fit:contain;margin-bottom:4px" onerror="this.style.display='none'">
+        <h1>مدارك</h1>
+        <p>نظام إدارة وتحويل رقمي متكامل للمدارس، رياض الأطفال، ودور الحضانة</p>
+      </div>
+      <div class="login-form">
+        <div class="tabs" style="margin-bottom:20px">
+          <div class="tab ${tab==='login'?'active':''}" onclick="App.showPlatformTab('login')">تسجيل دخول المدرسة</div>
+          <div class="tab ${tab==='register'?'active':''}" onclick="App.showPlatformTab('register')">تسجيل مدرسة جديدة</div>
+        </div>
+        ${tab==='login'?Views._tenantLoginForm():Views._tenantRegisterForm()}
+        <div style="text-align:center;margin-top:18px;padding-top:16px;border-top:1px solid #e2e8f0">
+          <a href="#provider" onclick="location.hash='provider';renderProviderArea();return false;" style="color:#94a3b8;font-size:12px;text-decoration:none">دخول مزوّد الخدمة</a>
+        </div>
+      </div>
+    </div>
+  </div>`;
+},
+_tenantLoginForm(){
+  return `
+  <div id="tenant-login-err" style="display:none;margin-bottom:16px" class="alert-box alert-red">⚠️ اسم المستخدم أو كلمة المرور غير صحيحة</div>
+  <div class="input-group">
+    <label>اسم مستخدم المدرسة</label>
+    <input class="input" id="tl-user" placeholder="اسم المستخدم الذي سجّلتِ به" autocomplete="username" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('tl-pass').focus();}">
+  </div>
+  <div class="input-group">
+    <label>كلمة المرور</label>
+    <input class="input" id="tl-pass" type="password" placeholder="••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doTenantLogin()">
+  </div>
+  <button class="btn btn-primary" id="tl-btn" style="width:100%;justify-content:center;font-size:15px;padding:12px" onclick="doTenantLogin()">تسجيل الدخول</button>`;
+},
+_tenantRegisterForm(){
+  return `
+  <div id="tenant-register-err" style="display:none;margin-bottom:16px" class="alert-box alert-red"></div>
+  <div class="input-group"><label>اسم المدرسة / الروضة / الحضانة</label><input class="input" id="tr-name" placeholder="مثال: روضة براعم المستقبل"></div>
+  <div class="input-group"><label>نوع العضوية المطلوب</label>
+    <select class="input" id="tr-type">
+      <option value="kindergarten">🧸 روضة أطفال</option>
+      <option value="nursery">🍼 حضانة / دار ضيافة أطفال (أصغر من الروضة)</option>
+      <option value="school">🏫 مدرسة بكل مراحلها</option>
+    </select>
+    <div style="font-size:11px;color:#94a3b8;margin-top:4px">نهائياً يحدّده مزوّد الخدمة عند تفعيل الحساب</div>
+  </div>
+  <div class="input-group"><label>اسم المسؤول</label><input class="input" id="tr-contact" placeholder="اسم مسؤول التواصل"></div>
+  <div class="input-group"><label>رقم الجوال</label><input class="input" id="tr-phone" placeholder="05xxxxxxxx"></div>
+  <div class="input-group"><label>البريد الإلكتروني (اختياري)</label><input class="input" id="tr-email" type="email" placeholder="name@example.com"></div>
+  <div class="input-group"><label>اسم المستخدم لتسجيل الدخول</label><input class="input" id="tr-user" placeholder="بالإنجليزية، بدون مسافات" autocomplete="username"></div>
+  <div class="input-group"><label>كلمة المرور</label><input class="input" id="tr-pass" type="password" placeholder="6 أحرف على الأقل" autocomplete="new-password"></div>
+  <button class="btn btn-primary" id="tr-btn" style="width:100%;justify-content:center;font-size:15px;padding:12px" onclick="doTenantRegister()">إرسال طلب التسجيل</button>`;
+},
+
+// ---------- شاشة حالة الاشتراك (قيد المراجعة / موقوفة / منتهية) ----------
+subscriptionStatus(tenant){
+  const status=tenant?.status||'pending';
+  const expired=status==='active'&&tenant?.subEnd&&tenant.subEnd<today();
+  let icon='⏳',title='طلبكم قيد المراجعة',msg='تم استلام طلب تسجيل مدرستكم بنجاح، وسيقوم مزوّد الخدمة بمراجعته وتفعيل الحساب خلال وقت قصير.';
+  if(status==='suspended'){icon='🚫';title='الحساب موقوف حالياً';msg='تم إيقاف حساب مدرستكم من قبل مزوّد الخدمة. يرجى التواصل معه لمعرفة السبب وإعادة التفعيل.';}
+  else if(expired){icon='⌛';title='انتهى الاشتراك';msg='انتهت مدة اشتراك مدرستكم بتاريخ '+formatDate(tenant.subEnd)+'. يرجى التواصل مع مزوّد الخدمة لتجديد الاشتراك.';}
+  return `
+  <div class="login-page">
+    <div class="login-card" style="max-width:440px">
+      <div class="login-form" style="padding-top:36px;text-align:center">
+        <div style="font-size:52px;margin-bottom:10px">${icon}</div>
+        <h2 style="font-size:19px;font-weight:800;color:#1e293b;margin-bottom:10px">${title}</h2>
+        <p style="font-size:14px;color:#64748b;line-height:1.9;margin-bottom:20px">${msg}</p>
+        ${tenant?`<div class="card" style="background:#f8fafc;text-align:right;padding:14px 16px;margin-bottom:18px">
+          <div style="font-size:13px;color:#475569"><strong>المدرسة:</strong> ${esc(tenant.name)}</div>
+          <div style="font-size:13px;color:#475569;margin-top:4px"><strong>نوع العضوية:</strong> ${MEMBERSHIP_LABELS[tenant.membershipType]||tenant.membershipType||'—'}</div>
+          ${tenant.subEnd?`<div style="font-size:13px;color:#475569;margin-top:4px"><strong>نهاية الاشتراك:</strong> ${formatDate(tenant.subEnd)}</div>`:''}
+        </div>`:''}
+        <button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="logoutTenant()">تسجيل خروج</button>
+      </div>
+    </div>
+  </div>`;
+},
+
+// ---------- شاشة تعذّر الاتصال بالخادم ----------
+connectionError(){
+  return `
+  <div class="login-page">
+    <div class="login-card" style="max-width:420px">
+      <div class="login-form" style="padding-top:36px;text-align:center">
+        <div style="font-size:52px;margin-bottom:10px">🔌</div>
+        <h2 style="font-size:18px;font-weight:800;color:#1e293b;margin-bottom:10px">تعذّر الاتصال بالخادم</h2>
+        <p style="font-size:14px;color:#64748b;margin-bottom:20px">تحقّقي من اتصال الإنترنت ثم أعيدي المحاولة.</p>
+        <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="location.reload()">إعادة المحاولة</button>
+      </div>
+    </div>
+  </div>`;
+},
+
+// ---------- PROVIDER (مزوّد الخدمة) ----------
+providerLogin(err){
+  return `
+  <div class="login-page">
+    <div class="login-card" style="max-width:400px">
+      <div class="login-brand">
+        <h1>لوحة مزوّد الخدمة</h1>
+        <p>إدارة كل المدارس المشتركة في منصة مدارك</p>
+      </div>
+      <div class="login-form">
+        ${err?`<div class="alert-box alert-red" style="margin-bottom:16px">⚠️ ${esc(err)}</div>`:''}
+        <div class="input-group">
+          <label>مفتاح مزوّد الخدمة</label>
+          <input class="input" id="pv-key" type="password" placeholder="أدخل المفتاح السرّي" onkeydown="if(event.key==='Enter')doProviderLogin()">
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;font-size:15px;padding:12px" onclick="doProviderLogin()">دخول</button>
+        <div style="text-align:center;margin-top:18px;padding-top:16px;border-top:1px solid #e2e8f0">
+          <a href="#" onclick="exitProviderArea();return false;" style="color:#94a3b8;font-size:12px;text-decoration:none">العودة لتسجيل دخول المدارس</a>
+        </div>
+      </div>
+    </div>
+  </div>`;
+},
+providerDashboard(tenants){
+  return `
+  <div style="min-height:100vh;background:#f1f5f9;padding:24px">
+    <div style="max-width:1100px;margin:0 auto">
+      <div class="section-header" style="margin-bottom:20px">
+        <h2 style="font-size:19px;font-weight:800;color:#0f766e">🏫 المدارس المشتركة في المنصة</h2>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary btn-sm" onclick="openProviderAddTenant()">+ إضافة مدرسة</button>
+          <button class="btn btn-secondary btn-sm" onclick="exitProviderArea()">خروج</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap"><table>
+          <thead><tr><th>المدرسة</th><th>المسؤول</th><th>نوع العضوية</th><th>الاشتراك</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+          <tbody>
+            ${tenants.length?tenants.map(t=>{
+              const expired=t.status==='active'&&t.subEnd&&t.subEnd<today();
+              const stMap={active:'badge-green',pending:'badge-yellow',suspended:'badge-red'};
+              return `<tr>
+                <td><strong>${esc(t.name)}</strong><br><small style="color:#94a3b8">@${esc(t.username||'')}</small></td>
+                <td>${esc(t.contactPerson||'—')}<br><small style="color:#94a3b8">${esc(t.phone||'')}</small></td>
+                <td>${MEMBERSHIP_LABELS[t.membershipType]||t.membershipType||'—'}</td>
+                <td style="font-size:12px">${TERM_LABELS[t.termType]||'—'}${t.subStart||t.subEnd?`<br>${formatDate(t.subStart)||'—'} → ${formatDate(t.subEnd)||'—'}`:''}</td>
+                <td>
+                  <span class="badge ${expired?'badge-red':(stMap[t.status]||'badge-gray')}">${expired?'منتهي الاشتراك':(TENANT_STATUS_LABELS[t.status]||t.status)}</span>
+                </td>
+                <td><button class="btn btn-secondary btn-xs" onclick="openProviderEditTenant('${t.id}')">تعديل</button></td>
+              </tr>`;
+            }).join(''):`<tr><td colspan="6"><div class="empty-state"><div class="es-icon">🏫</div><p>لا توجد مدارس مسجّلة بعد</p></div></td></tr>`}
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+    <div id="pv-modal-root"></div>
+  </div>`;
+},
+providerTenantForm(t){
+  const edit=!!t;
+  return `
+  <div class="modal-overlay" onclick="if(event.target===this)closeProviderModal()">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header"><h2>${edit?'تعديل مدرسة':'إضافة مدرسة'}</h2><button class="close-btn" onclick="closeProviderModal()">✕</button></div>
+    <div class="modal-body">
+      <div id="pv-err" style="display:none;margin-bottom:16px" class="alert-box alert-red"></div>
+      <div class="input-group"><label>اسم المدرسة</label><input class="input" id="pv-name" value="${esc(t?.name||'')}"></div>
+      <div class="input-group"><label>اسم المسؤول</label><input class="input" id="pv-contact" value="${esc(t?.contactPerson||'')}"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="input-group"><label>الهاتف</label><input class="input" id="pv-phone" value="${esc(t?.phone||'')}"></div>
+        <div class="input-group"><label>البريد الإلكتروني</label><input class="input" id="pv-email" value="${esc(t?.email||'')}"></div>
+      </div>
+      <div class="input-group"><label>نوع العضوية</label>
+        <select class="input" id="pv-type">
+          ${Object.entries(MEMBERSHIP_LABELS).map(([k,v])=>`<option value="${k}" ${t?.membershipType===k?'selected':''}>${v}</option>`).join('')}
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div class="input-group"><label>مدة الاشتراك</label>
+          <select class="input" id="pv-term">
+            <option value="">—</option>
+            ${Object.entries(TERM_LABELS).map(([k,v])=>`<option value="${k}" ${t?.termType===k?'selected':''}>${v}</option>`).join('')}
+          </select>
+        </div>
+        <div class="input-group"><label>بداية الاشتراك</label><input class="input" id="pv-start" type="date" value="${t?.subStart||''}"></div>
+        <div class="input-group"><label>نهاية الاشتراك</label><input class="input" id="pv-end" type="date" value="${t?.subEnd||''}"></div>
+      </div>
+      <div class="input-group"><label>حالة الحساب</label>
+        <select class="input" id="pv-status">
+          ${Object.entries(TENANT_STATUS_LABELS).map(([k,v])=>`<option value="${k}" ${(t?.status||'active')===k?'selected':''}>${v}</option>`).join('')}
+        </select>
+      </div>
+      ${!edit?`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="input-group"><label>اسم المستخدم</label><input class="input" id="pv-username" placeholder="بالإنجليزية"></div>
+        <div class="input-group"><label>كلمة المرور</label><input class="input" id="pv-password" type="text" placeholder="6 أحرف فأكثر"></div>
+      </div>`:`
+      <div class="input-group"><label>كلمة مرور جديدة (اختياري)</label><input class="input" id="pv-password" type="text" placeholder="اتركيه فارغاً للإبقاء على القديمة"></div>
+      `}
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveProviderTenant(${edit?`'${t.id}'`:'null'})">حفظ</button>
+      <button class="btn btn-secondary" onclick="closeProviderModal()">إلغاء</button>
+    </div>
+  </div></div>`;
+},
+
+// ---------- LOGIN (داخل المدرسة: مدير عام/فرع/معلمة) ----------
 login(){
+  const tenant=TenantSession.tenant;
   return `
   <div class="login-page">
     <div class="login-card">
       <div class="login-brand">
         <img src="logo.png" alt="مدارك الطفل" style="width:150px;height:150px;object-fit:contain;margin-bottom:4px" onerror="this.style.display='none'">
-        <h1>مدارك الطفل</h1>
+        <h1>${esc(tenant?.name||'مدارك الطفل')}</h1>
         <p>Kid Sense — مركز رعاية وتعليم الأطفال</p>
       </div>
       <div class="login-form">
@@ -1323,6 +1579,9 @@ login(){
         <div style="text-align:center;margin-top:18px;padding-top:16px;border-top:1px solid #e2e8f0">
           <a href="#attend" onclick="location.hash='attend';App.render();return false;" style="display:inline-flex;align-items:center;gap:6px;color:#0f766e;font-weight:700;font-size:14px;text-decoration:none">🕐 تحضير الموظفين (دخول/خروج)</a>
           <div style="font-size:11px;color:#94a3b8;margin-top:4px">للموظفين — تسجيل الحضور من الجوال بالموقع والرمز السري</div>
+        </div>
+        <div style="text-align:center;margin-top:12px">
+          <a href="#" onclick="logoutTenant();return false;" style="color:#94a3b8;font-size:11px;text-decoration:none">🏫 تسجيل خروج من هذه المدرسة (الدخول بمدرسة أخرى)</a>
         </div>
       </div>
     </div>
@@ -6817,6 +7076,194 @@ function doLogin(){
   else{const e=document.getElementById('login-err');if(e)e.style.display='flex'}
 }
 
+// ===== بوابة المنصة: تسجيل / دخول المدرسة =====
+async function doTenantLogin(){
+  const username=document.getElementById('tl-user')?.value?.trim();
+  const password=document.getElementById('tl-pass')?.value?.trim();
+  const errEl=document.getElementById('tenant-login-err');
+  const btn=document.getElementById('tl-btn');
+  if(!username||!password){if(errEl){errEl.textContent='⚠️ أدخلي اسم المستخدم وكلمة المرور';errEl.style.display='flex';}return;}
+  if(btn){btn.disabled=true;btn.textContent='...جاري الدخول';}
+  try{
+    const res=await tenantApiCall('/tenant/login',{method:'POST',body:JSON.stringify({username,password})});
+    TenantSession.save({token:res.token,tenant:res.tenant});
+    TenantSession.pendingCreds={username,password}; // لتأسيس أول مدير عام إن كانت مدرسة جديدة بلا بيانات بعد
+    if(!res.active){
+      document.getElementById('app').innerHTML=Views.subscriptionStatus(res.tenant);
+      return;
+    }
+    await startAppForTenant();
+  }catch(e){
+    if(errEl){errEl.textContent='⚠️ اسم المستخدم أو كلمة المرور غير صحيحة';errEl.style.display='flex';}
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='تسجيل الدخول';}
+  }
+}
+async function doTenantRegister(){
+  const name=document.getElementById('tr-name')?.value?.trim();
+  const membershipType=document.getElementById('tr-type')?.value;
+  const contactPerson=document.getElementById('tr-contact')?.value?.trim();
+  const phone=document.getElementById('tr-phone')?.value?.trim();
+  const email=document.getElementById('tr-email')?.value?.trim();
+  const username=document.getElementById('tr-user')?.value?.trim();
+  const password=document.getElementById('tr-pass')?.value?.trim();
+  const errEl=document.getElementById('tenant-register-err');
+  const btn=document.getElementById('tr-btn');
+  const showErr=(m)=>{if(errEl){errEl.textContent='⚠️ '+m;errEl.style.display='flex';}};
+  if(errEl) errEl.style.display='none';
+  if(!name||!contactPerson||!phone||!username||!password){showErr('يرجى تعبئة جميع الحقول المطلوبة');return;}
+  if(password.length<6){showErr('كلمة المرور 6 أحرف على الأقل');return;}
+  if(!/^[a-zA-Z0-9_.-]{3,40}$/.test(username)){showErr('اسم المستخدم بالإنجليزية فقط بدون مسافات (٣ أحرف فأكثر)');return;}
+  if(btn){btn.disabled=true;btn.textContent='...جاري الإرسال';}
+  try{
+    await tenantApiCall('/tenant/register',{method:'POST',body:JSON.stringify({name,membershipType,contactPerson,phone,email,username,password})});
+    document.getElementById('app').innerHTML=Views.subscriptionStatus({name,membershipType,status:'pending'});
+  }catch(e){
+    showErr(e.code==='username_taken'?'اسم المستخدم مستخدم مسبقاً، اختاري اسماً آخر':'تعذّر إرسال الطلب، حاولي لاحقاً');
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='إرسال طلب التسجيل';}
+  }
+}
+
+// ===== تشغيل التطبيق بعد نجاح دخول المدرسة =====
+async function startAppForTenant(){
+  API_TOKEN=TenantSession.token;
+  document.getElementById('app').innerHTML=`<div style="height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Tajawal',sans-serif;background:linear-gradient(150deg,#0f766e,#064e3b)"><img src="logo.png" style="width:90px;height:90px;object-fit:contain;margin-bottom:16px" onerror="this.style.display='none'"><p style="color:#fff;font-size:22px;font-weight:700">${esc(TenantSession.tenant?.name||'مدارك')}</p><p style="color:rgba(255,255,255,.7);font-size:14px;margin-top:10px">⏳ جاري الاتصال بقاعدة البيانات...</p></div>`;
+  try{
+    await DB.initStorage();
+  }catch(e){
+    if(e.code==='subscription_inactive'){
+      const t={...TenantSession.tenant,...(e.tenantInfo||{})};
+      TenantSession.save({token:TenantSession.token,tenant:t});
+      document.getElementById('app').innerHTML=Views.subscriptionStatus(t);
+      return;
+    }
+    if(e.code==='unauthorized'){
+      TenantSession.clear();
+      document.getElementById('app').innerHTML=Views.platformGate('login');
+      return;
+    }
+    console.error('[boot] تعذّر الاتصال بالخادم:',e);
+    document.getElementById('app').innerHTML=Views.connectionError();
+    return;
+  }
+  DB.init();
+  TenantSession.pendingCreds=null; // استُهلكت إن لزم الأمر، لا نُبقي كلمة المرور صريحة في الذاكرة
+  // إصلاحات تاريخية خاصة بمدرسة "مدارك/روافد" المُرحّلة فقط — لا تُطبَّق على مدرسة جديدة
+  if(TenantSession.tenant?.id==='default'){
+    (()=>{
+      const fixes={
+        'b1':{correct:'الفرع الأول - هارون الرشيد', old:['الفرع الرئيسي','الفرع الأول']},
+        'b2':{correct:'الفرع الثاني - زامل بن سليم', old:['الفرع الثاني']},
+      };
+      const branches=DB.branches();
+      let changed=false;
+      branches.forEach(b=>{
+        const fix=fixes[b.id];
+        if(fix&&fix.old.includes(b.name)){b.name=fix.correct;changed=true;}
+      });
+      if(changed) DB.save('branches',branches);
+    })();
+    (()=>{
+      try{
+        const HLAT=24.6882151, HLNG=46.7946825; // هارون الرشيد
+        const ZLAT=24.6941321, ZLNG=46.7871351; // زامل بن سليم
+        const near=(a,v)=>Math.abs((+a||0)-v)<1e-6;
+        const empty=(v)=>v==null||v===''||v===undefined;
+        const branches=DB.branches();
+        let changed=false;
+        const b2=branches.find(x=>x.id==='b2'||(x.name||'').includes('زامل بن سليم'));
+        if(b2&&near(b2.lat,HLAT)&&near(b2.lng,HLNG)){b2.lat=null;b2.lng=null;changed=true;}
+        if(b2&&empty(b2.lat)){b2.lat=ZLAT;b2.lng=ZLNG;if(!b2.geoRadius)b2.geoRadius=150;changed=true;}
+        const b1=branches.find(x=>x.id==='b1'||(x.name||'').includes('هارون الرشيد'));
+        if(b1&&empty(b1.lat)){b1.lat=HLAT;b1.lng=HLNG;if(!b1.geoRadius)b1.geoRadius=150;changed=true;}
+        if(changed) DB.save('branches',branches);
+      }catch(e){}
+    })();
+  }
+  Auth.init();
+  if(!Auth.user){
+    // مدرسة جديدة أُنشئ مديرها العام للتو — سجّلي دخوله تلقائياً دون خطوة إضافية
+    const admin=DB.users().find(u=>u.role==='superadmin');
+    if(admin) Auth.login(admin.username,admin.password);
+  }
+  App.render();
+  _watchForNewBuild();
+}
+
+// =========================================================
+//  PROVIDER — لوحة تحكم مزوّد الخدمة (إدارة كل المدارس المشتركة)
+// =========================================================
+async function renderProviderArea(){
+  const root=document.getElementById('app');
+  if(!Provider.token){root.innerHTML=Views.providerLogin();return;}
+  root.innerHTML=`<div style="padding:60px;text-align:center;color:#64748b">⏳ جاري تحميل المدارس...</div>`;
+  try{
+    const tenants=await Provider.listTenants();
+    root.innerHTML=Views.providerDashboard(tenants);
+  }catch(e){
+    Provider.token='';
+    root.innerHTML=Views.providerLogin('تعذّر تسجيل الدخول — تحقّقي من المفتاح');
+  }
+}
+function doProviderLogin(){
+  const v=document.getElementById('pv-key')?.value?.trim();
+  if(!v) return;
+  Provider.token=v;
+  renderProviderArea();
+}
+function exitProviderArea(){
+  Provider.token='';
+  location.hash='';
+  TenantSession.init();
+  if(TenantSession.token&&TenantSession.tenant) startAppForTenant();
+  else document.getElementById('app').innerHTML=Views.platformGate('login');
+}
+function openProviderAddTenant(){
+  document.getElementById('pv-modal-root').innerHTML=Views.providerTenantForm(null);
+}
+async function openProviderEditTenant(id){
+  const tenants=await Provider.listTenants();
+  const t=tenants.find(x=>x.id===id);
+  if(t) document.getElementById('pv-modal-root').innerHTML=Views.providerTenantForm(t);
+}
+function closeProviderModal(){
+  const el=document.getElementById('pv-modal-root');
+  if(el) el.innerHTML='';
+}
+async function saveProviderTenant(id){
+  const val=(sel)=>document.getElementById(sel)?.value?.trim();
+  const payload={
+    name:val('pv-name'),
+    contactPerson:val('pv-contact'),
+    phone:val('pv-phone'),
+    email:val('pv-email'),
+    membershipType:val('pv-type'),
+    termType:val('pv-term'),
+    subStart:val('pv-start'),
+    subEnd:val('pv-end'),
+    status:val('pv-status'),
+  };
+  const errEl=document.getElementById('pv-err');
+  if(!payload.name){if(errEl){errEl.textContent='⚠️ اسم المدرسة مطلوب';errEl.style.display='flex';}return;}
+  try{
+    if(id){
+      const password=val('pv-password');
+      if(password) payload.password=password;
+      await Provider.updateTenant(id,payload);
+    }else{
+      payload.username=val('pv-username');
+      payload.password=val('pv-password');
+      if(!payload.username||!payload.password){if(errEl){errEl.textContent='⚠️ اسم المستخدم وكلمة المرور مطلوبان عند الإضافة';errEl.style.display='flex';}return;}
+    }
+    if(!id) await Provider.createTenant(payload);
+    closeProviderModal();
+    renderProviderArea();
+  }catch(e){
+    if(errEl){errEl.textContent='⚠️ '+(e.message==='username_taken'?'اسم المستخدم مستخدم مسبقاً':'تعذّر الحفظ');errEl.style.display='flex';}
+  }
+}
+
 // ===== تحضير الموظفين الذاتي (باركود + GPS) =====
 function _nowHM(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
 function _minsBetween(t1,t2){if(!t1||!t2)return 0;const[a,b]=t1.split(':').map(Number),[c,d]=t2.split(':').map(Number);return (c*60+d)-(a*60+b);}
@@ -9874,48 +10321,16 @@ function showDataRecovery(){
 // =========================================================
 //  INIT
 // =========================================================
-document.getElementById('app').innerHTML=`<div style="height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Tajawal',sans-serif;background:linear-gradient(150deg,#0f766e,#064e3b)"><img src="logo.png" style="width:90px;height:90px;object-fit:contain;margin-bottom:16px" onerror="this.style.display='none'"><p style="color:#fff;font-size:22px;font-weight:700">مدارك الطفل</p><p style="color:rgba(255,255,255,.7);font-size:14px;margin-top:10px">⏳ جاري الاتصال بقاعدة البيانات...</p></div>`;
-(async()=>{
-  await DB.initStorage();
-  DB.init();
-  // تصحيح أسماء الفروع — يُصحَّح الاسم فقط إن كان لا يزال على الاسم الافتراضي القديم
-  (()=>{
-    const fixes={
-      'b1':{correct:'الفرع الأول - هارون الرشيد', old:['الفرع الرئيسي','الفرع الأول']},
-      'b2':{correct:'الفرع الثاني - زامل بن سليم', old:['الفرع الثاني']},
-    };
-    const branches=DB.branches();
-    let changed=false;
-    branches.forEach(b=>{
-      const fix=fixes[b.id];
-      if(fix&&fix.old.includes(b.name)){b.name=fix.correct;changed=true;}
-    });
-    if(changed) DB.save('branches',branches);
-  })();
-  // تعيين مواقع الفروع تلقائياً (يُضبط فقط إن كان الفرع بلا موقع — فلا يمسح تعديلاً يدوياً):
-  //  هارون الرشيد (b1) = 24.6882151,46.7946825  |  زامل بن سليم (b2) = 24.6941321,46.7871351
-  (()=>{
-    try{
-      const HLAT=24.6882151, HLNG=46.7946825; // هارون الرشيد
-      const ZLAT=24.6941321, ZLNG=46.7871351; // زامل بن سليم
-      const near=(a,v)=>Math.abs((+a||0)-v)<1e-6;
-      const empty=(v)=>v==null||v===''||v===undefined;
-      const branches=DB.branches();
-      let changed=false;
-      const b2=branches.find(x=>x.id==='b2'||(x.name||'').includes('زامل بن سليم'));
-      // إزالة قيمة هارون التي زُرعت خطأً على زامل سابقاً
-      if(b2&&near(b2.lat,HLAT)&&near(b2.lng,HLNG)){b2.lat=null;b2.lng=null;changed=true;}
-      // تعيين موقع زامل الصحيح إن كان فارغاً
-      if(b2&&empty(b2.lat)){b2.lat=ZLAT;b2.lng=ZLNG;if(!b2.geoRadius)b2.geoRadius=150;changed=true;}
-      // تعيين موقع هارون الرشيد إن كان فارغاً
-      const b1=branches.find(x=>x.id==='b1'||(x.name||'').includes('هارون الرشيد'));
-      if(b1&&empty(b1.lat)){b1.lat=HLAT;b1.lng=HLNG;if(!b1.geoRadius)b1.geoRadius=150;changed=true;}
-      if(changed) DB.save('branches',branches);
-    }catch(e){}
-  })();
-  Auth.init();
-  App.render();
-  _watchForNewBuild();
+(function boot(){
+  const h=(location.hash||'').replace(/^#/,'').split(/[?\/]/)[0];
+  if(h==='provider'){renderProviderArea();return;}
+  if(h==='attend'){document.getElementById('app').innerHTML=Views.staffCheckin();return;}
+  TenantSession.init();
+  if(TenantSession.token&&TenantSession.tenant){
+    startAppForTenant();
+  }else{
+    document.getElementById('app').innerHTML=Views.platformGate('login');
+  }
 })();
 
 // شريط تنبيه عائم قابل لإعادة الاستخدام — يطلب من المستخدم إعادة تحميل الصفحة

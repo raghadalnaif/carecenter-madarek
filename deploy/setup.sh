@@ -6,14 +6,16 @@ set -euo pipefail
 ROOT=/var/www/madarek
 ENV_FILE=/etc/madarek-api.env
 
-# 1) توكن سري (يُولّد مرة واحدة ويُعاد استخدامه)
+# 1) مفتاح مزوّد الخدمة السرّي (يُولّد مرة واحدة ويُعاد استخدامه) — هذا مفتاح
+#    لوحة تحكم مزوّد الخدمة فقط (إدارة كل المدارس)، وليس مفتاح مدرسة. لا يُخزَّن
+#    في أي ملف تصله المتصفحات — يُدخله مزوّد الخدمة يدوياً من صفحة #provider.
 if [ -f "$ENV_FILE" ]; then
-  TOKEN="$(grep -E '^API_TOKEN=' "$ENV_FILE" | head -1 | cut -d= -f2-)"
-  echo "ℹ️  توكن موجود مسبقاً، سنعيد استخدامه."
+  TOKEN="$(grep -E '^PLATFORM_TOKEN=|^API_TOKEN=' "$ENV_FILE" | head -1 | cut -d= -f2-)"
+  echo "ℹ️  مفتاح موجود مسبقاً، سنعيد استخدامه."
 else
   TOKEN="$(openssl rand -hex 24)"
 fi
-echo "🔑 API_TOKEN=$TOKEN"
+echo "🔑 PLATFORM_TOKEN=$TOKEN   (احفظيه — تحتاجينه لدخول لوحة مزوّد الخدمة على /#provider)"
 
 # 2) Node.js 20 LTS + أدوات البناء (احتياطاً لـ better-sqlite3)
 if ! command -v node >/dev/null 2>&1; then
@@ -28,14 +30,14 @@ echo "📦 تثبيت اعتماديات الخادم..."
 cd "$ROOT/server"
 npm install --omit=dev --no-audit --no-fund
 
-# 4) ملف البيئة (التوكن) — صلاحيات مقيّدة
-echo "API_TOKEN=$TOKEN" > "$ENV_FILE"
+# 4) ملف البيئة (المفتاح) — صلاحيات مقيّدة، على الخادم فقط
+echo "PLATFORM_TOKEN=$TOKEN" > "$ENV_FILE"
 chmod 600 "$ENV_FILE"
 
-# 5) إعداد الواجهة (التوكن للمتصفح) — غير موجود في المستودع العام
+# 5) إعداد الواجهة — لم يعد يحتوي أي سرّ (الصفحة عامة الآن، تصلها متصفحات
+#    زوّار يسجّلون مدارس جديدة، فلا يجوز تضمين مفتاح مزوّد الخدمة فيها)
 cat > "$ROOT/api-config.js" <<EOF
 window.MADAREK_API_BASE='/api';
-window.MADAREK_API_TOKEN='$TOKEN';
 EOF
 
 # 6) خدمة systemd
