@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v92 -->
+<!-- BUILD: 2026-06-24-v93 -->
 <script>
 (function(){
-  var BUILD='v92-20260624-1';
+  var BUILD='v93-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -777,6 +777,25 @@ const DB = {
     const seen=new Map();
     (list||[]).forEach(a=>{if(!a)return;const k=(a.employeeId&&a.date)?a.employeeId+'|'+a.date:(a.id||Math.random());seen.set(k,a);});
     this.save('hr_attendance',Array.from(seen.values()));
+  },
+  // حفظ الحضور مع تأكيد وصوله للخادم (للتحضير الذاتي — يرجّع Promise)
+  saveHrAttendanceAwait(list){
+    const seen=new Map();
+    (list||[]).forEach(a=>{if(!a)return;const k=(a.employeeId&&a.date)?a.employeeId+'|'+a.date:(a.id||Math.random());seen.set(k,a);});
+    const arr=Array.from(seen.values());
+    _mem['hr_attendance']=arr;
+    let s=null;try{s=JSON.stringify(arr);}catch{}
+    try{if(s!==null)localStorage.setItem('ccs_hr_attendance',s);}catch{}
+    try{_backupData('hr_attendance',arr);}catch{}
+    if(_storageMode==='backend'&&s!==null){
+      return _backendPut('hr_attendance',s).then(r=>{if(!r.ok)throw new Error('http '+r.status);return true;});
+    }
+    if(_fdb&&_fbStatus==='ok'){
+      _pendingEcho['hr_attendance']=s;_ensureKeyListener('hr_attendance');setTimeout(()=>{delete _pendingEcho['hr_attendance'];},60000);
+      return _fdb.ref('ccs/hr_attendance').set(arr).then(()=>true);
+    }
+    // لا يوجد خادم (وضع محلي فقط) — نرفض ليظهر تنبيه للمستخدم
+    return Promise.reject(new Error('no-backend'));
   },
   hrPayroll(){return this.get('hr_payroll')||[]},
   addHrPayroll(p){const a=this.hrPayroll();a.push(p);this.save('hr_payroll',a)},
@@ -7002,6 +7021,7 @@ function _staffRecord(emp,kind,lat,lng,dist){
   }
   const devIp=(window._deviceIp||'');
   const list=DB.hrAttendance().filter(a=>!(a.employeeId===emp.id&&a.date===date));
+  let okMsg='';
   if(kind==='in'){
     // بداية دوام اليوم من الجدول الأسبوعي (الدوام قد يختلف كل يوم)
     const wd=new Date().getDay(); // 0=الأحد
@@ -7012,16 +7032,21 @@ function _staffRecord(emp,kind,lat,lng,dist){
     const lateBy=isOff?0:Math.max(0,_minsBetween(dutyStart,now)-grace);
     const status=lateBy>0?'late':'present';
     list.push({id:uid(),employeeId:emp.id,date,status,checkIn:now,checkOut:prev?.checkOut||'',lateMinutes:lateBy,dutyStart:isOff?'':dutyStart,via:'qr-gps',checkInLat:lat,checkInLng:lng,checkInDist:dist,deviceId:_clientId,deviceIp:devIp});
-    DB.saveHrAttendance(list);
-    _scMsg(`✅ تم تسجيل دخولك يا ${esc(emp.name)}<br>🕐 ${now} · 📍 داخل الفرع (${dist}م)${isOff?'<br>🏖️ اليوم إجازتك — سُجّل حضورك بدون احتساب تأخير':(lateBy>0?`<br>⏰ متأخر ${lateBy} دقيقة (دوامك ${dutyStart})`:' · في الوقت 👌')}`,'ok');
+    okMsg=`✅ تم تسجيل دخولك يا ${esc(emp.name)}<br>🕐 ${now} · 📍 داخل الفرع (${dist}م)${isOff?'<br>🏖️ اليوم إجازتك — سُجّل حضورك بدون احتساب تأخير':(lateBy>0?`<br>⏰ متأخر ${lateBy} دقيقة (دوامك ${dutyStart})`:' · في الوقت 👌')}`;
   } else {
     const wm=prev?.checkIn?Math.max(0,_minsBetween(prev.checkIn,now)):0;
     if(prev) list.push({...prev,checkOut:now,workedMinutes:wm,checkOutLat:lat,checkOutLng:lng,deviceId:prev.deviceId||_clientId,deviceIp:prev.deviceIp||devIp});
     else list.push({id:uid(),employeeId:emp.id,date,status:'present',checkIn:'',checkOut:now,lateMinutes:0,workedMinutes:0,via:'qr-gps',checkOutLat:lat,checkOutLng:lng,deviceId:_clientId,deviceIp:devIp});
-    DB.saveHrAttendance(list);
     const worked=prev?.checkIn?(_minsBetween(prev.checkIn,now)/60).toFixed(1):null;
-    _scMsg(`✅ تم تسجيل خروجك يا ${esc(emp.name)}<br>🕐 ${now} · 📍 (${dist}م)${worked?`<br>⏳ ساعات العمل: ${worked} ساعة`:''}`,'ok');
+    okMsg=`✅ تم تسجيل خروجك يا ${esc(emp.name)}<br>🕐 ${now} · 📍 (${dist}م)${worked?`<br>⏳ ساعات العمل: ${worked} ساعة`:''}`;
   }
+  // الحفظ مع تأكيد المزامنة مع النظام (لا نُظهر «تم» إلا بعد وصولها للخادم فعلاً)
+  _scMsg('⏳ جارٍ حفظ الحضور ومزامنته مع النظام... لا تغلقي الصفحة','info');
+  DB.saveHrAttendanceAwait(list).then(()=>{
+    _scMsg(okMsg+'<br><span style="font-size:12px;color:#166534">🔄 تمت المزامنة مع النظام</span>','ok');
+  }).catch(()=>{
+    _scMsg('⚠️ حُفِظ على جهازك لكن <b>تعذّرت المزامنة مع النظام</b>.<br>تأكدي من اتصال الإنترنت وأعيدي المحاولة حتى تظهر «تمت المزامنة».','err');
+  });
   const pinEl=document.getElementById('sc-pin');if(pinEl)pinEl.value='';
 }
 
