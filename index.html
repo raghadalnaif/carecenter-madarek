@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v90 -->
+<!-- BUILD: 2026-06-24-v91 -->
 <script>
 (function(){
-  var BUILD='v90-20260624-1';
+  var BUILD='v91-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -5734,6 +5734,11 @@ const Modals = {
     const period=c.period||'evening';
     const p=getSubPrices(c.branchId)[period]||getSubPrices(c.branchId).evening;
     const periodLabel=period==='morning'?'🌅 صباحية':'🌙 مسائية';
+    // آخر اشتراك للطفل — للتجديد: نبدأ من اليوم التالي لنهايته، أو من اليوم
+    const _prevSubs=DB.subscriptions().filter(s=>s.childId===childId).sort((a,b)=>(b.endDate||'').localeCompare(a.endDate||''));
+    const _lastEnd=_prevSubs[0]?.endDate||'';
+    const _contStart=_lastEnd?addDays(_lastEnd,1):T0;
+    const _defStart=(_lastEnd&&_lastEnd>=T0)?_contStart:T0;
     App.showModal(`
     <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
     <div class="modal">
@@ -5763,9 +5768,13 @@ const Modals = {
           </div>
         </div>
         <div class="grid-2">
-          <div class="input-group"><label>تاريخ البداية *</label><input class="input" id="sub-start" type="date" value="${T0}" onchange="calcEndDate()"></div>
-          <div class="input-group"><label>تاريخ الانتهاء</label><input class="input" id="sub-end" type="date" value="${addDays(T0,30)}"></div>
+          <div class="input-group"><label>تاريخ البداية *</label><input class="input" id="sub-start" type="date" value="${_defStart}" onchange="calcEndDate()"></div>
+          <div class="input-group"><label>تاريخ الانتهاء</label><input class="input" id="sub-end" type="date" value="${addDays(_defStart,30)}" onchange="subEndManual()"></div>
         </div>
+        ${_lastEnd?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-6px 0 12px">
+          <button type="button" class="btn btn-xs" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe" onclick="document.getElementById('sub-start').value='${_contStart}';calcEndDate()">🔄 متابعة من نهاية الاشتراك السابق (${formatDate(_lastEnd)})</button>
+          <button type="button" class="btn btn-xs" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0" onclick="document.getElementById('sub-start').value='${T0}';calcEndDate()">📅 يبدأ اليوم</button>
+        </div>`:''}
         <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#fefce8;border-radius:8px;margin-bottom:14px;border:1px solid #fde68a">
           <span style="font-size:13px;font-weight:600">نسبة الخصم %</span>
           <input class="input" id="sub-disc" type="number" min="0" max="100" value="${c.discountPct||0}" style="width:80px" oninput="calcEndDate(false)">
@@ -7030,6 +7039,17 @@ function calcEndDate(recalcEnd=true){
   const final=disc>0?Math.round(base*(1-disc/100)):base;
   if(baseLabel) baseLabel.textContent=base+' ر.س';
   if(priceEl){priceEl.value=final;if(paidEl)paidEl.value=final;}
+}
+
+// تخصيص يدوي للأيام: عند تعديل تاريخ الانتهاء يدوياً → نوع «مخصص» + حساب الأيام والسعر من المدة
+function subEndManual(){
+  const start=document.getElementById('sub-start')?.value;
+  const end=document.getElementById('sub-end')?.value;
+  if(!start||!end||end<start) return;
+  const days=diffDays(end,start)+1;
+  const typeEl=document.getElementById('sub-type'); if(typeEl) typeEl.value='custom';
+  const cd=document.getElementById('sub-custom-days'); if(cd) cd.value=days;
+  calcEndDate(false); // يحسب السعر بدون إعادة ضبط تاريخ الانتهاء
 }
 
 function calcChildSubPrice(recalcEnd=true){
