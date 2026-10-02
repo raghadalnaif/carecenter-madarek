@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v91 -->
+<!-- BUILD: 2026-06-24-v92 -->
 <script>
 (function(){
-  var BUILD='v91-20260624-1';
+  var BUILD='v92-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -1362,7 +1362,7 @@ staffCheckin(){
         ${!hasGeo?`<div class="alert-box alert-yellow" style="font-size:12px">⚠️ لم يُحدَّد موقع هذا الفرع بعد. يتواصل المدير لضبط موقع الفرع من إعداداته.</div>`:''}
         <div class="input-group">
           <label>👤 الموظف</label>
-          <select class="input" id="sc-emp">
+          <select class="input" id="sc-emp" onchange="_scShowStatus()">
             ${emps.length?emps.map(e=>`<option value="${e.id}">${esc(e.name)} — ${esc(e.jobTitle||'')}</option>`).join(''):'<option value="">لا يوجد موظفون في هذا الفرع</option>'}
           </select>
         </div>
@@ -6936,6 +6936,16 @@ function _scMsg(html,type){
   const bd={ok:'#bbf7d0',err:'#fecaca',info:'#bfdbfe'}[type]||'#e2e8f0';
   el.innerHTML=`<div style="background:${bg};border:1px solid ${bd};border-radius:10px;padding:12px 14px;font-size:14px;font-weight:600;text-align:center">${html}</div>`;
 }
+// إظهار حالة الموظف اليوم عند اختياره (دخول/خروج) لتوجيهه وتفادي الضغط الخاطئ
+function _scShowStatus(){
+  const empId=document.getElementById('sc-emp')?.value;
+  const el=document.getElementById('sc-result');if(!el)return;
+  if(!empId){el.innerHTML='';return;}
+  const a=DB.hrAttendance().find(x=>x.employeeId===empId&&x.date===T0);
+  if(a&&a.checkIn&&a.checkOut) _scMsg(`✅ حضورك مكتمل اليوم — دخول ${a.checkIn} · خروج ${a.checkOut}`,'ok');
+  else if(a&&a.checkIn) _scMsg(`🟢 أنتِ مسجّلة دخول من ${a.checkIn} — المطلوب الآن <b>🔴 تسجيل خروج</b>`,'info');
+  else el.innerHTML='';
+}
 function staffCheck(kind){
   const bid=document.getElementById('sc-branch')?.value;
   const empId=document.getElementById('sc-emp')?.value;
@@ -6978,6 +6988,15 @@ function _staffRecord(emp,kind,lat,lng,dist){
     if(sameDev){
       const other=DB.hrEmployees().find(e=>e.id===sameDev.employeeId);
       _scMsg(`❌ لا يُسمح بتسجيل أكثر من موظف من نفس الجهاز اليوم.<br>هذا الجهاز سجّل دخول: <b>${esc(other?.name||'موظف آخر')}</b>.<br>🔸 كل موظف يسجّل حضوره من جهازه الخاص.`,'err');
+      return;
+    }
+    // 🚫 منع تكرار تسجيل الدخول (غالباً الموظفة تبي تسجّل خروج بالخطأ)
+    if(prev&&prev.checkIn){
+      if(prev.checkOut){
+        _scMsg(`ℹ️ سجّلتِ اليوم بالفعل:<br>🟢 دخول ${prev.checkIn} · 🔴 خروج ${prev.checkOut}<br>لا حاجة لتسجيل جديد.`,'info');
+      } else {
+        _scMsg(`⚠️ أنتِ مسجّلة <b>دخول</b> من الساعة <b>${prev.checkIn}</b>.<br>إذا تبين تسجيل الخروج اضغطي الزر الأحمر 🔴 تسجيل خروج.<br><button onclick="staffCheck('out')" style="margin-top:10px;background:#ef4444;color:#fff;border:none;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:800;cursor:pointer;width:100%">🔴 تسجيل الخروج الآن</button>`,'err');
+      }
       return;
     }
   }
