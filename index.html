@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v97 -->
+<!-- BUILD: 2026-06-24-v98 -->
 <script>
 (function(){
-  var BUILD='v97-20260624-1';
+  var BUILD='v98-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -1066,6 +1066,7 @@ const App = {
         {v:'branches',icon:'🏢',label:'الفروع'},
         {v:'children',icon:'👶',label:'الأطفال'},
         {v:'subscriptions',icon:'📋',label:'الاشتراكات'},
+        {v:'attendance',icon:'✅',label:'تحضير الأطفال'},
       ]},
       {label:'المالية',items:[
         {v:'sales',icon:'🛍️',label:'المبيعات'},
@@ -5177,28 +5178,63 @@ hr(){
       ${App.params.hrRange?(()=>{
         const from=App.params.hrFrom||date, to=App.params.hrTo||date;
         const recs=DB.hrAttendance().filter(a=>(a.date||'')>=from&&(a.date||'')<=to);
-        const byEmp={};
-        recs.forEach(a=>{const b=byEmp[a.employeeId]||(byEmp[a.employeeId]={present:0,late:0,absent:0,leave:0,min:0,lateMin:0});if(a.status==='present')b.present++;else if(a.status==='late')b.late++;else if(a.status==='absent')b.absent++;else if(a.status==='leave')b.leave++;b.min+=_recWorkedMin(a);b.lateMin+=(+a.lateMinutes||0);});
+        const byEmp={};       // ملخّص
+        const empRecs={};     // سجلات مفصّلة لكل موظفة
+        recs.forEach(a=>{
+          const b=byEmp[a.employeeId]||(byEmp[a.employeeId]={present:0,late:0,absent:0,leave:0,min:0,lateMin:0});
+          if(a.status==='present')b.present++;else if(a.status==='late')b.late++;else if(a.status==='absent')b.absent++;else if(a.status==='leave')b.leave++;
+          b.min+=_recWorkedMin(a);b.lateMin+=(+a.lateMinutes||0);
+          (empRecs[a.employeeId]=empRecs[a.employeeId]||[]).push(a);
+        });
+        Object.values(empRecs).forEach(arr=>arr.sort((x,y)=>(x.date||'').localeCompare(y.date||'')));
         const list=_hrRptSel.size?activeEmps.filter(e=>_hrRptSel.has(e.id)):activeEmps;
         const gMin=Object.values(byEmp).reduce((s,b)=>s+b.min,0);
+        // صفوف الحضور المفصّل (يوم بيوم) لكل معلمة مختارة
+        const detailRows=list.map(e=>{
+          const arr=empRecs[e.id]||[];
+          if(!arr.length) return `<tr><td><strong>${esc(e.name)}</strong></td><td colspan="5" style="text-align:center;color:#94a3b8">لا يوجد تسجيل في هذه الفترة</td></tr>`;
+          return arr.map((a,i)=>{
+            const st=a.status||'—';
+            const wMin=_recWorkedMin(a);
+            const gh=st==='absent'?'<span style="color:#dc2626;font-weight:800">🔴 غياب</span>':st==='leave'?'<span style="color:#7c3aed;font-weight:700">🏖️ إجازة</span>':st==='late'?`<span style="color:#d97706;font-weight:700">⏰ متأخر${(+a.lateMinutes)?` ${a.lateMinutes}د`:''}</span>`:'<span style="color:#16a34a;font-weight:700">✅ حاضر</span>';
+            return `<tr>
+              <td>${i===0?`<strong>${esc(e.name)}</strong>`:`<span style="color:#cbd5e1">↳</span>`}</td>
+              <td style="text-align:center;font-size:12px">${formatDate(a.date)}</td>
+              <td style="text-align:center;font-weight:700;color:${st==='late'?'#d97706':'#166534'}">${a.checkIn||'—'}</td>
+              <td style="text-align:center;font-weight:700;color:#991b1b">${a.checkOut||'—'}</td>
+              <td style="text-align:center;font-weight:600">${wMin>0?(wMin/60).toFixed(1):'—'}</td>
+              <td style="text-align:center">${gh}</td>
+            </tr>`;
+          }).join('');
+        }).join('');
         return `<div class="card">
-          <div class="card-title">📊 تقرير الفترة — من ${formatDate(from)} إلى ${formatDate(to)}${_hrRptSel.size?` (${list.length} موظفة مختارة)`:''}</div>
-          <div class="table-wrap"><table>
-            <thead><tr><th>الموظفة</th><th>✅ حضور</th><th>⏰ تأخّر</th><th>❌ غياب</th><th>🏖️ إجازة</th><th>⏱️ إجمالي الساعات</th><th>⏰ إجمالي التأخر</th></tr></thead>
-            <tbody>
-              ${list.map(e=>{const b=byEmp[e.id]||{present:0,late:0,absent:0,leave:0,min:0,lateMin:0};return `<tr>
-                <td><strong>${esc(e.name)}</strong><br><small style="color:#64748b">${esc(e.jobTitle||'')}</small></td>
-                <td style="text-align:center;color:#16a34a;font-weight:700">${b.present+b.late}</td>
-                <td style="text-align:center;color:#d97706">${b.late}</td>
-                <td style="text-align:center;color:#dc2626">${b.absent}</td>
-                <td style="text-align:center;color:#7c3aed">${b.leave}</td>
-                <td style="text-align:center;font-weight:700;color:#0f766e">${b.min?_fmtDur(b.min):'—'}</td>
-                <td style="text-align:center;color:${b.lateMin?'#dc2626':'#94a3b8'}">${b.lateMin?b.lateMin+' د':'—'}</td>
-              </tr>`;}).join('')}
-              <tr style="background:#f0fdf4;font-weight:800"><td>الإجمالي</td><td colspan="4"></td><td style="text-align:center;color:#0f766e">${_fmtDur(gMin)}</td><td></td></tr>
-            </tbody>
+          <div class="card-title">📊 حضور مفصّل — من ${formatDate(from)} إلى ${formatDate(to)}${_hrRptSel.size?` (${list.length} معلمة مختارة)`:''}</div>
+          <div class="table-wrap"><table id="hr-range-detail">
+            <thead><tr><th>المعلمة</th><th>📅 التاريخ</th><th>🟢 دخول</th><th>🔴 خروج</th><th>⏱️ ساعات</th><th>الغياب</th></tr></thead>
+            <tbody>${detailRows||`<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:20px">لا توجد سجلات حضور في هذه الفترة</td></tr>`}</tbody>
           </table></div>
-          <button class="btn btn-secondary btn-sm no-print" style="margin-top:10px" onclick="window.print()">🖨️ طباعة</button>
+          <details style="margin-top:12px">
+            <summary style="cursor:pointer;font-weight:700;color:#0f766e;font-size:13px;padding:6px 0">📊 ملخّص إجمالي لكل معلمة (اضغطي للعرض)</summary>
+            <div class="table-wrap" style="margin-top:8px"><table>
+              <thead><tr><th>المعلمة</th><th>✅ أيام حضور</th><th>⏰ تأخّر</th><th>❌ غياب</th><th>🏖️ إجازة</th><th>⏱️ إجمالي الساعات</th><th>⏰ إجمالي التأخر</th></tr></thead>
+              <tbody>
+                ${list.map(e=>{const b=byEmp[e.id]||{present:0,late:0,absent:0,leave:0,min:0,lateMin:0};return `<tr>
+                  <td><strong>${esc(e.name)}</strong></td>
+                  <td style="text-align:center;color:#16a34a;font-weight:700">${b.present+b.late}</td>
+                  <td style="text-align:center;color:#d97706">${b.late}</td>
+                  <td style="text-align:center;color:#dc2626">${b.absent}</td>
+                  <td style="text-align:center;color:#7c3aed">${b.leave}</td>
+                  <td style="text-align:center;font-weight:700;color:#0f766e">${b.min?_fmtDur(b.min):'—'}</td>
+                  <td style="text-align:center;color:${b.lateMin?'#dc2626':'#94a3b8'}">${b.lateMin?b.lateMin+' د':'—'}</td>
+                </tr>`;}).join('')}
+                <tr style="background:#f0fdf4;font-weight:800"><td>الإجمالي</td><td colspan="4"></td><td style="text-align:center;color:#0f766e">${_fmtDur(gMin)}</td><td></td></tr>
+              </tbody>
+            </table></div>
+          </details>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn btn-secondary btn-sm no-print" onclick="exportTableCSV('hr-range-detail','حضور-مفصل-${from}_${to}')">📊 تصدير Excel</button>
+            <button class="btn btn-secondary btn-sm no-print" onclick="window.print()">🖨️ طباعة</button>
+          </div>
         </div>`;
       })():''}
       ${App.params.hrAttReport?`<div class="card">
@@ -5214,7 +5250,7 @@ hr(){
           </div>
         </details>
         <div class="table-wrap"><table>
-          <thead><tr><th>الموظف</th><th>المسمى</th><th>الحالة</th><th>دخول</th><th>خروج</th><th>ساعات</th><th>دقائق التأخر</th><th>خصم التأخر (ر.س)</th><th>الجهاز / IP</th></tr></thead>
+          <thead><tr><th>المعلمة</th><th>🟢 دخول</th><th>🔴 خروج</th><th>⏱️ ساعات</th><th>⏰ تأخر</th><th>خصم التأخر (ر.س)</th><th>الغياب</th><th>الجهاز / IP</th></tr></thead>
           <tbody>
           ${(()=>{const dc={};attList.forEach(a=>{if(a.deviceId&&a.checkIn)dc[a.deviceId]=(dc[a.deviceId]||0)+1;});window._hrDevCount=dc;return '';})()}
           ${(_hrRptSel.size?activeEmps.filter(e=>_hrRptSel.has(e.id)):activeEmps).map(e=>{
@@ -5227,15 +5263,15 @@ hr(){
             const wMin=(a.checkIn&&a.checkOut)?((()=>{const[a1,b1]=a.checkIn.split(':').map(Number),[a2,b2]=a.checkOut.split(':').map(Number);return (a2*60+b2)-(a1*60+b1);})()):0;
             const devShared=a.deviceId&&(window._hrDevCount||{})[a.deviceId]>1;
             const devCell=a.deviceId?`<span title="معرّف الجهاز: ${esc(a.deviceId)}" style="font-family:monospace;font-size:11px">${a.deviceIp?esc(a.deviceIp):('…'+esc(a.deviceId.slice(-5)))}</span>${devShared?' <span style="color:#dc2626;font-weight:700" title="نفس الجهاز سجّل أكثر من موظف!">⚠️</span>':''}`:'—';
+            const ghCell=st==='absent'?'<span style="color:#dc2626;font-weight:800">🔴 غياب</span>':st==='leave'?'<span style="color:#7c3aed;font-weight:700">🏖️ إجازة</span>':st==='—'?'<span style="color:#94a3b8">لم يُسجَّل</span>':'<span style="color:#16a34a;font-weight:700">✅ حاضر</span>';
             return `<tr>
               <td><strong>${esc(e.name)}</strong>${a.via==='qr-gps'?' <span style="color:#166534;font-size:10px">📷GPS</span>':''}</td>
-              <td>${esc(e.jobTitle||'—')}</td>
-              <td style="font-weight:600">${stLabel}</td>
-              <td style="text-align:center;color:#166534">${a.checkIn||'—'}</td>
-              <td style="text-align:center;color:#991b1b">${a.checkOut||'—'}</td>
+              <td style="text-align:center;font-weight:700;color:${st==='late'?'#d97706':'#166534'}">${a.checkIn||'—'}${st==='late'?' ⏰':''}</td>
+              <td style="text-align:center;font-weight:700;color:#991b1b">${a.checkOut||'—'}</td>
               <td style="text-align:center;font-weight:600">${wMin>0?(wMin/60).toFixed(1):'—'}</td>
-              <td style="text-align:center">${st==='late'?lateMin+' دقيقة':'—'}</td>
-              <td style="color:#ef4444">${st==='late'&&lateDeduct>0?lateDeduct.toLocaleString()+' ر.س':'—'}</td>
+              <td style="text-align:center">${st==='late'?lateMin+' د':'—'}</td>
+              <td style="color:#ef4444;text-align:center">${st==='late'&&lateDeduct>0?lateDeduct.toLocaleString():'—'}</td>
+              <td style="text-align:center">${ghCell}</td>
               <td style="text-align:center">${devCell}</td>
             </tr>`;
           }).join('')}
