@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v94 -->
+<!-- BUILD: 2026-06-24-v95 -->
 <script>
 (function(){
-  var BUILD='v94-20260624-1';
+  var BUILD='v95-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -5079,6 +5079,41 @@ hr(){
         <button class="btn btn-secondary" onclick="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:'${date}',hrHours:'1'})" style="${App.params.hrHours?'background:#0f766e;color:#fff':''}">⏱️ ساعات العمل الشهرية</button>
         <button class="btn btn-secondary" onclick="exportHrAttendanceExcel('${date.slice(0,7)}','${filterBranch}')">📤 تصدير الشهر Excel</button>
       </div>
+      <div class="actions-bar" style="background:#f8fafc;padding:8px 12px;border-radius:10px;align-items:center">
+        <span style="font-size:13px;font-weight:700;color:#475569">📅 تقرير فترة من/إلى:</span>
+        <input type="date" class="input" style="width:150px" id="hr-rng-from" value="${App.params.hrFrom||date}" max="${today()}">
+        <span style="font-size:13px">إلى</span>
+        <input type="date" class="input" style="width:150px" id="hr-rng-to" value="${App.params.hrTo||date}" max="${today()}">
+        <button class="btn btn-primary btn-sm" onclick="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:'${date}',hrPeriod:'${hrPeriod}',hrRange:'1',hrFrom:document.getElementById('hr-rng-from').value,hrTo:document.getElementById('hr-rng-to').value})">📊 عرض تقرير الفترة</button>
+        ${App.params.hrRange?`<button class="btn btn-secondary btn-sm" onclick="App.go('hr',{hrTab:'attendance',hrBranch:'${filterBranch}',hrDate:'${date}',hrPeriod:'${hrPeriod}'})">✕ إغلاق</button>`:''}
+      </div>
+      ${App.params.hrRange?(()=>{
+        const from=App.params.hrFrom||date, to=App.params.hrTo||date;
+        const recs=DB.hrAttendance().filter(a=>(a.date||'')>=from&&(a.date||'')<=to);
+        const byEmp={};
+        recs.forEach(a=>{const b=byEmp[a.employeeId]||(byEmp[a.employeeId]={present:0,late:0,absent:0,leave:0,min:0,lateMin:0});if(a.status==='present')b.present++;else if(a.status==='late')b.late++;else if(a.status==='absent')b.absent++;else if(a.status==='leave')b.leave++;b.min+=_recWorkedMin(a);b.lateMin+=(+a.lateMinutes||0);});
+        const list=_hrRptSel.size?activeEmps.filter(e=>_hrRptSel.has(e.id)):activeEmps;
+        const gMin=Object.values(byEmp).reduce((s,b)=>s+b.min,0);
+        return `<div class="card">
+          <div class="card-title">📊 تقرير الفترة — من ${formatDate(from)} إلى ${formatDate(to)}${_hrRptSel.size?` (${list.length} موظفة مختارة)`:''}</div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>الموظفة</th><th>✅ حضور</th><th>⏰ تأخّر</th><th>❌ غياب</th><th>🏖️ إجازة</th><th>⏱️ إجمالي الساعات</th><th>⏰ إجمالي التأخر</th></tr></thead>
+            <tbody>
+              ${list.map(e=>{const b=byEmp[e.id]||{present:0,late:0,absent:0,leave:0,min:0,lateMin:0};return `<tr>
+                <td><strong>${esc(e.name)}</strong><br><small style="color:#64748b">${esc(e.jobTitle||'')}</small></td>
+                <td style="text-align:center;color:#16a34a;font-weight:700">${b.present+b.late}</td>
+                <td style="text-align:center;color:#d97706">${b.late}</td>
+                <td style="text-align:center;color:#dc2626">${b.absent}</td>
+                <td style="text-align:center;color:#7c3aed">${b.leave}</td>
+                <td style="text-align:center;font-weight:700;color:#0f766e">${b.min?_fmtDur(b.min):'—'}</td>
+                <td style="text-align:center;color:${b.lateMin?'#dc2626':'#94a3b8'}">${b.lateMin?b.lateMin+' د':'—'}</td>
+              </tr>`;}).join('')}
+              <tr style="background:#f0fdf4;font-weight:800"><td>الإجمالي</td><td colspan="4"></td><td style="text-align:center;color:#0f766e">${_fmtDur(gMin)}</td><td></td></tr>
+            </tbody>
+          </table></div>
+          <button class="btn btn-secondary btn-sm no-print" style="margin-top:10px" onclick="window.print()">🖨️ طباعة</button>
+        </div>`;
+      })():''}
       ${App.params.hrAttReport?`<div class="card">
         <div class="card-title">📊 تقرير تفصيلي — ${formatDate(date)}</div>
         <details style="margin-bottom:12px" ${_hrRptSel.size?'open':''}>
