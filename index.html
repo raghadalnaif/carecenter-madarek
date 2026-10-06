@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v96 -->
+<!-- BUILD: 2026-06-24-v97 -->
 <script>
 (function(){
-  var BUILD='v96-20260624-1';
+  var BUILD='v97-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -1084,6 +1084,7 @@ const App = {
         {v:'messages',icon:'💬',label:'الرسائل الداخلية'},
         {v:'reports',icon:'📊',label:'التقارير'},
         {v:'branchReport',icon:'📈',label:'تقرير الفروع'},
+        {v:'qurrahReport',icon:'🟣',label:'أطفال قُرّة'},
       ]},
       {label:'أدوات',items:[
         {v:'activities',icon:'🎯',label:'دليل الأنشطة'},
@@ -1115,6 +1116,7 @@ const App = {
       {label:'التقارير',items:[
         {v:'branchReport',icon:'📈',label:'تقرير الفرع'},
         {v:'reports',icon:'📊',label:'التقارير'},
+        {v:'qurrahReport',icon:'🟣',label:'أطفال قُرّة'},
         {v:'activities',icon:'🎯',label:'الأنشطة الأسبوعية'},
       ]},
     ] : [
@@ -1265,6 +1267,7 @@ const App = {
       children:()=>role!=='teacher',
       subscriptions:()=>role!=='teacher',
       reports:()=>role!=='teacher',
+      qurrahReport:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       whatsapp:()=>role!=='teacher',
       teachers:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
       attendance:()=>role!=='teacher',
@@ -1290,7 +1293,7 @@ const App = {
     };
     const guard=guards[App.view];
     if(guard&&!guard()) return Views._forbidden();
-    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,myAttendance:Views.myAttendance,myLeaves:Views.myLeaves,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,monthlyClose:Views.monthlyClose,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,childNotes:Views.childNotes,messages:Views.messages,settings:Views.settings,govDocs:Views.govDocs,hr:Views.hr};
+    const map={dashboard:Views.dashboard,schools:Views.schools,branches:Views.branches,children:Views.children,subscriptions:Views.subscriptions,reports:Views.reports,users:Views.users,attendance:Views.attendance,whatsapp:Views.whatsapp,my_reports:Views.myReports,myAttendance:Views.myAttendance,myLeaves:Views.myLeaves,teachers:Views.teachers,activities:Views.activities,sales:Views.sales,accounting:Views.accounting,monthlyClose:Views.monthlyClose,expenses:Views.expenses,tasks:Views.tasks,branchTasks:Views.branchTasks,cashClosing:Views.cashClosing,statement:Views.statement,auditLog:Views.auditLog,branchReport:Views.branchReport,childNotes:Views.childNotes,messages:Views.messages,settings:Views.settings,govDocs:Views.govDocs,hr:Views.hr,qurrahReport:Views.qurrahReport};
     const fn=map[App.view]||Views.dashboard;
     try{return fn();}
     catch(e){console.error('[CCS]',App.view,e);return `<div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:#ef4444;font-size:16px;font-weight:700">خطأ في تحميل الصفحة: ${App.view}</p><pre style="background:#f1f5f9;padding:16px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-width:600px;margin:16px auto">${e.message}\n${(e.stack||'').split('\n').slice(0,5).join('\n')}</pre><button class="btn btn-primary" onclick="App.go('dashboard')">العودة للرئيسية</button></div>`;}
@@ -1945,6 +1948,10 @@ children(){
   const hideNoSub=App.params.hideNoSub==='1';
   const noSubCount=kids.filter(c=>!DB.activeSub(c.id)).length;
   if(hideNoSub) kids=kids.filter(c=>DB.activeSub(c.id));
+  // تصنيف قُرّة
+  const onlyQurrah=App.params.onlyQurrah==='1';
+  const qurrahCount=kids.filter(c=>c.isQurrah).length;
+  if(onlyQurrah) kids=kids.filter(c=>c.isQurrah);
   const childSort=App.params.childSort||'name';
   kids=[...kids];
   if(childSort==='name') kids.sort((a,b)=>(a.name||'').localeCompare(b.name||'','ar'));
@@ -1962,6 +1969,8 @@ children(){
     <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('kids-table','الأطفال')">📊 تصدير</button>
     <button class="btn btn-sm" style="background:#0f766e;color:#fff" onclick="printAllPickupCards()" title="طباعة بطاقة خروج لكل طفل">🪪 بطاقات الخروج</button>
     ${(noSubCount>0||hideNoSub)?`<button class="btn btn-sm ${hideNoSub?'btn-warning':'btn-secondary'}" onclick="App.go('children',{...App.params,hideNoSub:'${hideNoSub?'0':'1'}'})" title="إظهار/إخفاء الأطفال غير المشتركين">${hideNoSub?'👁️ إظهار الكل':`🙈 إخفاء غير المشتركين (${noSubCount})`}</button>`:''}
+    ${(qurrahCount>0||onlyQurrah)?`<button class="btn btn-sm" style="${onlyQurrah?'background:#7c3aed;color:#fff':'background:#faf5ff;color:#7c3aed;border:1px solid #e9d5ff'}" onclick="App.go('children',{...App.params,onlyQurrah:'${onlyQurrah?'0':'1'}'})" title="عرض أطفال قُرّة فقط">🟣 ${onlyQurrah?'عرض الكل':`أطفال قُرّة (${qurrahCount})`}</button>`:''}
+    <button class="btn btn-sm" style="background:#f3e8ff;color:#6b21a8;border:1px solid #d8b4fe" onclick="App.go('qurrahReport')" title="تقرير أطفال قُرّة الكامل">🟣 تقرير قُرّة</button>
     <div class="search-bar" style="flex:1;max-width:300px;margin:0">
       <span class="search-icon">🔍</span>
       <input id="search-children" class="input" placeholder="بحث بالاسم أو ولي الأمر أو الهاتف..." value="${esc(App.params.q||'')}" oninput="App.liveSearch('children',{...App.params,q:this.value},this)">
@@ -2013,6 +2022,7 @@ children(){
                 <strong>${esc(c.name)}</strong>
                 ${Views._hasDefaultedDebt(c.id)?Views._defaulterBadge():''}
                 ${c.isVip?`<span class="badge badge-yellow" style="font-size:10px">⭐ VIP${c.discountPct?` ${c.discountPct}%`:''}</span>`:''}
+                ${c.isQurrah?`<span class="badge" style="font-size:10px;background:#f3e8ff;color:#7c3aed;border:1px solid #e9d5ff">🟣 قُرّة</span>`:''}
               </div>
               ${c.healthNotes?`<small style="color:#ef4444">🏥 ${esc(c.healthNotes)}</small>`:''}
               ${c.notes?`<small style="color:#f59e0b">📝 ${esc(c.notes)}</small>`:''}
@@ -2035,6 +2045,79 @@ children(){
       </tbody>
     </table>
   </div></div>`;
+},
+
+// ---------- تقرير أطفال قُرّة (حسب تصنيف الطفل) ----------
+qurrahReport(){
+  const sid=Auth.schoolId();
+  const bid=Auth.branchId();
+  const uPeriod=Auth.period();
+  const branches=DB.branches();
+  const pmLbl={cash:'💵 كاش',mada:'💳 مدى',transfer:'🏦 حوالة',qurrah:'🟣 قُرّة'};
+  let kids=DB.children().filter(c=>c.isQurrah);
+  if(sid) kids=kids.filter(c=>c.schoolId===sid);
+  if(bid) kids=kids.filter(c=>c.branchId===bid);
+  if(uPeriod) kids=kids.filter(c=>c.period===uPeriod);
+  const qrBranch=App.params.qrBranch||'all';
+  if(!bid&&qrBranch!=='all') kids=kids.filter(c=>c.branchId===qrBranch);
+  kids=[...kids].sort((a,b)=>(a.name||'').localeCompare(b.name||'','ar'));
+  // حساب الإجماليات على الاشتراك النشط لكل طفل
+  let activeCount=0,totalValue=0,totalPaid=0,totalRemaining=0,viaQurrahCount=0;
+  const rows=kids.map(c=>{
+    const sub=DB.activeSub(c.id);
+    const st=DB.subStatus(sub);
+    const price=+sub?.price||0, paid=+sub?.paidAmount||0, rem=Math.max(0,price-paid);
+    if(sub){activeCount++;totalValue+=price;totalPaid+=paid;totalRemaining+=rem;if(sub.paymentMethod==='qurrah')viaQurrahCount++;}
+    return {c,sub,st,price,paid,rem};
+  });
+  const stLbl={active:'نشط',today:'ينتهي اليوم',soon3:'ينتهي قريباً',soon7:'7 أيام',expired:'منتهي',none:'بدون اشتراك'};
+  const stMap={active:'badge-green',today:'badge-yellow',soon3:'badge-orange',soon7:'badge-blue',expired:'badge-red',none:'badge-gray'};
+  return `
+  <div class="actions-bar" style="flex-wrap:wrap">
+    <h2 style="margin:0;color:#7c3aed;font-size:18px">🟣 تقرير أطفال قُرّة</h2>
+    <div style="flex:1"></div>
+    <button class="btn btn-secondary btn-sm no-print" onclick="exportTableCSV('qurrah-table','أطفال قُرّة')">📊 تصدير Excel</button>
+    <button class="btn btn-sm no-print" style="background:#7c3aed;color:#fff" onclick="window.print()">🖨️ طباعة التقرير</button>
+  </div>
+  ${(!bid)?`<div class="card" style="padding:12px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:13px;font-weight:600;color:#64748b">🏢 الفرع:</span>
+      <span class="chip ${qrBranch==='all'?'active':''}" onclick="App.go('qurrahReport',{qrBranch:'all'})">الكل</span>
+      ${branches.map(b=>`<span class="chip ${qrBranch===b.id?'active':''}" onclick="App.go('qurrahReport',{qrBranch:'${b.id}'})">${esc(b.name)}</span>`).join('')}
+    </div>
+  </div>`:''}
+  <div class="stats-grid">
+    <div class="stat-card" style="border-color:#9333ea"><div class="stat-val" style="color:#9333ea">${kids.length}</div><div class="stat-lbl">👶 عدد أطفال قُرّة</div></div>
+    <div class="stat-card blue"><div class="stat-val">${activeCount}</div><div class="stat-lbl">✅ لديهم اشتراك نشط</div></div>
+    <div class="stat-card" style="border-color:#9333ea"><div class="stat-val" style="color:#9333ea">${totalValue.toLocaleString()}</div><div class="stat-lbl">🧾 قيمة الاشتراكات (ر.س)</div></div>
+    <div class="stat-card green"><div class="stat-val">${totalPaid.toLocaleString()}</div><div class="stat-lbl">💰 المحصّل (ر.س)</div></div>
+    <div class="stat-card ${totalRemaining>0?'red':'green'}"><div class="stat-val">${totalRemaining.toLocaleString()}</div><div class="stat-lbl">⏳ المتبقي (ر.س)</div></div>
+  </div>
+  <div class="card" style="border-right:5px solid #9333ea">
+    <div class="card-title" style="color:#7c3aed">🟣 قائمة أطفال قُرّة${qrBranch!=='all'&&!bid?` — ${esc(DB.branchName(qrBranch))}`:''} <span style="font-size:12px;color:#94a3b8;font-weight:500">(${kids.length} طفل · ${viaQurrahCount} اشتراكهم عبر قُرّة)</span></div>
+    ${kids.length?`<div class="table-wrap"><table id="qurrah-table">
+      <thead><tr>${Auth.isSuperAdmin()?'<th>الفرع / الفترة</th>':'<th>الفترة</th>'}<th>اسم الطفل</th><th>ولي الأمر</th><th>الهاتف</th><th>الاشتراك</th><th>طريقة الدفع</th><th>القيمة</th><th>المدفوع</th><th>المتبقي</th></tr></thead>
+      <tbody>
+        ${rows.map(({c,sub,st,price,paid,rem})=>`<tr>
+          <td><span class="badge badge-blue" style="font-size:10px">🏢 ${DB.branchName(c.branchId)}</span><br><span class="badge ${c.period==='morning'?'badge-blue':'badge-orange'}" style="font-size:10px;margin-top:4px">${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'}</span></td>
+          <td><strong>${esc(c.name)}</strong></td>
+          <td style="font-size:12px">${esc(c.parentName||'—')}</td>
+          <td style="font-size:12px"><a href="tel:${c.parentPhone}" style="color:#0f766e">${esc(c.parentPhone||'—')}</a></td>
+          <td><span class="badge ${stMap[st]}" style="font-size:10px">${stLbl[st]}${sub?' — '+formatDate(sub.endDate):''}</span></td>
+          <td style="font-size:12px">${sub?(pmLbl[sub.paymentMethod]||sub.paymentMethod||'—'):'—'}</td>
+          <td style="font-weight:700">${price.toLocaleString()}</td>
+          <td style="color:#10b981;font-weight:700">${paid.toLocaleString()}</td>
+          <td style="color:${rem>0?'#ef4444':'#10b981'};font-weight:700">${rem.toLocaleString()}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot><tr style="background:#faf5ff;font-weight:800">
+        <td colspan="${Auth.isSuperAdmin()?'6':'6'}" style="text-align:left;color:#7c3aed">الإجمالي</td>
+        <td style="color:#7c3aed">${totalValue.toLocaleString()}</td>
+        <td style="color:#10b981">${totalPaid.toLocaleString()}</td>
+        <td style="color:${totalRemaining>0?'#ef4444':'#10b981'}">${totalRemaining.toLocaleString()}</td>
+      </tr></tfoot>
+    </table></div>`:`<div class="empty-state"><div class="es-icon">🟣</div><p>لا يوجد أطفال مصنّفون كأطفال قُرّة بعد</p><p style="font-size:13px;color:#94a3b8">لتصنيف طفل: افتحي بطاقة الطفل ← فعّلي خيار «طفل مدعوم من قُرّة»</p></div>`}
+  </div>`;
 },
 
 // ---------- SUBSCRIPTIONS ----------
@@ -5618,6 +5701,12 @@ const Modals = {
           </div>
         </div>
 
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:13px;padding:10px 14px;background:#faf5ff;border-radius:8px;margin-bottom:14px;border:1px solid #e9d5ff">
+          <input type="checkbox" id="c-qurrah" style="width:16px;height:16px;cursor:pointer" onchange="if(this.checked){const pm=document.getElementById('c-sub-pm');if(pm)pm.value='qurrah';const b=document.querySelector('.pm-btn[data-v=qurrah]');if(b)b.click();}">
+          🟣 طفل مدعوم من قُرّة (تصنيف)
+          <span style="font-size:11px;color:#7c3aed;font-weight:500;margin-right:auto">يظهر في تقرير أطفال قُرّة</span>
+        </label>
+
         <div style="font-size:13px;font-weight:700;color:#0f766e;padding:8px 12px;background:#f0fdf4;border-radius:8px;margin:0 0 14px">💳 الاشتراك والدفع</div>
 
         <div class="grid-2">
@@ -5723,6 +5812,11 @@ const Modals = {
             <input class="input" id="c-disc" type="number" min="0" max="100" value="${c.discountPct||0}" placeholder="0" style="width:80px">
           </div>
         </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:13px;padding:10px 14px;background:#faf5ff;border-radius:8px;margin-top:12px;border:1px solid #e9d5ff">
+          <input type="checkbox" id="c-qurrah" ${c.isQurrah?'checked':''} style="width:16px;height:16px;cursor:pointer">
+          🟣 طفل مدعوم من قُرّة (تصنيف)
+          <span style="font-size:11px;color:#7c3aed;font-weight:500;margin-right:auto">يظهر في تقرير أطفال قُرّة</span>
+        </label>
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" onclick="saveChild(true)">حفظ التعديلات</button>
@@ -8072,6 +8166,7 @@ function saveChild(edit=false){
     joinDate:document.getElementById('c-join')?.value||T0,
     isActive:true,
     isVip:document.getElementById('c-vip')?.checked||false,
+    isQurrah:document.getElementById('c-qurrah')?.checked||false,
     discountPct:parseFloat(document.getElementById('c-disc')?.value||0),
     photo:_childPhoto||'',
   };
