@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v101 -->
+<!-- BUILD: 2026-06-24-v102 -->
 <script>
 (function(){
-  var BUILD='v101-20260624-1';
+  var BUILD='v102-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -9236,11 +9236,9 @@ function childAttendanceReport(childId,from,to){
       <td style="text-align:center">${formatDate(a.date)}</td>
       <td style="text-align:center">${wd}</td>
       <td style="text-align:center">${stCell(a.status)}</td>
-      <td style="text-align:center;color:#166534;font-weight:600">${a.status==='absent'?'—':(a.checkIn||'—')}</td>
-      <td style="text-align:center;color:#991b1b;font-weight:600">${a.status==='absent'?'—':(a.checkOut||'—')}</td>
       <td style="font-size:12px;color:#475569">${esc(note)||'—'}</td>
     </tr>`;
-  }).join(''):`<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:20px">لا توجد سجلات حضور في هذه الفترة</td></tr>`;
+  }).join(''):`<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:20px">لا توجد سجلات حضور في هذه الفترة</td></tr>`;
   App.showModal(`
   <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
   <div class="modal" style="max-width:720px">
@@ -9265,7 +9263,7 @@ function childAttendanceReport(childId,from,to){
           <div style="flex:1;min-width:90px;text-align:center;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px"><div style="font-size:20px;font-weight:800;color:#1d4ed8">${rate}%</div><div style="font-size:11px;color:#64748b">نسبة الحضور</div></div>
         </div>
         <div class="table-wrap"><table id="child-att-rpt">
-          <thead><tr><th>📅 التاريخ</th><th>اليوم</th><th>الحالة</th><th>🟢 دخول</th><th>🔴 خروج</th><th>📝 ملاحظة</th></tr></thead>
+          <thead><tr><th>📅 التاريخ</th><th>اليوم</th><th>الحالة</th><th>📝 ملاحظة</th></tr></thead>
           <tbody>${rows}</tbody>
         </table></div>
       </div>
