@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v95 -->
+<!-- BUILD: 2026-06-24-v96 -->
 <script>
 (function(){
-  var BUILD='v95-20260624-1';
+  var BUILD='v96-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -265,6 +265,10 @@ details[open]>summary span:last-child{transform:rotate(180deg)}
   .msg-send-ic{display:inline;font-size:18px}
   .msg-intro{display:none}
 }
+/* أيقونات خطّية موحّدة بدل الإيموجي */
+.ic{display:inline-flex;align-items:center;justify-content:center;width:1.05em;height:1.05em;vertical-align:-.16em;line-height:0;flex:0 0 auto}
+.ic>svg{width:100%;height:100%;display:block;stroke-width:1.8}
+.notif-bell .ic,.nav-link .ic{width:1.15em;height:1.15em}
 </style>
 </head>
 <body>
@@ -6967,6 +6971,7 @@ function printPickupCards(ids){
   <script>onload=function(){setTimeout(function(){window.print();},400);}<\/script>
   </body></html>`);
   w.document.close();
+  try{if(window._iconizeChildDoc)_iconizeChildDoc(w.document);}catch(e){}
 }
 function printAllPickupCards(){
   const bid=Auth.branchId();
@@ -6993,6 +6998,7 @@ function printBranchQR(id){
      <script>onload=function(){setTimeout(function(){print();},300);}<\/script>
    </body></html>`);
   w.document.close();
+  try{if(window._iconizeChildDoc)_iconizeChildDoc(w.document);}catch(e){}
 }
 function _scMsg(html,type){
   const el=document.getElementById('sc-result');if(!el)return;
@@ -7543,6 +7549,7 @@ function printHrEmployee(id){
   <div class="footer">مدارك الطفل — نظام إدارة الموارد البشرية · تم الإصدار بتاريخ ${formatDate(T0)}</div>
   </body></html>`);
   win.document.close();
+  try{if(window._iconizeChildDoc)_iconizeChildDoc(win.document);}catch(e){}
 }
 // توليد اسم مستخدم لاتيني من الاسم العربي
 const _AR2LAT={'ا':'a','أ':'a','إ':'i','آ':'a','ب':'b','ت':'t','ث':'th','ج':'j','ح':'h','خ':'kh','د':'d','ذ':'z','ر':'r','ز':'z','س':'s','ش':'sh','ص':'s','ض':'d','ط':'t','ظ':'z','ع':'a','غ':'gh','ف':'f','ق':'q','ك':'k','ل':'l','م':'m','ن':'n','ه':'h','و':'w','ي':'y','ى':'a','ة':'h','ء':'','ئ':'y','ؤ':'w'};
@@ -7922,6 +7929,7 @@ function printAttendanceSheet(date,schoolId){
   </div>
   </body></html>`);
   win.document.close();
+  try{if(window._iconizeChildDoc)_iconizeChildDoc(win.document);}catch(e){}
 }
 // فترة الموظف (من حساب الدخول المرتبط، أو حقل الفترة، أو غير محدد)
 function _empPeriod(e){
@@ -7963,6 +7971,7 @@ function printHrAttendance(date,branchFilter){
   <script>onload=function(){setTimeout(function(){print();},400);}<\/script>
   </body></html>`);
   w.document.close();
+  try{if(window._iconizeChildDoc)_iconizeChildDoc(w.document);}catch(e){}
 }
 function exportHrAttendanceExcel(month,branchFilter){
   if(!window.XLSX){toast('مكتبة Excel غير محملة','error');return;}
@@ -8329,6 +8338,7 @@ function generateReportWindow(html, title){
   <footer>${esc(school.name||'مدارك الطفل')} — نظام الإدارة المتكامل &nbsp;|&nbsp; تاريخ الطباعة: ${new Date().toLocaleDateString('ar-SA',{day:'2-digit',month:'2-digit',year:'numeric'})}</footer>
   </body></html>`);
   w.document.close();
+  try{if(window._iconizeChildDoc)_iconizeChildDoc(w.document);}catch(e){}
   setTimeout(()=>w.print(),800);
 }
 
@@ -8624,6 +8634,222 @@ function toast(msg,kind='success'){
   clearTimeout(el._t);
   el._t=setTimeout(()=>{el.style.opacity='0';},2500);
 }
+
+// =========================================================
+//  ICONS — رموز خطّية موحّدة بدل الإيموجي (بلون واحد، نظيفة)
+//  يحوّل كل الإيموجي في الواجهة إلى أيقونات SVG خطّية تلقائياً
+// =========================================================
+(function(){
+  var S=function(p){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>';};
+  var DOT=function(c){return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5.5" fill="'+c+'"/></svg>';};
+  var ICON={
+    check:S('<path d="M20 6L9 17l-5-5"/>'),
+    x:S('<path d="M18 6L6 18M6 6l12 12"/>'),
+    ban:S('<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>'),
+    warn:S('<path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>'),
+    building:S('<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M3 21h18"/>'),
+    home:S('<path d="M4 11l8-7 8 7M6 10v9h12v-9M10 19v-5h4v5"/>'),
+    calendar:S('<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>'),
+    clock:S('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+    hourglass:S('<path d="M6 3h12M6 21h12M7 3c0 4 3 5 5 9 2-4 5-5 5-9M7 21c0-4 3-5 5-9 2 4 5 5 5 9"/>'),
+    money:S('<path d="M9 3h6l-1 3H10zM8 6C5 8 4 12 4 15a5 5 0 0 0 5 5h6a5 5 0 0 0 5-5c0-3-1-7-4-9"/><path d="M12 10v6M10.5 11.5h3M10.5 14.5h3"/>'),
+    cash:S('<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9v6M18 9v6"/>'),
+    card:S('<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>'),
+    receipt:S('<path d="M5 3h14v18l-2.5-1.5L14 21l-2-1.5L10 21l-2.5-1.5L5 21zM8 8h8M8 12h8M8 16h5"/>'),
+    gem:S('<path d="M6 3h12l3 5-9 13L3 8zM3 8h18M9 3 6 8l6 13 6-13-3-5"/>'),
+    clipboard:S('<rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2" width="6" height="3" rx="1"/><path d="M9 10h6M9 14h6M9 18h4"/>'),
+    doc:S('<path d="M6 3h8l4 4v14H6zM14 3v4h4"/><path d="M9 12h6M9 15h6M9 18h4"/>'),
+    chart:S('<path d="M3 21h18"/><rect x="5" y="11" width="3" height="8"/><rect x="11" y="6" width="3" height="13"/><rect x="17" y="13" width="3" height="6"/>'),
+    chartUp:S('<path d="M3 17l5-5 4 4 7-8M15 8h5v5"/>'),
+    chartDown:S('<path d="M3 7l5 5 4-4 7 8M15 16h5v-5"/>'),
+    chat:S('<path d="M4 5h16v11H9l-4 4V5z"/><path d="M8 9.5h8M8 12.5h5"/>'),
+    announce:S('<path d="M3 10v4h4l6 4V6l-6 4H3zM17 9a4 4 0 0 1 0 6"/>'),
+    bell:S('<path d="M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7"/><path d="M10 20.5a2 2 0 0 0 4 0"/>'),
+    user:S('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'),
+    users:S('<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5"/><path d="M16 5a3.5 3.5 0 0 1 0 7M22 20c0-3-1.5-4.8-4-5.3"/>'),
+    printer:S('<path d="M6 9V3h12v6"/><path d="M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2"/><rect x="6" y="15" width="12" height="6"/>'),
+    pencil:S('<path d="M4 20h4L19 9a2 2 0 0 0-3-3L5 17v3z"/><path d="M14 6l4 4"/>'),
+    lock:S('<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>'),
+    unlock:S('<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 7-2.5"/>'),
+    key:S('<circle cx="8" cy="8" r="4"/><path d="M11 11l8 8M16 16l2-2M18 18l2-2"/>'),
+    umbrella:S('<path d="M12 3v18M4 11a8 8 0 0 1 16 0z"/>'),
+    search:S('<circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-5-5"/>'),
+    save:S('<path d="M5 3h12l4 4v14H5zM8 3v5h8V3M8 21v-7h8v7"/>'),
+    trash:S('<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13M10 11v6M14 11v6"/>'),
+    clip:S('<path d="M20 11l-8.5 8.5a4 4 0 0 1-6-6L13 5a2.7 2.7 0 0 1 4 4l-8 8a1.4 1.4 0 0 1-2-2l7.5-7.5"/>'),
+    pin:S('<path d="M12 21s7-6 7-11a7 7 0 0 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>'),
+    pushpin:S('<path d="M9 3h6l-1 6 3 3H7l3-3-1-6zM12 15v6"/>'),
+    refresh:S('<path d="M4 12a8 8 0 0 1 14-5l2 2M20 12a8 8 0 0 1-14 5l-2-2M18 3v4h-4M6 21v-4h4"/>'),
+    sun:S('<circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/>'),
+    moon:S('<path d="M20 14a8 8 0 1 1-9-11 6.5 6.5 0 0 0 9 11z"/>'),
+    star:S('<path d="M12 3l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-3-5.3 3 1.1-6L3.4 9.3l6-.8z"/>'),
+    camera:S('<rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.5"/><path d="M8 7l1.5-3h5L16 7"/>'),
+    image:S('<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.8"/><path d="M4 18l5-5 4 4 3-3 4 4"/>'),
+    gear:S('<circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>'),
+    wrench:S('<path d="M15 6a4 4 0 0 0-5 5l-7 7 2 2 7-7a4 4 0 0 0 5-5l-2.5 2.5-2-2L15 6z"/>'),
+    down:S('<path d="M12 4v14M6 12l6 6 6-6"/>'),
+    up:S('<path d="M12 20V6M6 12l6-6 6 6"/>'),
+    box:S('<path d="M3 7l9-4 9 4v10l-9 4-9-4V7z"/><path d="M3 7l9 4 9-4M12 11v10"/>'),
+    inbox:S('<path d="M3 13l3-8h12l3 8v6H3zM3 13h5l1 3h6l1-3h5"/>'),
+    bulb:S('<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/>'),
+    target:S('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.3"/>'),
+    link:S('<path d="M9 13a4 4 0 0 0 6 .5l2-2a4 4 0 0 0-6-6l-1 1M15 11a4 4 0 0 0-6-.5l-2 2a4 4 0 0 0 6 6l1-1"/>'),
+    tag:S('<path d="M3 3h8l9 9-8 8-9-9V3z"/><circle cx="7.5" cy="7.5" r="1.5"/>'),
+    bookmark:S('<path d="M6 3h12v18l-6-4-6 4V3z"/>'),
+    folder:S('<path d="M3 6h6l2 2h10v11H3V6z"/>'),
+    folderOpen:S('<path d="M3 6h6l2 2h10v3H3V6zM3 11h18l-2 8H5l-2-8z"/>'),
+    archive:S('<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v11h14V9M9 13h6"/>'),
+    id:S('<rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="11" r="2.5"/><path d="M4.5 16c.6-2 2-2.5 3.5-2.5s2.9.5 3.5 2.5M14 9h5M14 12h5M14 15h3"/>'),
+    eye:S('<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
+    eyeOff:S('<path d="M4 4l16 16M9 5a9 9 0 0 1 3-.5c6 0 10 7 10 7a15 15 0 0 1-3 3.5M6 7a15 15 0 0 0-4 5s4 7 10 7a9 9 0 0 0 4-1"/>'),
+    leaf:S('<path d="M12 21v-9M12 12c0-4 3-7 8-7 0 4-3 7-8 7zM12 14C9 14 5 12 4 7c4 0 8 2 8 7z"/>'),
+    globe:S('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'),
+    plus:S('<path d="M12 5v14M5 12h14"/>'),
+    minus:S('<path d="M5 12h14"/>'),
+    phone:S('<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M10 18.5h4"/>'),
+    handset:S('<path d="M5 4h4l2 5-2 1a11 11 0 0 0 5 5l1-2 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>'),
+    cloud:S('<path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.5-1.5A4 4 0 0 1 17 18H7z"/>'),
+    car:S('<path d="M3 13l2-5h14l2 5M3 13h18v4h-2M5 17H3v-4M8.5 17a1.5 1.5 0 0 1-3 0M18.5 17a1.5 1.5 0 0 1-3 0M8.5 17h7"/>'),
+    bag:S('<path d="M6 8h12l-1 13H7L6 8z"/><path d="M9 8a3 3 0 0 1 6 0"/>'),
+    gift:S('<rect x="3" y="8" width="18" height="13" rx="1"/><path d="M3 12h18M12 8v13M8 8a2.5 2.5 0 0 1 0-5c2 0 4 5 4 5M16 8a2.5 2.5 0 0 0 0-5c-2 0-4 5-4 5"/>'),
+    utensils:S('<path d="M5 3v8a2 2 0 0 0 4 0V3M7 11v10M16 3c-2 0-3 2-3 5s1 4 3 4v9"/>'),
+    door:S('<path d="M6 3h12v18H6zM14 12h.01M4 21h16"/>'),
+    menu:S('<path d="M4 7h16M4 12h16M4 17h16"/>'),
+    heart:S('<path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/>'),
+    book:S('<path d="M4 4h7a2 2 0 0 1 2 2v14a3 3 0 0 0-3-2H4zM20 4h-7a2 2 0 0 0-2 2v14a3 3 0 0 1 3-2h6z"/>'),
+    hash:S('<path d="M5 9h14M5 15h14M10 4l-2 16M16 4l-2 16"/>'),
+    hand:S('<path d="M7 11V6a1.5 1.5 0 0 1 3 0v4M10 10V4.5a1.5 1.5 0 0 1 3 0V10M13 10V5.5a1.5 1.5 0 0 1 3 0V11M16 11V7.5a1.5 1.5 0 0 1 3 0V13a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-3l-2-4a1.5 1.5 0 0 1 2.6-1.5L9 13"/>'),
+    sq:S('<rect x="4" y="4" width="16" height="16" rx="2"/>'),
+    dice:S('<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="15" r="1"/><circle cx="12" cy="12" r="1"/>'),
+    medical:S('<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/>'),
+    life:S('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M4.8 4.8l4.7 4.7M19.2 4.8l-4.7 4.7M4.8 19.2l4.7-4.7M19.2 19.2l-4.7-4.7"/>'),
+    broom:S('<path d="M19 3l-8 8M4 20c0-3 3-6 6-6l3 3c0 3-3 6-6 6-2 0-3-1-3-3zM10 14l4 4"/>'),
+    clothes:S('<path d="M8 3l4 3 4-3 4 3-3 3v12H7V9L4 6z"/>'),
+    bubble:S('<circle cx="9" cy="10" r="3"/><circle cx="16" cy="14" r="4"/>'),
+    info:S('<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/>'),
+    undo:S('<path d="M9 7L4 12l5 5M4 12h11a5 5 0 0 1 0 10h-1"/>'),
+    flag:S('<path d="M5 21V4M5 4h12l-2.5 4L17 12H5"/>'),
+    dotRed:DOT('#ef4444'), dotPurple:DOT('#8b5cf6'), dotOrange:DOT('#f59e0b'),
+    dotYellow:DOT('#eab308'), dotGreen:DOT('#22c55e'), dotBlue:DOT('#3b82f6'),
+    sqWhite:S('<rect x="5" y="5" width="14" height="14" rx="2"/>')
+  };
+  var MAP={
+    '✅':'check','✓':'check','✔':'check',
+    '✕':'x','❌':'x','✖':'x',
+    '⚠':'warn','🚨':'warn',
+    '🏢':'building','🏫':'building','🏛':'building','🏦':'building','🏙':'building','🕌':'building',
+    '🏠':'home',
+    '📋':'clipboard','📅':'calendar','🗓':'calendar',
+    '⏰':'clock','🕐':'clock','⏳':'hourglass',
+    '🔴':'dotRed','🟣':'dotPurple','🟠':'dotOrange','🟡':'dotYellow','🟢':'dotGreen','🔵':'dotBlue','🔸':'dotOrange',
+    '💰':'money','💵':'cash','💸':'cash','💳':'card','🧾':'receipt','💎':'gem','🧮':'chart',
+    '🌅':'sun','☀':'sun','🌙':'moon',
+    '📊':'chart','📈':'chartUp','📉':'chartDown',
+    '💬':'chat','📢':'announce','🗣':'announce',
+    '👶':'user','👩':'user','👤':'user','👷':'user','🏃':'user','👥':'users','🤝':'users',
+    '🖨':'printer','📄':'doc','📃':'doc','📜':'doc','📑':'doc',
+    '✏':'pencil','📝':'pencil','✍':'pencil',
+    '🔒':'lock','🔓':'unlock','🔑':'key',
+    '🏖':'umbrella','🔍':'search','💾':'save','🗑':'trash','📎':'clip',
+    '📍':'pin','📌':'pushpin','🔄':'refresh',
+    '🔔':'bell','📷':'camera','🖼':'image',
+    '🌟':'star','⭐':'star','🎉':'star',
+    '🛒':'bag','🔗':'link','🔌':'link','🎯':'target',
+    '🔧':'wrench','⚙':'gear','⬇':'down','📤':'up','📥':'inbox','📭':'inbox','📦':'box',
+    '💡':'bulb','🧠':'bulb','🏷':'tag','🔖':'bookmark',
+    '📁':'folder','📂':'folderOpen','🗂':'archive','🗄':'archive',
+    '🪪':'id','👁':'eye','🙈':'eyeOff',
+    '🌱':'leaf','🌺':'leaf','🌍':'globe',
+    '➕':'plus','➖':'minus','🚫':'ban','⛔':'ban',
+    '🛟':'life','🏥':'medical','🧯':'medical','🚑':'medical','🩺':'medical',
+    '📱':'phone','📞':'handset','📡':'cloud','☁':'cloud',
+    '🎲':'dice','☐':'sq','⬜':'sqWhite',
+    '🚪':'door','☰':'menu','❤':'heart','💛':'heart',
+    '🫧':'bubble','📚':'book','🔢':'hash','👋':'hand','👌':'hand',
+    '🚗':'car','🍽':'utensils','🎁':'gift','👔':'clothes','👕':'clothes','🧹':'broom',
+    '🇸🇦':'flag','ℹ':'info','↩':'undo','🆕':'star','🛒':'bag','🛍':'bag','🦪':'leaf'
+  };
+  var keys=Object.keys(MAP).sort(function(a,b){return b.length-a.length;});
+  var escRx=function(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');};
+  var RE=new RegExp('(?:'+keys.map(escRx).join('|')+')\\uFE0F?\\u20E3?','g');
+  window._ICON=ICON; window._EMAP=MAP;
+  window.iconizeHTML=function(s){
+    if(s==null) return s;
+    return String(s).replace(RE,function(m){
+      var ch=m.replace(/[️⃣]/g,'');
+      var k=MAP[ch]; if(!k) return '';
+      return '<span class="ic">'+ICON[k]+'</span>';
+    });
+  };
+  window.stripEmoji=function(s){
+    if(s==null) return s;
+    return String(s).replace(RE,'').replace(/[ \t]{2,}/g,' ').replace(/\n[ \t]+/g,'\n').trim();
+  };
+  function walk(node){
+    if(!node) return;
+    if(node.nodeType===3){
+      var t=node.nodeValue;
+      if(!t) return;
+      RE.lastIndex=0;
+      if(!RE.test(t)){RE.lastIndex=0;return;}
+      RE.lastIndex=0;
+      var doc=node.ownerDocument||document;
+      var frag=doc.createDocumentFragment();
+      var last=0,m;
+      while((m=RE.exec(t))){
+        if(m.index>last) frag.appendChild(doc.createTextNode(t.slice(last,m.index)));
+        var ch=m[0].replace(/[️⃣]/g,'');
+        var k=MAP[ch];
+        if(k){var sp=doc.createElement('span');sp.className='ic';sp.innerHTML=ICON[k];frag.appendChild(sp);}
+        last=m.index+m[0].length;
+      }
+      if(last<t.length) frag.appendChild(doc.createTextNode(t.slice(last)));
+      node.parentNode&&node.parentNode.replaceChild(frag,node);
+      RE.lastIndex=0;
+      return;
+    }
+    if(node.nodeType!==1) return;
+    var tag=node.nodeName;
+    if(tag==='SCRIPT'||tag==='STYLE'||tag==='TEXTAREA'||tag==='svg') return;
+    if(node.classList&&node.classList.contains('ic')) return;
+    var kids=node.childNodes, arr=[];
+    for(var i=0;i<kids.length;i++) arr.push(kids[i]);
+    for(var j=0;j<arr.length;j++) walk(arr[j]);
+  }
+  window.iconizeDOM=function(root){try{walk(root||document.body);}catch(e){}};
+  // تحويل الإيموجي داخل نافذة طباعة/تصدير منفصلة (نفس الأصل)
+  window._iconizeChildDoc=function(d){
+    try{
+      if(!d) return;
+      if(d.head){var st=d.createElement('style');st.textContent='.ic{display:inline-flex;align-items:center;justify-content:center;width:1.05em;height:1.05em;vertical-align:-.16em;line-height:0}.ic>svg{width:100%;height:100%;display:block;stroke-width:1.8}';d.head.appendChild(st);}
+      if(d.body) walk(d.body);
+    }catch(e){}
+  };
+  var _busy=false;
+  window.startIconObserver=function(){
+    try{
+      window.iconizeDOM(document.body);
+      var obs=new MutationObserver(function(muts){
+        if(_busy) return; _busy=true;
+        try{
+          for(var i=0;i<muts.length;i++){
+            var mm=muts[i];
+            if(mm.type==='characterData'){ walk(mm.target); }
+            else { for(var k=0;k<mm.addedNodes.length;k++) walk(mm.addedNodes[k]); }
+          }
+        }catch(e){}
+        _busy=false;
+      });
+      obs.observe(document.body,{childList:true,subtree:true,characterData:true});
+      window._iconObs=obs;
+    }catch(e){}
+  };
+  try{
+    var _al=window.alert.bind(window); window.alert=function(m){return _al(window.stripEmoji(m));};
+    var _cf=window.confirm.bind(window); window.confirm=function(m){return _cf(window.stripEmoji(m));};
+    var _pr=window.prompt.bind(window); window.prompt=function(m,d){return _pr(window.stripEmoji(m),d);};
+  }catch(e){}
+})();
 
 function confirmReset(){
   if(!Auth.isSuperAdmin()) return;
@@ -9976,6 +10202,7 @@ body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;color:#1e293b;backgrou
   if(!win){alert('يرجى السماح بفتح النوافذ المنبثقة في إعدادات المتصفح');return;}
   win.document.write(html);
   win.document.close();
+  try{if(window._iconizeChildDoc)_iconizeChildDoc(win.document);}catch(e){}
   win.focus();
 }
 
@@ -10064,6 +10291,7 @@ document.getElementById('app').innerHTML=`<div style="height:100vh;display:flex;
   _autoReactivateLeaves();
   Auth.init();
   App.render();
+  if(typeof startIconObserver==='function') startIconObserver();
   _watchForNewBuild();
 })();
 
