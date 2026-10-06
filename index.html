@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v93 -->
+<!-- BUILD: 2026-06-24-v94 -->
 <script>
 (function(){
-  var BUILD='v93-20260624-1';
+  var BUILD='v94-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -5081,11 +5081,21 @@ hr(){
       </div>
       ${App.params.hrAttReport?`<div class="card">
         <div class="card-title">📊 تقرير تفصيلي — ${formatDate(date)}</div>
+        <details style="margin-bottom:12px" ${_hrRptSel.size?'open':''}>
+          <summary style="cursor:pointer;font-weight:700;color:#0f766e;font-size:13px;padding:6px 0">👥 اختيار الموظفات في التقرير ${_hrRptSel.size?`(${_hrRptSel.size} مختارة)`:'(الكل)'}</summary>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">
+            <button class="btn btn-xs btn-secondary" onclick='hrRptSelectAll(${JSON.stringify(JSON.stringify(activeEmps.map(e=>e.id)))})'>✅ تحديد الكل</button>
+            <button class="btn btn-xs btn-secondary" onclick="hrRptClear()">✕ إلغاء التحديد (عرض الكل)</button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;max-height:180px;overflow:auto">
+            ${activeEmps.map(e=>`<label style="display:flex;align-items:center;gap:5px;background:${_hrRptSel.has(e.id)?'#dcfce7':'#f8fafc'};border:1px solid ${_hrRptSel.has(e.id)?'#86efac':'#e2e8f0'};border-radius:7px;padding:4px 9px;font-size:12px;font-weight:600;cursor:pointer"><input type="checkbox" ${_hrRptSel.has(e.id)?'checked':''} onchange="hrRptToggle('${e.id}')" style="width:14px;height:14px"> ${esc(e.name)}</label>`).join('')}
+          </div>
+        </details>
         <div class="table-wrap"><table>
           <thead><tr><th>الموظف</th><th>المسمى</th><th>الحالة</th><th>دخول</th><th>خروج</th><th>ساعات</th><th>دقائق التأخر</th><th>خصم التأخر (ر.س)</th><th>الجهاز / IP</th></tr></thead>
           <tbody>
           ${(()=>{const dc={};attList.forEach(a=>{if(a.deviceId&&a.checkIn)dc[a.deviceId]=(dc[a.deviceId]||0)+1;});window._hrDevCount=dc;return '';})()}
-          ${activeEmps.map(e=>{
+          ${(_hrRptSel.size?activeEmps.filter(e=>_hrRptSel.has(e.id)):activeEmps).map(e=>{
             const a=attMap[e.id]||{};
             const st=a.status||'—';
             const stLabel={present:'✅ حاضر',absent:'❌ غائب',late:'⏰ متأخر',leave:'🏖️ إجازة'}[st]||'—';
@@ -5124,7 +5134,7 @@ hr(){
           <div class="table-wrap"><table>
             <thead><tr><th>الموظف</th><th>أيام الحضور</th><th>إجمالي ساعات العمل</th><th>المتوسط/يوم</th><th>إجمالي التأخر</th></tr></thead>
             <tbody>
-              ${activeEmps.map(e=>{const b=byEmp[e.id]||{min:0,days:0,late:0};return `<tr>
+              ${(_hrRptSel.size?activeEmps.filter(e=>_hrRptSel.has(e.id)):activeEmps).map(e=>{const b=byEmp[e.id]||{min:0,days:0,late:0};return `<tr>
                 <td><strong>${esc(e.name)}</strong></td>
                 <td style="text-align:center">${b.days}</td>
                 <td style="text-align:center;font-weight:700;color:#0f766e">${b.min?_fmtDur(b.min):'—'}</td>
@@ -7608,6 +7618,11 @@ function saveHrLeave(){
 // ===== تراجع (Undo) لحضور الموظفين =====
 // يحفظ لقطة من كامل سجل الحضور قبل كل إجراء، فيمكن التراجع عن آخر خطأ
 let _hrAttUndo=null;
+// اختيار موظفات معيّنات في تقرير الحضور (فارغ = الكل)
+let _hrRptSel=new Set();
+function hrRptToggle(id){if(_hrRptSel.has(id))_hrRptSel.delete(id);else _hrRptSel.add(id);App.refresh();}
+function hrRptSelectAll(ids){try{ids=JSON.parse(ids);}catch{ids=[];}_hrRptSel=new Set(ids);App.refresh();}
+function hrRptClear(){_hrRptSel.clear();App.refresh();}
 function _snapHrAtt(label){
   try{_hrAttUndo={label,at:(typeof _nowHM==='function'?_nowHM():''),data:JSON.parse(JSON.stringify(DB.hrAttendance()))};}catch(e){_hrAttUndo=null;}
 }
@@ -7885,6 +7900,8 @@ function printHrAttendance(date,branchFilter){
   let emps=DB.hrEmployees().filter(e=>(e.status||'active')==='active'||(e.status||'active')==='on_leave');
   if(bid) emps=emps.filter(e=>e.branchId===bid);
   else if(branchFilter&&branchFilter!=='all') emps=emps.filter(e=>e.branchId===branchFilter);
+  // احترام اختيار الموظفات في التقرير (إن وُجد)
+  if(typeof _hrRptSel!=='undefined'&&_hrRptSel.size) emps=emps.filter(e=>_hrRptSel.has(e.id));
   const attMap={};DB.hrAttendance().filter(a=>a.date===date).forEach(a=>{attMap[a.employeeId]=a;});
   const stLbl={present:'✅ حاضر',absent:'❌ غائب',late:'⏰ متأخر',leave:'🏖️ إجازة'};
   const groups={morning:[],evening:[],other:[]};
