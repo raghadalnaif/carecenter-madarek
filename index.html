@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v100 -->
+<!-- BUILD: 2026-06-24-v101 -->
 <script>
 (function(){
-  var BUILD='v100-20260624-1';
+  var BUILD='v101-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -2036,6 +2036,7 @@ children(){
             <td style="white-space:nowrap">
               <button class="btn btn-secondary btn-xs" onclick="Modals.editChild('${c.id}')">تعديل</button>
               <button class="btn btn-xs" style="background:#f0fdfa;color:#0f766e;border:1px solid #99f6e4" onclick="printPickupCards(['${c.id}'])" title="بطاقة خروج الطفل">🪪</button>
+              <button class="btn btn-xs" style="background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe" onclick="childAttendanceReport('${c.id}')" title="تقرير حضور الطفل مفصّل">📄 حضور</button>
               <button class="btn btn-primary btn-xs" onclick="Modals.addSub('${c.id}')">اشتراك</button>
               ${Auth.isSuperAdmin()?`<button class="btn btn-xs" style="background:#fffbeb;color:#92400e;border:1px solid #fde68a" onclick="Modals.transferChild('${c.id}')" title="نقل بين الفروع">🔄 نقل</button>`:''}
               ${Auth.isSuperAdmin()?`<button class="btn btn-xs" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe" onclick="App.go('statement',{childId:'${c.id}'})" title="كشف حساب">📄</button>`:''}
@@ -2308,7 +2309,10 @@ attendance(){
       </div>
       ${a?`<div style="font-size:11px;margin-top:6px;color:#64748b">دخول: ${a.checkIn||'—'} · خروج: ${a.checkOut||'—'}</div>`:''}
       ${status==='absent'&&c.parentPhone?`<button class="btn btn-wa btn-xs" style="width:100%;margin-top:6px;justify-content:center" onclick="notifyAbsentParent('${c.id}','${date}')">💬 إبلاغ ولي الأمر بالغياب</button>`:''}
-      <button class="btn btn-secondary btn-xs" style="width:100%;margin-top:4px;justify-content:center;font-size:11px" onclick="openChildNoteModal('${c.id}','${date}')">📝 إضافة ملاحظة</button>
+      <div style="display:flex;gap:4px;margin-top:4px">
+        <button class="btn btn-secondary btn-xs" style="flex:1;justify-content:center;font-size:11px" onclick="openChildNoteModal('${c.id}','${date}')">📝 ملاحظة</button>
+        <button class="btn btn-xs" style="flex:1;justify-content:center;font-size:11px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe" onclick="childAttendanceReport('${c.id}')" title="تقرير حضور الطفل مفصّل">📄 تقرير حضوره</button>
+      </div>
     </div>`;
   };
 
@@ -9203,6 +9207,75 @@ function printReportTable(tableId,title,subtitle){
   </body></html>`);
   w.document.close();
   try{if(window._iconizeChildDoc)_iconizeChildDoc(w.document);}catch(e){}
+}
+
+// تقرير حضور مفصّل لطفل واحد (مستقل + طباعة/PDF)
+function childAttendanceReport(childId,from,to){
+  const c=DB.children().find(x=>x.id===childId);
+  if(!c){toast('لم يُعثر على الطفل','error');return;}
+  const T=today();
+  from=from||(T.slice(0,8)+'01');
+  to=to||T;
+  if(from>to){const t=from;from=to;to=t;}
+  const WD=['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  let recs=DB.attendance().filter(a=>a.childId===childId&&(a.date||'')>=from&&(a.date||'')<=to);
+  recs=[...recs].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const notesByDate={};
+  DB.childNotes().filter(n=>n.childId===childId&&n.note).forEach(n=>{if(n.date)(notesByDate[n.date]=notesByDate[n.date]||[]).push(n.note);});
+  const present=recs.filter(r=>r.status==='present').length;
+  const late=recs.filter(r=>r.status==='late').length;
+  const absent=recs.filter(r=>r.status==='absent').length;
+  const totalDays=recs.length;
+  const attended=present+late;
+  const rate=totalDays?Math.round(attended/totalDays*100):0;
+  const stCell=(st)=>st==='present'?'<span style="color:#16a34a;font-weight:700">✅ حاضر</span>':st==='late'?'<span style="color:#d97706;font-weight:700">⏰ متأخر</span>':st==='absent'?'<span style="color:#dc2626;font-weight:800">❌ غائب</span>':'<span style="color:#94a3b8">—</span>';
+  const rows=recs.length?recs.map(a=>{
+    let d=new Date((a.date||'')+'T00:00:00');const wd=isNaN(d)?'':WD[d.getDay()];
+    const note=(notesByDate[a.date]||[]).join(' • ');
+    return `<tr>
+      <td style="text-align:center">${formatDate(a.date)}</td>
+      <td style="text-align:center">${wd}</td>
+      <td style="text-align:center">${stCell(a.status)}</td>
+      <td style="text-align:center;color:#166534;font-weight:600">${a.status==='absent'?'—':(a.checkIn||'—')}</td>
+      <td style="text-align:center;color:#991b1b;font-weight:600">${a.status==='absent'?'—':(a.checkOut||'—')}</td>
+      <td style="font-size:12px;color:#475569">${esc(note)||'—'}</td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:20px">لا توجد سجلات حضور في هذه الفترة</td></tr>`;
+  App.showModal(`
+  <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-header"><h2>📄 تقرير حضور — ${esc(c.name)}</h2><button class="close-btn" onclick="App.closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="actions-bar no-print" style="flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+        <span style="font-size:13px;font-weight:600;color:#64748b">📅 الفترة:</span>
+        <input type="date" class="input" id="car-from" style="width:150px" value="${from}" max="${T}">
+        <span style="font-size:13px">إلى</span>
+        <input type="date" class="input" id="car-to" style="width:150px" value="${to}" max="${T}">
+        <button class="btn btn-primary btn-sm" onclick="childAttendanceReport('${childId}',document.getElementById('car-from').value,document.getElementById('car-to').value)">📊 عرض</button>
+      </div>
+      <div id="child-att-body">
+        <div style="font-size:13px;color:#475569;margin-bottom:10px;padding:8px 12px;background:#f8fafc;border-radius:8px">
+          🏢 ${DB.branchName(c.branchId)} · ${c.period==='morning'?'🌅 صباحي':'🌙 مسائي'} · ولي الأمر: ${esc(c.parentName||'—')}${c.isQurrah?' · <span style="color:#7c3aed;font-weight:700">🟣 قُرّة</span>':''}
+          <br>الفترة: من ${formatDate(from)} إلى ${formatDate(to)}
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <div style="flex:1;min-width:90px;text-align:center;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px"><div style="font-size:20px;font-weight:800;color:#16a34a">${present}</div><div style="font-size:11px;color:#64748b">أيام حضور</div></div>
+          <div style="flex:1;min-width:90px;text-align:center;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px"><div style="font-size:20px;font-weight:800;color:#d97706">${late}</div><div style="font-size:11px;color:#64748b">تأخّر</div></div>
+          <div style="flex:1;min-width:90px;text-align:center;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px"><div style="font-size:20px;font-weight:800;color:#dc2626">${absent}</div><div style="font-size:11px;color:#64748b">غياب</div></div>
+          <div style="flex:1;min-width:90px;text-align:center;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px"><div style="font-size:20px;font-weight:800;color:#1d4ed8">${rate}%</div><div style="font-size:11px;color:#64748b">نسبة الحضور</div></div>
+        </div>
+        <div class="table-wrap"><table id="child-att-rpt">
+          <thead><tr><th>📅 التاريخ</th><th>اليوم</th><th>الحالة</th><th>🟢 دخول</th><th>🔴 خروج</th><th>📝 ملاحظة</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px" class="no-print">
+        <button class="btn btn-sm" style="background:#0f766e;color:#fff" onclick="printReportTable('child-att-body','تقرير حضور — ${esc(c.name)}','من ${formatDate(from)} إلى ${formatDate(to)}')">📄 حفظ PDF / طباعة</button>
+        <button class="btn btn-secondary btn-sm" onclick="exportTableCSV('child-att-rpt','حضور-${esc(c.name)}')">📊 تصدير Excel</button>
+        <button class="btn btn-secondary btn-sm" onclick="App.closeModal()">إغلاق</button>
+      </div>
+    </div>
+  </div></div>`);
 }
 
 // حذف اشتراك واحد (متاح للمدير العام ومديرة الفرع — أساساً لحذف المكرر)
