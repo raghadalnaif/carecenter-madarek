@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v103 -->
+<!-- BUILD: 2026-06-24-v104 -->
 <script>
 (function(){
-  var BUILD='v103-20260624-1';
+  var BUILD='v104-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -5381,8 +5381,9 @@ hr(){
     if(empFilter!=='all') leaves=leaves.filter(l=>l.employeeId===empFilter);
     if(typeFilter!=='all') leaves=leaves.filter(l=>l.type===typeFilter);
     leaves.sort((a,b)=>b.startDate>a.startDate?1:-1);
-    const typeLabel={annual:'سنوية',sick:'مرضية',haj:'حج',maternity:'أمومة',emergency:'طارئة',unpaid:'بدون راتب',official:'إذن رسمي',permission:'⏰ استئذان'};
-    const typeColor={annual:'#059669',sick:'#ef4444',haj:'#0284c7',maternity:'#c026d3',emergency:'#f59e0b',unpaid:'#64748b',official:'#8b5cf6'};
+    const typeLabel={annual:'سنوية',sick:'مرضية',death:'🕊️ وفاة',haj:'حج',maternity:'أمومة',emergency:'طارئة',unpaid:'بدون راتب',official:'إذن رسمي',permission:'⏰ استئذان'};
+    const typeColor={annual:'#059669',sick:'#ef4444',death:'#7c3aed',haj:'#0284c7',maternity:'#c026d3',emergency:'#f59e0b',unpaid:'#64748b',official:'#8b5cf6'};
+    const degLabel={'1':'الدرجة الأولى','2':'الدرجة الثانية','3':'الدرجة الثالثة'};
     content=`
     <div>
       <div class="actions-bar">
@@ -5410,7 +5411,7 @@ hr(){
             return `<tr style="${l.status==='pending'?'background:#fffdf5':''}">
               <td><strong>${esc(emp?.name||'—')}</strong></td>
               <td style="text-align:center;font-size:12px" title="متبقٍ من أصل ${bal.accrued} تراكمي"><b style="color:${(+bal.remaining||0)<0?'#dc2626':'#059669'}">${bal.remaining}</b><span style="color:#94a3b8">/${bal.accrued}</span></td>
-              <td><span style="color:${tc};font-weight:600;font-size:12px">${typeLabel[l.type]||l.type}</span></td>
+              <td><span style="color:${tc};font-weight:600;font-size:12px">${typeLabel[l.type]||l.type}</span>${l.type==='death'?`<br><small style="color:#64748b">${degLabel[l.degree]||''}</small> ${l.paid?'<span class="badge badge-green" style="font-size:9px">مدفوع</span>':'<span class="badge badge-yellow" style="font-size:9px">غير مدفوع</span>'}`:''}</td>
               <td>${formatDate(l.startDate)}</td>
               <td>${l.type==='permission'?'—':formatDate(l.endDate)}</td>
               <td style="font-weight:700;text-align:center">${l.type==='permission'?`⏰ ${l.fromTime||''}–${l.toTime||''}`:l.days}</td>
@@ -6913,7 +6914,7 @@ const Modals = {
   },
   addHrLeave(preEmpId=''){
     const emps=DB.hrEmployees().filter(e=>e.status!=='deleted');
-    const typeLabel={annual:'سنوية (21-30 يوم/سنة)',sick:'مرضية',haj:'حج (10 أيام مدفوعة)',maternity:'أمومة (12 أسبوع)',emergency:'طارئة',unpaid:'بدون راتب',official:'إذن رسمي'};
+    const typeLabel={annual:'سنوية (21-30 يوم/سنة)',sick:'مرضية',death:'🕊️ وفاة (حسب درجة القرابة)',haj:'حج (10 أيام مدفوعة)',maternity:'أمومة (12 أسبوع)',emergency:'طارئة',unpaid:'بدون راتب',official:'إذن رسمي'};
     App.showModal(`
     <div class="modal-overlay" onclick="if(event.target===this)App.closeModal()">
     <div class="modal">
@@ -7508,12 +7509,47 @@ function hrCalcLeaveDays(){
   if(el) el.textContent=days+' يوم';
   hrShowLeaveInfo();
 }
+// درجات القرابة لإجازة الوفاة (نظام العمل السعودي م.113)
+const DEATH_DEGREES={
+  '1':{label:'الدرجة الأولى',rel:'الزوج/الزوجة · الوالدان · الأبناء · الأجداد · الأحفاد',paid:true,days:5,note:'إجازة مدفوعة بالكامل بنظام العمل السعودي (م.113): وفاة الزوج/الزوجة أو أحد الأصول أو الفروع.'},
+  '2':{label:'الدرجة الثانية',rel:'الإخوة والأخوات',paid:false,days:3,note:'غير إلزامية بنظام العمل — تخضع لسياسة المنشأة (افتراضياً تُحتسب غياباً غير مدفوع).'},
+  '3':{label:'الدرجة الثالثة',rel:'الأعمام · العمات · الأخوال · الخالات · أبناء الإخوة/الأخوات',paid:false,days:1,note:'غير إلزامية بنظام العمل — تخضع لسياسة المنشأة (افتراضياً تُحتسب غياباً غير مدفوع).'}
+};
+function hrApplyDeathDuration(){
+  const deg=document.getElementById('hl-degree')?.value||'1';
+  const d=DEATH_DEGREES[deg]; if(!d) return;
+  const s=document.getElementById('hl-start')?.value||T0;
+  const end=document.getElementById('hl-end'); if(end){end.value=addDays(s,d.days-1);}
+  hrCalcLeaveDays();
+}
 function hrShowLeaveInfo(){
   const type=document.getElementById('hl-type')?.value;
   const empId=document.getElementById('hl-emp')?.value;
   const el=document.getElementById('hl-leave-info');
   if(!el) return;
-  if(type==='sick'){
+  if(type==='death'){
+    const deg=document.getElementById('hl-degree')?.value||'1';
+    const d=DEATH_DEGREES[deg]||DEATH_DEGREES['1'];
+    el.innerHTML=`<div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;padding:14px;margin-bottom:12px;font-size:13px">
+      <div style="font-weight:800;color:#7c3aed;margin-bottom:10px">🕊️ إجازة وفاة — تحديد درجة القرابة</div>
+      <div class="input-group" style="margin-bottom:10px">
+        <label style="font-size:12px;font-weight:700;color:#6b21a8">درجة القرابة *</label>
+        <select class="input" id="hl-degree" onchange="hrShowLeaveInfo()">
+          ${Object.entries(DEATH_DEGREES).map(([k,v])=>`<option value="${k}" ${k===deg?'selected':''}>${v.label}</option>`).join('')}
+        </select>
+      </div>
+      <div style="background:#fff;border-radius:8px;padding:10px 12px;border:1px solid #e9d5ff">
+        <div style="font-size:12px;color:#475569;margin-bottom:6px">👥 تشمل: <b>${d.rel}</b></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <span style="font-weight:800;font-size:14px;padding:4px 12px;border-radius:20px;background:${d.paid?'#dcfce7':'#fef3c7'};color:${d.paid?'#166534':'#b45309'}">${d.paid?'✅ غياب مدفوع':'⚠️ غياب غير مدفوع'}</span>
+          <span style="font-size:13px;color:#475569">المدة المقترحة: <b>${d.days}</b> أيام</span>
+          <button type="button" class="btn btn-xs" style="background:#7c3aed;color:#fff" onclick="hrApplyDeathDuration()">📅 تطبيق المدة</button>
+        </div>
+        <div style="font-size:11px;color:#6b21a8;margin-top:8px;line-height:1.6">${d.note}</div>
+        ${deg==='1'?`<div style="font-size:11px;color:#92400e;margin-top:6px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 8px">ملاحظة: عند وفاة الزوج تستحق الموظفة المسلمة إجازة عدّة بأجر كامل ٤ أشهر و١٠ أيام (م.160)، وغير المسلمة ١٥ يوماً.</div>`:''}
+      </div>
+    </div>`;
+  } else if(type==='sick'){
     const yearStart=T0.slice(0,4)+'-01-01';
     const yearEnd=T0.slice(0,4)+'-12-31';
     const usedSick=empId?DB.hrLeaves().filter(l=>l.employeeId===empId&&l.type==='sick'&&l.status==='approved'&&l.startDate>=yearStart&&l.startDate<=yearEnd).reduce((a,l)=>a+(+l.days||0),0):0;
@@ -7810,7 +7846,14 @@ function saveHrLeave(){
   if(!empId||!type||!startDate||!endDate){alert('يرجى تعبئة جميع الحقول المطلوبة');return;}
   if(endDate<startDate){alert('تاريخ الانتهاء يجب أن يكون بعد تاريخ البداية');return;}
   const days=diffDays(endDate,startDate)+1;
-  DB.addHrLeave({id:uid(),employeeId:empId,type,startDate,endDate,days,reason,status,addedAt:T0,addedBy:Auth.user?.name||'—'});
+  // إجازة الوفاة: تحديد درجة القرابة وهل تُحتسب غياباً مدفوعاً
+  let extra={};
+  if(type==='death'){
+    const degree=document.getElementById('hl-degree')?.value||'1';
+    const dd=(typeof DEATH_DEGREES!=='undefined'&&DEATH_DEGREES[degree])||{paid:false};
+    extra={degree,paid:!!dd.paid};
+  }
+  DB.addHrLeave({id:uid(),employeeId:empId,type,startDate,endDate,days,reason,status,...extra,addedAt:T0,addedBy:Auth.user?.name||'—'});
   // تحديث حالة الموظف تلقائياً إن كانت إجازة موافق عليها تشمل اليوم
   if(status==='approved'&&startDate<=T0&&endDate>=T0){
     const e=DB.hrEmployees().find(x=>x.id===empId);
