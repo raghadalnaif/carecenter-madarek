@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v105 -->
+<!-- BUILD: 2026-06-24-v106 -->
 <script>
 (function(){
-  var BUILD='v105-20260624-1';
+  var BUILD='v106-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -1125,6 +1125,12 @@ const App = {
         {v:'qurrahReport',icon:'🟣',label:'أطفال قُرّة'},
         {v:'activities',icon:'🎯',label:'الأنشطة الأسبوعية'},
       ]},
+    ] : u.role==='staff' ? [
+      {items:[
+        {v:'myAttendance',icon:'🕐',label:'تسجيل حضوري'},
+        {v:'myLeaves',icon:'🏖️',label:'إجازاتي'},
+        {v:'messages',icon:'💬',label:'الرسائل الداخلية'},
+      ]},
     ] : [
       {items:[
         {v:'activities',icon:'🎯',label:'أنشطتي'},
@@ -1257,7 +1263,7 @@ const App = {
         <div class="topbar-user">
           <div style="text-align:left">
             <div style="font-size:13px;font-weight:600">${esc(Auth.user.name)}</div>
-            <div style="font-size:11px;color:#64748b">${Auth.user.role==='superadmin'?'مدير عام':Auth.user.role==='school_admin'?'مديرة فرع':'معلمة'}</div>
+            <div style="font-size:11px;color:#64748b">${Auth.user.role==='superadmin'?'مدير عام':Auth.user.role==='school_admin'?'مديرة فرع':Auth.user.role==='staff'?'موظف':'معلمة'}</div>
           </div>
           <div class="avatar">${(Auth.user.name||'م').charAt(0)}</div>
         </div>
@@ -1266,6 +1272,8 @@ const App = {
   },
   currentView(){
     const role=Auth.user?.role;
+    // دور «موظف» (حضور ذاتي فقط): لا يصل إلا لصفحاته
+    if(role==='staff'&&!['myAttendance','myLeaves','messages'].includes(App.view)) App.view='myAttendance';
     const guards={
       schools:()=>Auth.isSuperAdmin(),
       branches:()=>Auth.isSuperAdmin(),
@@ -1278,8 +1286,8 @@ const App = {
       teachers:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
       attendance:()=>role!=='teacher',
       my_reports:()=>false,
-      myAttendance:()=>role==='teacher',
-      myLeaves:()=>role==='teacher',
+      myAttendance:()=>role==='teacher'||role==='staff',
+      myLeaves:()=>role==='teacher'||role==='staff',
       activities:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin()||role==='teacher',
       sales:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       accounting:()=>Auth.isSuperAdmin(),
@@ -1292,7 +1300,7 @@ const App = {
       auditLog:()=>Auth.isSuperAdmin(),
       branchReport:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
       childNotes:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin(),
-      messages:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin()||role==='teacher',
+      messages:()=>Auth.isSchoolAdmin()||Auth.isSuperAdmin()||role==='teacher'||role==='staff',
       settings:()=>Auth.isSuperAdmin(),
       govDocs:()=>Auth.isSuperAdmin(),
       hr:()=>Auth.isSuperAdmin()||Auth.isSchoolAdmin(),
@@ -2878,7 +2886,7 @@ myLeaves(){
 // سجل حضور المعلمة الشخصي — عرض فقط
 myAttendance(){
   const me=Auth.user;
-  if(me?.role!=='teacher') return Views._forbidden();
+  if(me?.role!=='teacher'&&me?.role!=='staff') return Views._forbidden();
   const emp=Views._teacherEmployee(me);
   const month=App.params.myMonth||T0.slice(0,7);
   const monthLabel=Views._monthLabel?Views._monthLabel(month):month;
@@ -2902,6 +2910,21 @@ myAttendance(){
       <div style="font-size:20px;font-weight:800">🕐 سجل حضوري</div>
       <div style="opacity:.9;font-size:13px;margin-top:4px">${esc(emp.name)} · ${esc(emp.jobTitle||'معلمة')}</div>
     </div>
+    ${(me.role==='staff'||emp.privateEmp)?(()=>{
+      const tr=DB.hrAttendance().find(a=>a.employeeId===emp.id&&a.date===T0);
+      const statusLine=tr&&tr.checkIn&&tr.checkOut?`<span style="color:#166534;font-weight:700">✅ حضورك اليوم مكتمل — 🟢 دخول ${tr.checkIn} · 🔴 خروج ${tr.checkOut}</span>`
+        :tr&&tr.checkIn?`<span style="color:#1d4ed8;font-weight:700">🟢 مسجّل دخول من ${tr.checkIn} — اضغط «تسجيل خروج» عند الانصراف</span>`
+        :`<span style="color:#64748b">لم تسجّل حضورك اليوم بعد</span>`;
+      return `<div class="card" style="margin-bottom:16px;border:2px solid #0f766e">
+        <div style="font-weight:800;color:#0f766e;font-size:15px;margin-bottom:4px">📍 تسجيل حضوري اليوم — ${formatDate(T0)} (${dayNameAr(T0)})</div>
+        <div style="font-size:13px;margin-bottom:12px">${statusLine}</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn" style="flex:1;min-width:140px;justify-content:center;background:#10b981;color:#fff;font-size:16px;padding:14px;font-weight:800" onclick="selfCheck('in')">🟢 تسجيل دخول</button>
+          <button class="btn" style="flex:1;min-width:140px;justify-content:center;background:#ef4444;color:#fff;font-size:16px;padding:14px;font-weight:800" onclick="selfCheck('out')">🔴 تسجيل خروج</button>
+        </div>
+        <div id="self-att-msg" style="margin-top:10px"></div>
+      </div>`;
+    })():''}
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
       <input type="month" class="input" style="width:170px" value="${month}" max="${T0.slice(0,7)}" onchange="App.go('myAttendance',{myMonth:this.value})">
       <span style="font-size:15px;font-weight:700;color:#0f766e">${monthLabel}</span>
@@ -6658,7 +6681,7 @@ const Modals = {
     const bid=Auth.branchId()||e?.branchId||branches[0]?.id||'';
     const linkedUser=e?DB.users().find(u=>u.id===e.userId||u.employeeId===e.id):null;
     const suggestedU=linkedUser?.username||(e?.name?_slugFromArabic(e.name):'');
-    const accRole=linkedUser?.role||'teacher';
+    const accRole=linkedUser?.role||(e?.privateEmp?'staff':'teacher');
     const accPeriod=linkedUser?.period||'morning';
     return `
     <input type="hidden" id="hr-id" value="${e?.id||''}">
@@ -6681,6 +6704,7 @@ const Modals = {
           <div class="input-group" style="margin:0"><label>دور الحساب</label><select class="input" id="hr-acc-role" onchange="_hrToggleAcc()">
             <option value="teacher" ${accRole==='teacher'?'selected':''}>👩‍🏫 معلمة</option>
             <option value="school_admin" ${accRole==='school_admin'?'selected':''}>🏢 مدير فرع</option>
+            <option value="staff" ${accRole==='staff'?'selected':''}>🧰 موظف (تسجيل حضوره بنفسه فقط)</option>
           </select></div>
           <div class="input-group" id="hr-acc-period-wrap" style="margin:0"><label>الفترة</label><select class="input" id="hr-acc-period">
             <option value="morning" ${accPeriod==='morning'?'selected':''}>🌅 صباحي</option>
@@ -6754,9 +6778,9 @@ const Modals = {
         </div>
       </div>
       ${Auth.isSuperAdmin()?`<label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;cursor:pointer">
-        <input type="checkbox" id="hr-private" ${e?.privateEmp?'checked':''} style="width:18px;height:18px;margin-top:2px;cursor:pointer">
-        <span><span style="font-weight:800;color:#7c3aed;font-size:13px">🔒 موظف خاص — حضور يدوي بالمدير العام فقط</span>
-        <br><span style="font-size:11px;color:#6b21a8">لا يظهر في الباركود (تحضير الجوال) ولا لمديري الفروع — يُحضّر يدوياً من المدير العام فقط. مناسب لمشرفي الصيانة ونحوهم.</span></span>
+        <input type="checkbox" id="hr-private" ${e?.privateEmp?'checked':''} style="width:18px;height:18px;margin-top:2px;cursor:pointer" onchange="if(this.checked){var r=document.getElementById('hr-acc-role');if(r&&r.value!=='school_admin')r.value='staff';if(typeof _hrToggleAcc==='function')_hrToggleAcc();}">
+        <span><span style="font-weight:800;color:#7c3aed;font-size:13px">🔒 موظف خاص — مخفي عن الباركود ومديري الفروع</span>
+        <br><span style="font-size:11px;color:#6b21a8">لا يظهر في الباركود ولا لمديري الفروع. يُحضَّر يدوياً من المدير العام، أو يسجّل حضوره بنفسه بحسابه (دور الحساب: «🧰 موظف»). مناسب لمشرفي الصيانة.</span></span>
       </label>`:''}
       <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;font-size:12px;color:#1d4ed8;font-weight:600">💰 الراتب والبدلات</div>
       <div class="grid-2">
@@ -7063,7 +7087,7 @@ function toggleAct(id){
 function doLogin(){
   const user=document.getElementById('l-user')?.value?.trim();
   const pass=document.getElementById('l-pass')?.value?.trim();
-  if(Auth.login(user,pass)){App.go('dashboard')}
+  if(Auth.login(user,pass)){App.go(Auth.user?.role==='staff'?'myAttendance':'dashboard')}
   else{const e=document.getElementById('login-err');if(e)e.style.display='flex'}
 }
 
@@ -7268,6 +7292,48 @@ function _staffRecord(emp,kind,lat,lng,dist){
     _scMsg('⚠️ حُفِظ على جهازك لكن <b>تعذّرت المزامنة مع النظام</b>.<br>تأكدي من اتصال الإنترنت وأعيدي المحاولة حتى تظهر «تمت المزامنة».','err');
   });
   const pinEl=document.getElementById('sc-pin');if(pinEl)pinEl.value='';
+}
+
+// ===== تسجيل حضور ذاتي بالدخول للنظام (بدون باركود) — للموظف الخاص =====
+function selfCheck(kind){
+  const me=Auth.user;
+  const emp=Views._teacherEmployee(me);
+  const msgEl=document.getElementById('self-att-msg');
+  const show=(h,bg,bd,cl)=>{if(msgEl)msgEl.innerHTML=`<div style="background:${bg};border:1px solid ${bd};color:${cl};border-radius:10px;padding:10px 12px;font-size:13px;font-weight:700;text-align:center">${h}</div>`;};
+  if(!emp){show('⚠️ حسابك غير مربوط بملف موظف — راجع الإدارة','#fef2f2','#fecaca','#991b1b');return;}
+  const date=T0, now=_nowHM();
+  const prev=DB.hrAttendance().find(a=>a.employeeId===emp.id&&a.date===date);
+  if(kind==='in'){
+    if(prev&&prev.checkIn){
+      if(prev.checkOut) show(`ℹ️ سجّلت حضورك اليوم: 🟢 ${prev.checkIn} · 🔴 ${prev.checkOut}`,'#eff6ff','#bfdbfe','#1e40af');
+      else show(`⚠️ أنت مسجّل دخول من ${prev.checkIn}. إن أردت الانصراف اضغط «🔴 تسجيل خروج».`,'#fffbeb','#fde68a','#92400e');
+      return;
+    }
+    const wd=new Date().getDay();
+    const sch=(emp.schedule||[]).find(s=>s.day===wd);
+    const isOff=sch?!!sch.off:false;
+    const dutyStart=(sch&&!sch.off&&sch.start)?sch.start:(emp.dutyStart||'07:00');
+    const grace=+(emp.graceMinutes??15);
+    const lateBy=isOff?0:Math.max(0,_minsBetween(dutyStart,now)-grace);
+    const status=lateBy>0?'late':'present';
+    const list=DB.hrAttendance().filter(a=>!(a.employeeId===emp.id&&a.date===date));
+    list.push({id:uid(),employeeId:emp.id,date,status,checkIn:now,checkOut:prev?.checkOut||'',lateMinutes:lateBy,dutyStart:isOff?'':dutyStart,via:'self',deviceId:(typeof _clientId!=='undefined'?_clientId:'')});
+    _selfSave(list,`✅ تم تسجيل دخولك ${now}${isOff?' · اليوم إجازتك (بدون احتساب تأخير)':(lateBy>0?` · ⏰ متأخر ${lateBy} دقيقة (دوامك ${dutyStart})`:' · في الوقت 👌')}`);
+  } else {
+    if(!prev||!prev.checkIn){show('⚠️ لا يوجد تسجيل دخول اليوم — سجّل الدخول أولاً.','#fef2f2','#fecaca','#991b1b');return;}
+    if(prev.checkOut){show(`ℹ️ خروجك مسجّل مسبقاً الساعة ${prev.checkOut}`,'#eff6ff','#bfdbfe','#1e40af');return;}
+    const wm=Math.max(0,_minsBetween(prev.checkIn,now));
+    const list=DB.hrAttendance().filter(a=>!(a.employeeId===emp.id&&a.date===date));
+    list.push({...prev,checkOut:now,workedMinutes:wm});
+    _selfSave(list,`✅ تم تسجيل خروجك ${now} · ⏳ ساعات العمل ${(wm/60).toFixed(1)} ساعة`);
+  }
+}
+function _selfSave(list,okMsg){
+  const msgEl=document.getElementById('self-att-msg');
+  if(msgEl)msgEl.innerHTML='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px;text-align:center;font-weight:700;font-size:13px">⏳ جارٍ الحفظ والمزامنة... لا تغلق الصفحة</div>';
+  DB.saveHrAttendanceAwait(list).then(()=>{toast(okMsg);App.refresh();}).catch(()=>{
+    if(msgEl)msgEl.innerHTML='<div style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:10px;padding:10px;text-align:center;font-weight:700;font-size:13px">⚠️ حُفِظ محلياً لكن تعذّرت المزامنة — تأكد من الإنترنت وأعد المحاولة</div>';
+  });
 }
 
 function getSubPrices(branchId){
