@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v104 -->
+<!-- BUILD: 2026-06-24-v105 -->
 <script>
 (function(){
-  var BUILD='v104-20260624-1';
+  var BUILD='v105-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -1368,7 +1368,7 @@ staffCheckin(){
   const hashB=(location.hash.match(/[?&]b=([^&]+)/)||[])[1];
   const fromQR=!!hashB&&branches.some(x=>x.id===hashB);
   const bid=(fromQR?hashB:null)||localStorage.getItem('_sc_branch')||branches[0]?.id||'';
-  const emps=DB.hrEmployees().filter(e=>(e.status||'active')==='active'&&e.branchId===bid);
+  const emps=DB.hrEmployees().filter(e=>(e.status||'active')==='active'&&e.branchId===bid&&!e.privateEmp);
   const b=branches.find(x=>x.id===bid);
   const hasGeo=b&&b.lat&&b.lng;
   return `
@@ -1453,7 +1453,7 @@ _superDash(){
   const todayTotal=children.length;
   const attPct=todayTotal>0?Math.round((todayPresent/todayTotal)*100):0;
   const unreadMsgs=DB.unreadInternalCount(Auth.user?.id,'superadmin',null);
-  const hrAlerts=DB.hrEmployees().filter(e=>e.status!=='deleted'&&['iqamaExpiry','contractEnd','healthCertExpiry'].some(k=>e[k]&&['soon7','expired'].includes(DB.hrDocStatus(e[k])))).length;
+  const hrAlerts=DB.hrEmployees().filter(e=>e.status!=='deleted'&&(Auth.isSuperAdmin()||!e.privateEmp)&&['iqamaExpiry','contractEnd','healthCertExpiry'].some(k=>e[k]&&['soon7','expired'].includes(DB.hrDocStatus(e[k])))).length;
   return `
   <!-- لوحة اليوم السريعة -->
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px">
@@ -1767,7 +1767,7 @@ _alertBanners(al,schoolId=null){
 // تنبيهات وثائق الموظفين (إقامة / عقد / صحية) — مبني على نظام العمل السعودي
 _hrDocAlertBanner(){
   const bid=Auth.branchId();
-  let emps=DB.hrEmployees().filter(e=>(e.status||'active')==='active');
+  let emps=DB.hrEmployees().filter(e=>(e.status||'active')==='active'&&(Auth.isSuperAdmin()||!e.privateEmp));
   if(bid) emps=emps.filter(e=>e.branchId===bid);
   const fields=[{k:'iqamaExpiry',lbl:'إقامة'},{k:'contractEnd',lbl:'عقد'},{k:'healthCertExpiry',lbl:'شهادة صحية'}];
   const expired=[],urgent=[],warn=[];
@@ -5044,6 +5044,8 @@ hr(){
   ];
   let emps=DB.hrEmployees().filter(e=>e.status!=='deleted');
   if(bid) emps=emps.filter(e=>e.branchId===bid);
+  // الموظف الخاص (حضور يدوي) يظهر للمدير العام فقط، ومخفي عن مديري الفروع
+  if(!Auth.isSuperAdmin()) emps=emps.filter(e=>!e.privateEmp);
   const filterBranch=App.params.hrBranch||'all';
   if(!bid&&filterBranch!=='all') emps=emps.filter(e=>e.branchId===filterBranch);
   const statusBadge=(s)=>({active:'<span class="badge badge-green">نشط</span>',on_leave:'<span class="badge badge-yellow">إجازة</span>',resigned:'<span class="badge" style="background:#e2e8f0;color:#64748b">استقال</span>',terminated:'<span class="badge badge-red">منتهي الخدمة</span>',archived:'<span class="badge" style="background:#f1f5f9;color:#64748b">📁 مؤرشف</span>'})[s]||'';
@@ -5130,7 +5132,7 @@ hr(){
             const cdDays=e.contractEnd?diffDays(e.contractEnd,T0):'';
             const cdBadge=cdSt==='expired'?'<span style="color:#ef4444;font-size:11px">🔴 منتهي</span>':cdSt==='soon7'?`<span style="color:#ef4444;font-size:11px">🚨 ${cdDays} يوم</span>`:cdSt==='soon60'?`<span style="color:#f59e0b;font-size:11px">⏳ ${cdDays} يوم</span>`:formatDate(e.contractEnd);
             return `<tr>
-              <td><strong>${esc(e.name)}</strong><br><span style="font-size:11px;color:#64748b">${esc(e.nationality||'')}</span></td>
+              <td><strong>${esc(e.name)}</strong>${e.privateEmp?' <span class="badge" style="background:#f3e8ff;color:#7c3aed;border:1px solid #e9d5ff;font-size:9px">🔒 خاص</span>':''}<br><span style="font-size:11px;color:#64748b">${esc(e.nationality||'')}</span></td>
               <td>${esc(e.jobTitle||'—')}</td>
               <td>${esc(branches.find(b=>b.id===e.branchId)?.name.split(' - ')[0]||'—')}</td>
               <td style="font-weight:600;color:#059669">${(+e.basicSalary||0).toLocaleString()} ر.س</td>
@@ -6751,6 +6753,11 @@ const Modals = {
           <small style="font-size:11px;color:#64748b;margin-top:2px;display:block">يستخدمه الموظف عند مسح الباركود لتسجيل حضوره</small>
         </div>
       </div>
+      ${Auth.isSuperAdmin()?`<label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;cursor:pointer">
+        <input type="checkbox" id="hr-private" ${e?.privateEmp?'checked':''} style="width:18px;height:18px;margin-top:2px;cursor:pointer">
+        <span><span style="font-weight:800;color:#7c3aed;font-size:13px">🔒 موظف خاص — حضور يدوي بالمدير العام فقط</span>
+        <br><span style="font-size:11px;color:#6b21a8">لا يظهر في الباركود (تحضير الجوال) ولا لمديري الفروع — يُحضّر يدوياً من المدير العام فقط. مناسب لمشرفي الصيانة ونحوهم.</span></span>
+      </label>`:''}
       <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;font-size:12px;color:#1d4ed8;font-weight:600">💰 الراتب والبدلات</div>
       <div class="grid-2">
         <div class="input-group"><label>الراتب الأساسي (ر.س) *</label><input class="input" id="hr-basic" type="number" min="0" value="${e?.basicSalary||0}" oninput="hrCalcTotal()"></div>
@@ -6949,7 +6956,7 @@ const Modals = {
     </div></div>`);
   },
   runPayroll(month){
-    const emps=DB.hrEmployees().filter(e=>(e.status||'active')==='active'||(e.status||'active')==='on_leave');
+    const emps=DB.hrEmployees().filter(e=>((e.status||'active')==='active'||(e.status||'active')==='on_leave')&&(Auth.isSuperAdmin()||!e.privateEmp));
     const bid=Auth.branchId();
     const list=bid?emps.filter(e=>e.branchId===bid):emps;
     const existing=new Set(DB.hrPayroll().filter(p=>p.month===month).map(p=>p.employeeId));
@@ -7807,6 +7814,7 @@ function saveHrEmployee(edit=false){
     emergencyPhone:document.getElementById('hr-ep')?.value||'',
     status:document.getElementById('hr-status')?.value||'active',
     notes:document.getElementById('hr-notes')?.value||'',
+    privateEmp:document.getElementById('hr-private')?document.getElementById('hr-private').checked:(edit?(DB.hrEmployees().find(e=>e.id===id)?.privateEmp||false):false),
     addedAt:edit?(DB.hrEmployees().find(e=>e.id===id)?.addedAt||T0):T0,
     userId:edit?(DB.hrEmployees().find(e=>e.id===id)?.userId||null):null,
   };
@@ -7884,7 +7892,7 @@ function undoHrAtt(){
 function clearHrAttDay(date){
   if(!Auth.isSuperAdmin()){toast('حذف/مسح الحضور صلاحية المدير العام فقط','error');return;}
   const bid=Auth.branchId();
-  const emps=DB.hrEmployees().filter(e=>e.status!=='deleted'&&(!bid||e.branchId===bid));
+  const emps=DB.hrEmployees().filter(e=>e.status!=='deleted'&&(!bid||e.branchId===bid)&&(Auth.isSuperAdmin()||!e.privateEmp));
   const ids=new Set(emps.map(e=>e.id));
   const affected=DB.hrAttendance().filter(a=>a.date===date&&ids.has(a.employeeId));
   if(!affected.length){toast('لا يوجد حضور مسجّل لهذا اليوم','warn');return;}
@@ -7905,7 +7913,7 @@ function setHrAtt(empId,date,status){
 }
 function markAllHrPresent(date){
   const bid=Auth.branchId();
-  let emps=DB.hrEmployees().filter(e=>(e.status||'active')==='active'||(e.status||'active')==='on_leave');
+  let emps=DB.hrEmployees().filter(e=>((e.status||'active')==='active'||(e.status||'active')==='on_leave')&&(Auth.isSuperAdmin()||!e.privateEmp));
   if(bid) emps=emps.filter(e=>e.branchId===bid);
   if(!confirm(`تسجيل ${emps.length} موظف كحاضرين ليوم ${formatDate(date)}؟\nيمكنك التراجع بزر «تراجع» إن كان بالخطأ.`)) return;
   _snapHrAtt('تسجيل الكل حاضر '+formatDate(date));
@@ -7969,7 +7977,7 @@ function _readSchedule(){
 }
 function genAllPins(){
   const bid=Auth.branchId();
-  const emps=DB.hrEmployees().filter(e=>e.status!=='deleted'&&(!bid||e.branchId===bid));
+  const emps=DB.hrEmployees().filter(e=>e.status!=='deleted'&&(!bid||e.branchId===bid)&&!e.privateEmp);
   const missing=emps.filter(e=>!e.pin);
   if(!missing.length){toast('كل الموظفين لديهم رموز بالفعل ✅','warn');return;}
   if(!confirm(`توليد رمز سري عشوائي (4 أرقام) لـ ${missing.length} موظف بدون رمز؟\nالموظفون الذين لديهم رمز لن يتغيّروا.`)) return;
@@ -7985,7 +7993,7 @@ function genAllPins(){
 // إنشاء حساب دخول تلقائي لكل موظف بلا حساب (اسم مستخدم مولّد + كلمة مرور 123456)
 function genAllAccounts(){
   const bid=Auth.branchId();
-  const emps=DB.hrEmployees().filter(e=>e.status!=='deleted'&&(!bid||e.branchId===bid));
+  const emps=DB.hrEmployees().filter(e=>e.status!=='deleted'&&(!bid||e.branchId===bid)&&(Auth.isSuperAdmin()||!e.privateEmp));
   const missing=emps.filter(e=>!DB.users().find(u=>u.id===e.userId||u.employeeId===e.id));
   if(!missing.length){toast('كل الموظفين لديهم حسابات دخول ✅','warn');return;}
   if(!confirm(`إنشاء حساب دخول لـ ${missing.length} موظف بدون حساب؟\nالدور: معلمة · كلمة المرور: 123456 (يمكن تعديلها لاحقاً)`)) return;
@@ -8144,7 +8152,7 @@ function _empPeriod(e){
 // طباعة حضور الموظفين ليوم معيّن — مجمّعاً صباحي/مسائي
 function printHrAttendance(date,branchFilter){
   const bid=Auth.branchId();
-  let emps=DB.hrEmployees().filter(e=>(e.status||'active')==='active'||(e.status||'active')==='on_leave');
+  let emps=DB.hrEmployees().filter(e=>((e.status||'active')==='active'||(e.status||'active')==='on_leave')&&(Auth.isSuperAdmin()||!e.privateEmp));
   if(bid) emps=emps.filter(e=>e.branchId===bid);
   else if(branchFilter&&branchFilter!=='all') emps=emps.filter(e=>e.branchId===branchFilter);
   // احترام اختيار الموظفات في التقرير (إن وُجد)
