@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v107 -->
+<!-- BUILD: 2026-06-24-v108 -->
 <script>
 (function(){
-  var BUILD='v107-20260624-1';
+  var BUILD='v108-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -537,6 +537,37 @@ async function _backendBulk(obj){
 function _backendPut(k,serialized){
   return fetch(API_BASE+'/data/'+encodeURIComponent(k),{method:'PUT',headers:_apiHeaders(),body:serialized});
 }
+// مفتاح تمييز سجل الحضور (موظف|يوم أو طفل|يوم)
+function _attKeyOf(a){
+  if(!a) return 'r'+Math.random();
+  if(a.employeeId&&a.date) return a.employeeId+'|'+a.date;
+  if(a.childId&&a.date) return a.childId+'|'+a.date;
+  return a.id||('r'+Math.random());
+}
+// كتابة حضور آمنة: تجلب أحدث نسخة من الخادم وتدمج التغيير فيها قبل الحفظ،
+// فلا تُفقد سجلات أيام/موظفين آخرين إذا كانت نسخة الجهاز قديمة أو ناقصة.
+// (للعمليات الإضافية فقط: تحضير/تسجيل حضور — لا تُستخدم للحذف)
+async function _putAttMerged(k,localArr){
+  let serverArr=null;
+  try{
+    const fresh=await _backendGetAll();
+    let sv=fresh?fresh[k]:null;
+    if(typeof sv==='string'){try{sv=JSON.parse(sv);}catch{sv=null;}}
+    if(Array.isArray(sv)) serverArr=sv;
+  }catch(e){ serverArr=null; }
+  const map=new Map();
+  if(Array.isArray(serverArr)) serverArr.forEach(a=>{if(a)map.set(_attKeyOf(a),a);});
+  (localArr||[]).forEach(a=>{if(a)map.set(_attKeyOf(a),a);}); // المحلي يفوز لمفاتيحه (أحدث)
+  const merged=Array.from(map.values());
+  let s=null;try{s=JSON.stringify(merged);}catch{}
+  if(s===null) throw new Error('serialize');
+  _mem[k]=merged;
+  try{localStorage.setItem('ccs_'+k,s);}catch{}
+  try{_backupData(k,merged);}catch{}
+  const r=await _backendPut(k,s);
+  if(!r.ok) throw new Error('http '+r.status);
+  return merged;
+}
 function _openSSE(){
   try{
     if(_sse){try{_sse.close();}catch{}}
@@ -781,11 +812,22 @@ const DB = {
   updateHrLeave(l){const a=this.hrLeaves();const i=a.findIndex(x=>x.id===l.id);if(i>=0)a[i]=l;else a.push(l);this.save('hr_leaves',a)},
   deleteHrLeave(id){this.save('hr_leaves',this.hrLeaves().filter(x=>x.id!==id))},
   hrAttendance(){return this.get('hr_attendance')||[]},
-  saveHrAttendance(list){
+  saveHrAttendance(list,opts){
     // منع التكرار: سجل واحد لكل موظف/يوم (نُبقي الأحدث)
     const seen=new Map();
     (list||[]).forEach(a=>{if(!a)return;const k=(a.employeeId&&a.date)?a.employeeId+'|'+a.date:(a.id||Math.random());seen.set(k,a);});
-    this.save('hr_attendance',Array.from(seen.values()));
+    const arr=Array.from(seen.values());
+    // عملية إضافية (تحضير/تعديل حالة) + خادم: تحديث محلي فوري ثم دمج آمن مع الخادم
+    // (يمنع فقدان أيام/موظفين آخرين عند قِدم نسخة الجهاز). الحذف يبقى استبدالاً مباشراً.
+    if(opts&&opts.additive&&_storageMode==='backend'){
+      _mem['hr_attendance']=arr;
+      let s=null;try{s=JSON.stringify(arr);}catch{}
+      try{if(s!==null)localStorage.setItem('ccs_hr_attendance',s);}catch{}
+      try{_backupData('hr_attendance',arr);}catch{}
+      if(s!==null) _putAttMerged('hr_attendance',arr).then(()=>{try{_scheduleRender&&_scheduleRender();}catch{}}).catch(()=>{if(typeof toast==='function')toast('⚠️ تعذّر حفظ الحضور — تحقق من الاتصال','error');});
+      return;
+    }
+    this.save('hr_attendance',arr);
   },
   // حفظ الحضور مع تأكيد وصوله للخادم (للتحضير الذاتي — يرجّع Promise)
   saveHrAttendanceAwait(list){
@@ -797,7 +839,8 @@ const DB = {
     try{if(s!==null)localStorage.setItem('ccs_hr_attendance',s);}catch{}
     try{_backupData('hr_attendance',arr);}catch{}
     if(_storageMode==='backend'&&s!==null){
-      return _backendPut('hr_attendance',s).then(r=>{if(!r.ok)throw new Error('http '+r.status);return true;});
+      // دمج آمن مع أحدث نسخة من الخادم قبل الكتابة (يمنع فقدان أيام/موظفين آخرين)
+      return _putAttMerged('hr_attendance',arr).then(()=>true);
     }
     if(_fdb&&_fbStatus==='ok'){
       _pendingEcho['hr_attendance']=s;_ensureKeyListener('hr_attendance');setTimeout(()=>{delete _pendingEcho['hr_attendance'];},60000);
@@ -879,11 +922,20 @@ const DB = {
       return false;
     }).length;
   },
-  saveAttendance(list){
+  saveAttendance(list,opts){
     // منع التكرار: سجل حضور واحد لكل طفل/يوم (نُبقي الأحدث)
     const seen=new Map();
     (list||[]).forEach(a=>{if(!a)return;const k=(a.childId&&a.date)?a.childId+'|'+a.date:(a.id||Math.random());seen.set(k,a);});
-    this.save('attendance',Array.from(seen.values()));
+    const arr=Array.from(seen.values());
+    if(opts&&opts.additive&&_storageMode==='backend'){
+      _mem['attendance']=arr;
+      let s=null;try{s=JSON.stringify(arr);}catch{}
+      try{if(s!==null)localStorage.setItem('ccs_attendance',s);}catch{}
+      try{_backupData('attendance',arr);}catch{}
+      if(s!==null) _putAttMerged('attendance',arr).then(()=>{try{_scheduleRender&&_scheduleRender();}catch{}}).catch(()=>{if(typeof toast==='function')toast('⚠️ تعذّر حفظ التحضير — تحقق من الاتصال','error');});
+      return;
+    }
+    this.save('attendance',arr);
   },
   notifications(){return this.get('notifications')||[]},
   addNotification(n){
@@ -7691,7 +7743,7 @@ function setHrLateMin(empId,date,minutes){
   const idx=list.findIndex(a=>a.employeeId===empId&&a.date===date);
   if(idx>=0) list[idx]={...list[idx],lateMinutes:mins};
   else list.push({id:uid(),employeeId:empId,date,status:'late',lateMinutes:mins});
-  DB.saveHrAttendance(list);
+  DB.saveHrAttendance(list,{additive:true});
 }
 function printHrEmployee(id){
   const e=DB.hrEmployees().find(x=>x.id===id);
@@ -7984,7 +8036,7 @@ function setHrAtt(empId,date,status){
   const list=DB.hrAttendance().filter(a=>!(a.employeeId===empId&&a.date===date));
   const keep=(status==='absent'||status==='leave')?{}:{checkIn:prev.checkIn||'',checkOut:prev.checkOut||'',via:prev.via,checkInDist:prev.checkInDist};
   list.push({id:uid(),employeeId:empId,date,status,lateMinutes:prev.lateMinutes||0,...keep});
-  DB.saveHrAttendance(list);App.refresh();
+  DB.saveHrAttendance(list,{additive:true});App.refresh();
 }
 function markAllHrPresent(date){
   const bid=Auth.branchId();
@@ -7996,7 +8048,7 @@ function markAllHrPresent(date){
   const prevMap={};DB.hrAttendance().forEach(a=>{if(a.date===date&&empIds.has(a.employeeId))prevMap[a.employeeId]=a;});
   const existing=DB.hrAttendance().filter(a=>a.date!==date||!empIds.has(a.employeeId));
   emps.forEach(e=>{const p=prevMap[e.id]||{};existing.push({id:uid(),employeeId:e.id,date,status:p.status==='late'?'late':'present',checkIn:p.checkIn||'',checkOut:p.checkOut||'',lateMinutes:p.lateMinutes||0,via:p.via,checkInDist:p.checkInDist});});
-  DB.saveHrAttendance(existing);toast('✅ تم تسجيل الجميع حاضرين — اضغط «تراجع» للتراجع');App.refresh();
+  DB.saveHrAttendance(existing,{additive:true});toast('✅ تم تسجيل الجميع حاضرين — اضغط «تراجع» للتراجع');App.refresh();
 }
 function deleteHrEmployee(id){
   const e=DB.hrEmployees().find(x=>x.id===id);
@@ -9775,7 +9827,7 @@ function saveAttendance(date,schoolId){
     else{att.push({id:uid(),...entry});idxByKey.set(key,att.length-1);childrenWithAtt.add(entry.childId);}
     if(!hadPrev&&entry.status==='present'&&Auth.user) firstAttIds.push(entry.childId);
   });
-  DB.saveAttendance(att);
+  DB.saveAttendance(att,{additive:true});
   // إشعارات «أول حضور» تُحفظ دفعة واحدة (بدل حفظ كامل للإشعارات لكل طفل)
   if(firstAttIds.length&&Auth.user){
     const kidsById=new Map(DB.children().map(c=>[c.id,c]));
