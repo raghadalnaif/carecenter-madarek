@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v106 -->
+<!-- BUILD: 2026-06-24-v107 -->
 <script>
 (function(){
-  var BUILD='v106-20260624-1';
+  var BUILD='v107-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -6778,10 +6778,15 @@ const Modals = {
         </div>
       </div>
       ${Auth.isSuperAdmin()?`<label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;cursor:pointer">
-        <input type="checkbox" id="hr-private" ${e?.privateEmp?'checked':''} style="width:18px;height:18px;margin-top:2px;cursor:pointer" onchange="if(this.checked){var r=document.getElementById('hr-acc-role');if(r&&r.value!=='school_admin')r.value='staff';if(typeof _hrToggleAcc==='function')_hrToggleAcc();}">
+        <input type="checkbox" id="hr-private" ${e?.privateEmp?'checked':''} style="width:18px;height:18px;margin-top:2px;cursor:pointer" onchange="if(this.checked){var r=document.getElementById('hr-acc-role');if(r&&r.value!=='school_admin')r.value='staff';var f=document.getElementById('hr-flex');if(f)f.checked=true;if(typeof _hrToggleAcc==='function')_hrToggleAcc();}">
         <span><span style="font-weight:800;color:#7c3aed;font-size:13px">🔒 موظف خاص — مخفي عن الباركود ومديري الفروع</span>
         <br><span style="font-size:11px;color:#6b21a8">لا يظهر في الباركود ولا لمديري الفروع. يُحضَّر يدوياً من المدير العام، أو يسجّل حضوره بنفسه بحسابه (دور الحساب: «🧰 موظف»). مناسب لمشرفي الصيانة.</span></span>
       </label>`:''}
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;cursor:pointer">
+        <input type="checkbox" id="hr-flex" ${(e?.flexibleHours!==undefined?e.flexibleHours:e?.privateEmp)?'checked':''} style="width:18px;height:18px;margin-top:2px;cursor:pointer">
+        <span><span style="font-weight:800;color:#0f766e;font-size:13px">⏱️ دوام مرن — لا يُحتسب تأخير</span>
+        <br><span style="font-size:11px;color:#0f766e">يُسجَّل حضوره دائماً «حاضر» بغضّ النظر عن وقت الدخول (مناسب لمن دوامهم مرن كمشرفي الصيانة).</span></span>
+      </label>
       <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;font-size:12px;color:#1d4ed8;font-weight:600">💰 الراتب والبدلات</div>
       <div class="grid-2">
         <div class="input-group"><label>الراتب الأساسي (ر.س) *</label><input class="input" id="hr-basic" type="number" min="0" value="${e?.basicSalary||0}" oninput="hrCalcTotal()"></div>
@@ -7273,10 +7278,11 @@ function _staffRecord(emp,kind,lat,lng,dist){
     const isOff=sch?!!sch.off:false;
     const dutyStart=(sch&&!sch.off&&sch.start)?sch.start:(emp.dutyStart||'07:00');
     const grace=+(emp.graceMinutes??15);
-    const lateBy=isOff?0:Math.max(0,_minsBetween(dutyStart,now)-grace);
+    const flex=(emp.flexibleHours!==undefined)?emp.flexibleHours:!!emp.privateEmp;
+    const lateBy=(flex||isOff)?0:Math.max(0,_minsBetween(dutyStart,now)-grace);
     const status=lateBy>0?'late':'present';
-    list.push({id:uid(),employeeId:emp.id,date,status,checkIn:now,checkOut:prev?.checkOut||'',lateMinutes:lateBy,dutyStart:isOff?'':dutyStart,via:'qr-gps',checkInLat:lat,checkInLng:lng,checkInDist:dist,deviceId:_clientId,deviceIp:devIp});
-    okMsg=`✅ تم تسجيل دخولك يا ${esc(emp.name)}<br>🕐 ${now} · 📍 داخل الفرع (${dist}م)${isOff?'<br>🏖️ اليوم إجازتك — سُجّل حضورك بدون احتساب تأخير':(lateBy>0?`<br>⏰ متأخر ${lateBy} دقيقة (دوامك ${dutyStart})`:' · في الوقت 👌')}`;
+    list.push({id:uid(),employeeId:emp.id,date,status,checkIn:now,checkOut:prev?.checkOut||'',lateMinutes:lateBy,dutyStart:(flex||isOff)?'':dutyStart,flexible:flex||undefined,via:'qr-gps',checkInLat:lat,checkInLng:lng,checkInDist:dist,deviceId:_clientId,deviceIp:devIp});
+    okMsg=`✅ تم تسجيل دخولك يا ${esc(emp.name)}<br>🕐 ${now} · 📍 داخل الفرع (${dist}م)${flex?'<br>⏱️ دوام مرن — بدون احتساب تأخير':isOff?'<br>🏖️ اليوم إجازتك — سُجّل حضورك بدون احتساب تأخير':(lateBy>0?`<br>⏰ متأخر ${lateBy} دقيقة (دوامك ${dutyStart})`:' · في الوقت 👌')}`;
   } else {
     const wm=prev?.checkIn?Math.max(0,_minsBetween(prev.checkIn,now)):0;
     if(prev) list.push({...prev,checkOut:now,workedMinutes:wm,checkOutLat:lat,checkOutLng:lng,deviceId:prev.deviceId||_clientId,deviceIp:prev.deviceIp||devIp});
@@ -7314,11 +7320,13 @@ function selfCheck(kind){
     const isOff=sch?!!sch.off:false;
     const dutyStart=(sch&&!sch.off&&sch.start)?sch.start:(emp.dutyStart||'07:00');
     const grace=+(emp.graceMinutes??15);
-    const lateBy=isOff?0:Math.max(0,_minsBetween(dutyStart,now)-grace);
+    // دوام مرن: لا يُحتسب تأخير (افتراضياً مفعّل للموظف الخاص)
+    const flex=(emp.flexibleHours!==undefined)?emp.flexibleHours:!!emp.privateEmp;
+    const lateBy=(flex||isOff)?0:Math.max(0,_minsBetween(dutyStart,now)-grace);
     const status=lateBy>0?'late':'present';
     const list=DB.hrAttendance().filter(a=>!(a.employeeId===emp.id&&a.date===date));
-    list.push({id:uid(),employeeId:emp.id,date,status,checkIn:now,checkOut:prev?.checkOut||'',lateMinutes:lateBy,dutyStart:isOff?'':dutyStart,via:'self',deviceId:(typeof _clientId!=='undefined'?_clientId:'')});
-    _selfSave(list,`✅ تم تسجيل دخولك ${now}${isOff?' · اليوم إجازتك (بدون احتساب تأخير)':(lateBy>0?` · ⏰ متأخر ${lateBy} دقيقة (دوامك ${dutyStart})`:' · في الوقت 👌')}`);
+    list.push({id:uid(),employeeId:emp.id,date,status,checkIn:now,checkOut:prev?.checkOut||'',lateMinutes:lateBy,dutyStart:(flex||isOff)?'':dutyStart,flexible:flex||undefined,via:'self',deviceId:(typeof _clientId!=='undefined'?_clientId:'')});
+    _selfSave(list,`✅ تم تسجيل دخولك ${now}${flex?' · ⏱️ دوام مرن (بدون احتساب تأخير)':isOff?' · اليوم إجازتك (بدون احتساب تأخير)':(lateBy>0?` · ⏰ متأخر ${lateBy} دقيقة (دوامك ${dutyStart})`:' · في الوقت 👌')}`);
   } else {
     if(!prev||!prev.checkIn){show('⚠️ لا يوجد تسجيل دخول اليوم — سجّل الدخول أولاً.','#fef2f2','#fecaca','#991b1b');return;}
     if(prev.checkOut){show(`ℹ️ خروجك مسجّل مسبقاً الساعة ${prev.checkOut}`,'#eff6ff','#bfdbfe','#1e40af');return;}
@@ -7881,6 +7889,7 @@ function saveHrEmployee(edit=false){
     status:document.getElementById('hr-status')?.value||'active',
     notes:document.getElementById('hr-notes')?.value||'',
     privateEmp:document.getElementById('hr-private')?document.getElementById('hr-private').checked:(edit?(DB.hrEmployees().find(e=>e.id===id)?.privateEmp||false):false),
+    flexibleHours:document.getElementById('hr-flex')?document.getElementById('hr-flex').checked:(edit?(DB.hrEmployees().find(e=>e.id===id)?.flexibleHours||false):false),
     addedAt:edit?(DB.hrEmployees().find(e=>e.id===id)?.addedAt||T0):T0,
     userId:edit?(DB.hrEmployees().find(e=>e.id===id)?.userId||null):null,
   };
