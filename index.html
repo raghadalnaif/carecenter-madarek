@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v108 -->
+<!-- BUILD: 2026-06-24-v109 -->
 <script>
 (function(){
-  var BUILD='v108-20260624-1';
+  var BUILD='v109-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -561,12 +561,23 @@ async function _putAttMerged(k,localArr){
   const merged=Array.from(map.values());
   let s=null;try{s=JSON.stringify(merged);}catch{}
   if(s===null) throw new Error('serialize');
+  // حفظ محلي + نسخة احتياطية فوراً (لا يُفقد شيء حتى لو تأخّرت المزامنة)
   _mem[k]=merged;
   try{localStorage.setItem('ccs_'+k,s);}catch{}
   try{_backupData(k,merged);}catch{}
-  const r=await _backendPut(k,s);
-  if(!r.ok) throw new Error('http '+r.status);
-  return merged;
+  // كتابة للخادم مع إعادة محاولة (مثل بقية الحفظ) — لا نرفض إلا بعد فشل متكرر،
+  // فلا يظهر «تحقق من الاتصال» عند تعثّر لحظي عابر بالشبكة (شائع بالجوال)
+  let lastErr=null;
+  for(let n=1;n<=4;n++){
+    try{
+      const r=await _backendPut(k,s);
+      if(r&&r.ok){_writeFails[k]=0;return merged;}
+      lastErr=new Error('http '+(r&&r.status));
+    }catch(e){ lastErr=e; }
+    if(n<4) await new Promise(res=>setTimeout(res,700*n));
+  }
+  _writeFails[k]=(_writeFails[k]||0)+1;
+  throw lastErr||new Error('put-failed');
 }
 function _openSSE(){
   try{
@@ -824,7 +835,7 @@ const DB = {
       let s=null;try{s=JSON.stringify(arr);}catch{}
       try{if(s!==null)localStorage.setItem('ccs_hr_attendance',s);}catch{}
       try{_backupData('hr_attendance',arr);}catch{}
-      if(s!==null) _putAttMerged('hr_attendance',arr).then(()=>{try{_scheduleRender&&_scheduleRender();}catch{}}).catch(()=>{if(typeof toast==='function')toast('⚠️ تعذّر حفظ الحضور — تحقق من الاتصال','error');});
+      if(s!==null) _putAttMerged('hr_attendance',arr).then(()=>{try{_scheduleRender&&_scheduleRender();}catch{}}).catch(()=>{if(typeof toast==='function')toast('⚠️ حُفظ الحضور محلياً — تعذّرت المزامنة، أعيدي الحفظ عند عودة الاتصال','warn');});
       return;
     }
     this.save('hr_attendance',arr);
@@ -932,7 +943,7 @@ const DB = {
       let s=null;try{s=JSON.stringify(arr);}catch{}
       try{if(s!==null)localStorage.setItem('ccs_attendance',s);}catch{}
       try{_backupData('attendance',arr);}catch{}
-      if(s!==null) _putAttMerged('attendance',arr).then(()=>{try{_scheduleRender&&_scheduleRender();}catch{}}).catch(()=>{if(typeof toast==='function')toast('⚠️ تعذّر حفظ التحضير — تحقق من الاتصال','error');});
+      if(s!==null) _putAttMerged('attendance',arr).then(()=>{try{_scheduleRender&&_scheduleRender();}catch{}}).catch(()=>{if(typeof toast==='function')toast('⚠️ حُفظ التحضير محلياً — تعذّرت المزامنة، أعيدي الحفظ عند عودة الاتصال','warn');});
       return;
     }
     this.save('attendance',arr);
