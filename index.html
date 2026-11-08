@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v109 -->
+<!-- BUILD: 2026-06-24-v110 -->
 <script>
 (function(){
-  var BUILD='v109-20260624-1';
+  var BUILD='v110-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -405,6 +405,17 @@ function _onKeyValue(k,val){
     const cur=Array.isArray(_mem[k])?_mem[k]:[];
     if(cur.length>0){console.warn('[sync] تم تجاهل مزامنة فارغة لـ'+k+' لحماية '+cur.length+' سجل');return;}
   }
+  // دمج آمن للحضور عند الاستقبال: نأخذ نسخة الخادم ونُبقي السجلات المحلية التي
+  // لم تصل الخادم بعد (حماية من فقدان أيام/موظفين آخرين دون إبطاء الحفظ)
+  if((k==='attendance'||k==='hr_attendance')&&Array.isArray(val)){
+    const cur=Array.isArray(_mem[k])?_mem[k]:[];
+    if(cur.length){
+      const keyOf=(a)=>(a&&a.employeeId&&a.date)?a.employeeId+'|'+a.date:(a&&a.childId&&a.date)?a.childId+'|'+a.date:(a&&a.id)||('r'+Math.random());
+      const inKeys=new Set(val.map(keyOf));
+      const localOnly=cur.filter(a=>a&&!inKeys.has(keyOf(a)));
+      if(localOnly.length){ val=val.concat(localOnly); try{incoming=JSON.stringify(val);}catch{} }
+    }
+  }
   _mem[k]=val;
   try{localStorage.setItem('ccs_'+k,incoming);}catch{}
   _backupData(k,val); // نسخ احتياطي للحضور القادم من المزامنة أيضاً
@@ -543,41 +554,6 @@ function _attKeyOf(a){
   if(a.employeeId&&a.date) return a.employeeId+'|'+a.date;
   if(a.childId&&a.date) return a.childId+'|'+a.date;
   return a.id||('r'+Math.random());
-}
-// كتابة حضور آمنة: تجلب أحدث نسخة من الخادم وتدمج التغيير فيها قبل الحفظ،
-// فلا تُفقد سجلات أيام/موظفين آخرين إذا كانت نسخة الجهاز قديمة أو ناقصة.
-// (للعمليات الإضافية فقط: تحضير/تسجيل حضور — لا تُستخدم للحذف)
-async function _putAttMerged(k,localArr){
-  let serverArr=null;
-  try{
-    const fresh=await _backendGetAll();
-    let sv=fresh?fresh[k]:null;
-    if(typeof sv==='string'){try{sv=JSON.parse(sv);}catch{sv=null;}}
-    if(Array.isArray(sv)) serverArr=sv;
-  }catch(e){ serverArr=null; }
-  const map=new Map();
-  if(Array.isArray(serverArr)) serverArr.forEach(a=>{if(a)map.set(_attKeyOf(a),a);});
-  (localArr||[]).forEach(a=>{if(a)map.set(_attKeyOf(a),a);}); // المحلي يفوز لمفاتيحه (أحدث)
-  const merged=Array.from(map.values());
-  let s=null;try{s=JSON.stringify(merged);}catch{}
-  if(s===null) throw new Error('serialize');
-  // حفظ محلي + نسخة احتياطية فوراً (لا يُفقد شيء حتى لو تأخّرت المزامنة)
-  _mem[k]=merged;
-  try{localStorage.setItem('ccs_'+k,s);}catch{}
-  try{_backupData(k,merged);}catch{}
-  // كتابة للخادم مع إعادة محاولة (مثل بقية الحفظ) — لا نرفض إلا بعد فشل متكرر،
-  // فلا يظهر «تحقق من الاتصال» عند تعثّر لحظي عابر بالشبكة (شائع بالجوال)
-  let lastErr=null;
-  for(let n=1;n<=4;n++){
-    try{
-      const r=await _backendPut(k,s);
-      if(r&&r.ok){_writeFails[k]=0;return merged;}
-      lastErr=new Error('http '+(r&&r.status));
-    }catch(e){ lastErr=e; }
-    if(n<4) await new Promise(res=>setTimeout(res,700*n));
-  }
-  _writeFails[k]=(_writeFails[k]||0)+1;
-  throw lastErr||new Error('put-failed');
 }
 function _openSSE(){
   try{
@@ -827,18 +803,9 @@ const DB = {
     // منع التكرار: سجل واحد لكل موظف/يوم (نُبقي الأحدث)
     const seen=new Map();
     (list||[]).forEach(a=>{if(!a)return;const k=(a.employeeId&&a.date)?a.employeeId+'|'+a.date:(a.id||Math.random());seen.set(k,a);});
-    const arr=Array.from(seen.values());
-    // عملية إضافية (تحضير/تعديل حالة) + خادم: تحديث محلي فوري ثم دمج آمن مع الخادم
-    // (يمنع فقدان أيام/موظفين آخرين عند قِدم نسخة الجهاز). الحذف يبقى استبدالاً مباشراً.
-    if(opts&&opts.additive&&_storageMode==='backend'){
-      _mem['hr_attendance']=arr;
-      let s=null;try{s=JSON.stringify(arr);}catch{}
-      try{if(s!==null)localStorage.setItem('ccs_hr_attendance',s);}catch{}
-      try{_backupData('hr_attendance',arr);}catch{}
-      if(s!==null) _putAttMerged('hr_attendance',arr).then(()=>{try{_scheduleRender&&_scheduleRender();}catch{}}).catch(()=>{if(typeof toast==='function')toast('⚠️ حُفظ الحضور محلياً — تعذّرت المزامنة، أعيدي الحفظ عند عودة الاتصال','warn');});
-      return;
-    }
-    this.save('hr_attendance',arr);
+    // حفظ مباشر موثوق (مع إعادة المحاولة المدمجة في save). حماية الفقدان تتم عند
+    // استقبال المزامنة (دمج) لا عند الكتابة، فلا يتأخّر الحفظ.
+    this.save('hr_attendance',Array.from(seen.values()));
   },
   // حفظ الحضور مع تأكيد وصوله للخادم (للتحضير الذاتي — يرجّع Promise)
   saveHrAttendanceAwait(list){
@@ -850,8 +817,9 @@ const DB = {
     try{if(s!==null)localStorage.setItem('ccs_hr_attendance',s);}catch{}
     try{_backupData('hr_attendance',arr);}catch{}
     if(_storageMode==='backend'&&s!==null){
-      // دمج آمن مع أحدث نسخة من الخادم قبل الكتابة (يمنع فقدان أيام/موظفين آخرين)
-      return _putAttMerged('hr_attendance',arr).then(()=>true);
+      // كتابة مباشرة مع إعادة محاولة (حتى 4 مرات) — لا بطء ولا تنزيل لكامل البيانات
+      const tryPut=(n)=>_backendPut('hr_attendance',s).then(r=>{if(r&&r.ok)return true;throw new Error('http '+(r&&r.status));}).catch(e=>{if(n<4)return new Promise(res=>setTimeout(res,700*n)).then(()=>tryPut(n+1));throw e;});
+      return tryPut(1);
     }
     if(_fdb&&_fbStatus==='ok'){
       _pendingEcho['hr_attendance']=s;_ensureKeyListener('hr_attendance');setTimeout(()=>{delete _pendingEcho['hr_attendance'];},60000);
@@ -937,16 +905,9 @@ const DB = {
     // منع التكرار: سجل حضور واحد لكل طفل/يوم (نُبقي الأحدث)
     const seen=new Map();
     (list||[]).forEach(a=>{if(!a)return;const k=(a.childId&&a.date)?a.childId+'|'+a.date:(a.id||Math.random());seen.set(k,a);});
-    const arr=Array.from(seen.values());
-    if(opts&&opts.additive&&_storageMode==='backend'){
-      _mem['attendance']=arr;
-      let s=null;try{s=JSON.stringify(arr);}catch{}
-      try{if(s!==null)localStorage.setItem('ccs_attendance',s);}catch{}
-      try{_backupData('attendance',arr);}catch{}
-      if(s!==null) _putAttMerged('attendance',arr).then(()=>{try{_scheduleRender&&_scheduleRender();}catch{}}).catch(()=>{if(typeof toast==='function')toast('⚠️ حُفظ التحضير محلياً — تعذّرت المزامنة، أعيدي الحفظ عند عودة الاتصال','warn');});
-      return;
-    }
-    this.save('attendance',arr);
+    // حفظ مباشر موثوق (مع إعادة المحاولة المدمجة). حماية الفقدان تتم عند استقبال
+    // المزامنة (دمج) لا عند الكتابة، فلا يتأخّر حفظ التحضير.
+    this.save('attendance',Array.from(seen.values()));
   },
   notifications(){return this.get('notifications')||[]},
   addNotification(n){
