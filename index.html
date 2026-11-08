@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v110 -->
+<!-- BUILD: 2026-06-24-v111 -->
 <script>
 (function(){
-  var BUILD='v110-20260624-1';
+  var BUILD='v111-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -512,12 +512,22 @@ function _scheduleRender(){
     _refreshNotifBadge(); // شارة الجرس تتحدّث دائماً ولو كنا في الإعدادات أو نافذة مفتوحة
     _refreshMsgNav();     // نقطة الرسائل في القائمة الجانبية تتحدّث فوراً
     if(App.modal||App.view==='settings') return;
+    // لا نعيد رسم صفحة تحضير الأطفال أثناء وجود علامات غير محفوظة (قيد التحضير)
+    // حتى لا يضيع عمل المستخدمة ولا تقفز الصفحة للأعلى عند وصول مزامنة
+    try{
+      if(App.view==='attendance'){
+        const d=(App.params&&App.params.date)||T0;
+        if(pendingAtt&&pendingAtt[d]&&Object.keys(pendingAtt[d]).length) return;
+      }
+    }catch(e){}
     const el=document.getElementById('content');
     if(!el) return;
     const saved={};
     el.querySelectorAll('input[id],select[id]').forEach(inp=>{saved[inp.id]=inp.value;});
+    const sy=window.scrollY||window.pageYOffset||0; // حفظ موضع التمرير حتى لا تقفز الصفحة
     el.innerHTML=App.currentView();
     Object.entries(saved).forEach(([id,val])=>{const f=document.getElementById(id);if(f&&val!==undefined)f.value=val;});
+    try{if(sy)window.scrollTo(0,sy);}catch(e){}
   });
 }
 
@@ -2322,6 +2332,8 @@ attendance(){
   const todayAtt=attList.filter(a=>a.date===date&&(sid?a.schoolId===sid:true));
   const attMap={};
   todayAtt.forEach(a=>{attMap[a.childId]=a});
+  // دمج العلامات غير المحفوظة (قيد التحضير) فوق المحفوظة — فلا تضيع عند أي إعادة رسم
+  try{ const pend=pendingAtt&&pendingAtt[date]; if(pend) Object.keys(pend).forEach(cid=>{attMap[cid]={...(attMap[cid]||{}),...pend[cid]};}); }catch(e){}
   const isToday=date===T0;
 
   const renderCard=(c)=>{
