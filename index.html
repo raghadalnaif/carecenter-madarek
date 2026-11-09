@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>مدارك الطفل — نظام الإدارة</title>
-<!-- BUILD: 2026-06-24-v111 -->
+<!-- BUILD: 2026-06-24-v112 -->
 <script>
 (function(){
-  var BUILD='v111-20260624-1';
+  var BUILD='v112-20260624-1';
   var key='_madarak_build';
   var stored=localStorage.getItem(key);
   // إذا الإصدار اللي بالـURL لا يطابق BUILD، نُعيد التحميل بـURL جديد
@@ -918,6 +918,25 @@ const DB = {
     // حفظ مباشر موثوق (مع إعادة المحاولة المدمجة). حماية الفقدان تتم عند استقبال
     // المزامنة (دمج) لا عند الكتابة، فلا يتأخّر حفظ التحضير.
     this.save('attendance',Array.from(seen.values()));
+  },
+  // حفظ تحضير الأطفال مع تأكيد وصوله للخادم (يرجّع Promise) — لا نُظهر «تم» إلا بعد التأكيد
+  saveAttendanceAwait(list){
+    const seen=new Map();
+    (list||[]).forEach(a=>{if(!a)return;const k=(a.childId&&a.date)?a.childId+'|'+a.date:(a.id||Math.random());seen.set(k,a);});
+    const arr=Array.from(seen.values());
+    _mem['attendance']=arr;
+    let s=null;try{s=JSON.stringify(arr);}catch{}
+    try{if(s!==null)localStorage.setItem('ccs_attendance',s);}catch{}
+    try{_backupData('attendance',arr);}catch{}
+    if(_storageMode==='backend'&&s!==null){
+      const tryPut=(n)=>_backendPut('attendance',s).then(r=>{if(r&&r.ok)return true;throw new Error('HTTP '+(r&&r.status));}).catch(e=>{if(n<4)return new Promise(res=>setTimeout(res,700*n)).then(()=>tryPut(n+1));throw e;});
+      return tryPut(1);
+    }
+    if(_fdb&&_fbStatus==='ok'){
+      _pendingEcho['attendance']=s;_ensureKeyListener('attendance');setTimeout(()=>{delete _pendingEcho['attendance'];},60000);
+      return _fdb.ref('ccs/attendance').set(arr).then(()=>true);
+    }
+    return Promise.reject(new Error('no-backend'));
   },
   notifications(){return this.get('notifications')||[]},
   addNotification(n){
@@ -9811,15 +9830,24 @@ function saveAttendance(date,schoolId){
     else{att.push({id:uid(),...entry});idxByKey.set(key,att.length-1);childrenWithAtt.add(entry.childId);}
     if(!hadPrev&&entry.status==='present'&&Auth.user) firstAttIds.push(entry.childId);
   });
-  DB.saveAttendance(att,{additive:true});
-  // إشعارات «أول حضور» تُحفظ دفعة واحدة (بدل حفظ كامل للإشعارات لكل طفل)
-  if(firstAttIds.length&&Auth.user){
-    const kidsById=new Map(DB.children().map(c=>[c.id,c]));
-    const notifs=firstAttIds.map(cid=>kidsById.get(cid)).filter(Boolean).map(child=>({type:'first_att',title:'🌟 أول حضور',body:`${child.name} حضر لأول مرة`,branchId:child.branchId,period:child.period,addedBy:Auth.user.name,addedById:Auth.user.id}));
-    DB.addNotificationsBatch(notifs);
-  }
-  delete pendingAtt[date]; // امسح الذاكرة المعلّقة
-  toast('✅ تم حفظ الحضور بنجاح');
+  // الحفظ مع تأكيد وصوله للخادم — لا نمسح العلامات ولا نقول «تم» إلا بعد التأكيد.
+  // هكذا لو فشلت الكتابة على الخادم تبقى العلامات ظاهرة ويُعلم المستخدم بوضوح،
+  // فلا يرجع ويجد التحضير لم يُحفظ.
+  toast('⏳ جارٍ حفظ الحضور ومزامنته... لا تغلقي الصفحة');
+  DB.saveAttendanceAwait(att).then(()=>{
+    if(firstAttIds.length&&Auth.user){
+      const kidsById=new Map(DB.children().map(c=>[c.id,c]));
+      const notifs=firstAttIds.map(cid=>kidsById.get(cid)).filter(Boolean).map(child=>({type:'first_att',title:'🌟 أول حضور',body:`${child.name} حضر لأول مرة`,branchId:child.branchId,period:child.period,addedBy:Auth.user.name,addedById:Auth.user.id}));
+      DB.addNotificationsBatch(notifs);
+    }
+    delete pendingAtt[date]; // امسح الذاكرة المعلّقة بعد تأكيد الحفظ فقط
+    toast('✅ تم حفظ الحضور ومزامنته مع النظام');
+    if(App.view==='attendance') App.refresh();
+  }).catch(err=>{
+    // لا نمسح pendingAtt — العلامات تبقى ظاهرة ويمكن إعادة الحفظ
+    const m=(err&&err.message)||'خطأ';
+    toast('⚠️ لم يُحفظ على الخادم ('+m+'). العلامات محفوظة مؤقتاً على جهازك — تأكدي من الاتصال وأعيدي الحفظ.','error');
+  });
 }
 
 // تعليم جميع الأطفال المعروضين كحاضرين (الحضور الجماعي)
